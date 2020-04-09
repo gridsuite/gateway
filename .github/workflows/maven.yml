@@ -1,0 +1,36 @@
+name: CI
+
+on: [push]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Set up JDK 11
+        uses: actions/setup-java@v1
+        with:
+          java-version: 11
+
+      - name: Checkout sources
+        uses: actions/checkout@v1
+
+      - name: Build with Maven
+        run: mvn --batch-mode -P jacoco,perform-integration-test install
+
+      - name: Build Docker image
+        if: github.ref == 'refs/heads/master'
+        run: >
+          mvn --batch-mode jib:build
+          -Djib.httpTimeout=60000
+          -Djib.to.image=docker.io/gridsuite/gateway
+          -Djib.to.auth.username=gridsuiteci
+          -Djib.to.auth.password=${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Broadcast update event
+        if: github.ref == 'refs/heads/master'
+        uses: gridsuite/broadcast-event@master
+        with:
+          token: ${{ secrets.REPO_ACCESS_TOKEN }}
+          event-type: study_server_updated
