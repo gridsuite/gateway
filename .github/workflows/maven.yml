@@ -29,8 +29,8 @@ jobs:
           -Djib.to.auth.password=${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Broadcast update event
-          if: github.ref == 'refs/heads/master'
-          uses: gridsuite/broadcast-event@master
-          with:
-            token: ${{ secrets.REPO_ACCESS_TOKEN }}
-            event-type: gateway_updated
+        if: github.ref == 'refs/heads/master'
+        uses: gridsuite/broadcast-event@master
+        with:
+          token: ${{ secrets.REPO_ACCESS_TOKEN }}
+          event-type: gateway_updated
