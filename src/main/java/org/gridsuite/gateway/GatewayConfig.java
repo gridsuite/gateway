@@ -18,6 +18,7 @@ import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
 import org.springframework.cloud.netflix.hystrix.EnableHystrix;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.PropertySource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
@@ -35,12 +36,13 @@ import com.nimbusds.openid.connect.sdk.validators.*;
  */
 @EnableHystrix
 @Configuration
+@PropertySource(value = {"classpath:idp.properties"})
 public class GatewayConfig {
     private static final Logger LOGGER = LoggerFactory.getLogger(GatewayConfig.class);
 
     @Value("${backing-services.case.base-uri:http://case-server/}") String caseServerBaseUri;
     @Value("${backing-services.study-server.base-uri:http://study-server/}") String studyServerBaseUri;
-    @Value("${jwk-url}")  String jwkUri;
+    @Value("${jwks-url}")  String jwksUri;
     @Value("${client-id}")  String clientID;
 
     public String getClientID() {
@@ -66,9 +68,9 @@ public class GatewayConfig {
                 JWSAlgorithm jwsAlg = JWSAlgorithm.RS256;
                 URL jwkSetURL = null;
                 try {
-                    jwkSetURL = new URL(jwkUri);
+                    jwkSetURL = new URL(jwksUri);
                 } catch (MalformedURLException e) {
-                    e.printStackTrace();
+                    throw new GatewayException("MalformedURLException : " + e.getMessage());
                 }
 
                 // Create validator for signed ID tokens
