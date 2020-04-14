@@ -18,6 +18,7 @@
     </module>
 
     <module name="Translation"/>
+    <module name="SuppressionCommentFilter"/>
 
     <module name="TreeWalker">
         <module name="AbbreviationAsWordInName"/>
@@ -41,8 +42,11 @@
         <module name="LeftCurly"/>
         <module name="LocalFinalVariableName"/>
         <module name="LocalVariableName"/>
+        <!--
         <module name="MemberName"/>
         <module name="MethodName"/>
+        <module name="ParameterName"/>
+        -->
         <module name="MethodParamPad"/>
         <module name="ModifierOrder"/>
         <module name="MultipleVariableDeclarations"/>
@@ -52,7 +56,6 @@
         <module name="NoWhitespaceBefore"/>
         <module name="OuterTypeFilename"/>
         <module name="ParameterAssignment"/>
-        <module name="ParameterName"/>
         <module name="ParenPad"/>
         <module name="RedundantImport"/>
         <module name="RightCurly"/>

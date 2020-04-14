@@ -15,10 +15,8 @@ import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
-import org.springframework.cloud.netflix.hystrix.EnableHystrix;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.PropertySource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
@@ -34,19 +32,17 @@ import com.nimbusds.openid.connect.sdk.validators.*;
 /**
  * @author Chamseddine Benhamed <chamseddine.benhamed at rte-france.com>
  */
-@EnableHystrix
 @Configuration
-@PropertySource(value = {"classpath:idp.properties"})
 public class GatewayConfig {
     private static final Logger LOGGER = LoggerFactory.getLogger(GatewayConfig.class);
 
+    final GatewayService gatewayService;
+
     @Value("${backing-services.case.base-uri:http://case-server/}") String caseServerBaseUri;
     @Value("${backing-services.study-server.base-uri:http://study-server/}") String studyServerBaseUri;
-    @Value("${jwks-url}")  String jwksUri;
-    @Value("${client-id}")  String clientID;
 
-    public String getClientID() {
-        return clientID;
+    public GatewayConfig(GatewayService gatewayService) {
+        this.gatewayService = gatewayService;
     }
 
     @Component
@@ -64,11 +60,12 @@ public class GatewayConfig {
                 JWT idToken = JWTParser.parse(token);
                 // The required parameters
                 Issuer iss = new Issuer(jwt.getIssuer());
-                ClientID clientID = new ClientID(getClientID());
-                JWSAlgorithm jwsAlg = JWSAlgorithm.RS256;
+                ClientID clientID = new ClientID(jwt.getAudience().get(0));
+
+                JWSAlgorithm jwsAlg = JWSAlgorithm.parse(jwt.getAlgorithm());
                 URL jwkSetURL = null;
                 try {
-                    jwkSetURL = new URL(jwksUri);
+                    jwkSetURL = new URL(gatewayService.getJwksUrl(jwt.getIssuer()));
                 } catch (MalformedURLException e) {
                     throw new GatewayException("MalformedURLException : " + e.getMessage());
                 }
@@ -81,7 +78,7 @@ public class GatewayConfig {
                 LOGGER.debug("The token is valid");
             } catch (Exception e) {
                 LOGGER.debug("The token cannot be trusted");
-                throw new IllegalArgumentException("The token cannot be trusted" + e.getMessage());
+                throw new IllegalArgumentException("The token cannot be trusted : " + e.getMessage());
             }
             return chain.filter(exchange);
         }
@@ -97,8 +94,7 @@ public class GatewayConfig {
             )
             .route(p -> p
                     .path("/case/**")
-                    .filters(f -> f.hystrix(config -> config.setName("study").setFallbackUri("forward:/caseFallback"))
-                            .rewritePath("/case/(.*)", "/$1"))
+                    .filters(f -> f.rewritePath("/case/(.*)", "/$1"))
                     .uri(caseServerBaseUri)
             )
             .build();
