@@ -44,7 +44,6 @@ public class GatewayConfig {
 
     public GatewayConfig(GatewayService gatewayService, UriConfiguration uriConfiguration) {
         this.gatewayService = gatewayService;
-        System.out.println(uriConfiguration);
         this.ignoreTokenValidation = uriConfiguration.getIgnoreTokenValidation();
     }
 
