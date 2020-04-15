@@ -11,6 +11,8 @@ import com.nimbusds.openid.connect.sdk.claims.IDTokenClaimsSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.cloud.gateway.route.RouteLocator;
@@ -33,22 +35,26 @@ import com.nimbusds.openid.connect.sdk.validators.*;
  * @author Chamseddine Benhamed <chamseddine.benhamed at rte-france.com>
  */
 @Configuration
+@EnableConfigurationProperties(UriConfiguration.class)
 public class GatewayConfig {
     private static final Logger LOGGER = LoggerFactory.getLogger(GatewayConfig.class);
 
-    final GatewayService gatewayService;
+    private final GatewayService gatewayService;
+    private boolean ignoreTokenValidation = false;
 
-    @Value("${backing-services.case.base-uri:http://case-server/}") String caseServerBaseUri;
-    @Value("${backing-services.study-server.base-uri:http://study-server/}") String studyServerBaseUri;
-
-    public GatewayConfig(GatewayService gatewayService) {
+    public GatewayConfig(GatewayService gatewayService, UriConfiguration uriConfiguration) {
         this.gatewayService = gatewayService;
+        System.out.println(uriConfiguration);
+        this.ignoreTokenValidation = uriConfiguration.getIgnoreTokenValidation();
     }
 
     @Component
     public class TokenValidatorGlobalPreFilter implements GlobalFilter {
         @Override
         public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
+            if (ignoreTokenValidation) {
+                return chain.filter(exchange);
+            }
             LOGGER.debug("checking authorization");
             List<String> ls = exchange.getRequest().getHeaders().get("Authorization");
             assert ls != null;
@@ -85,18 +91,49 @@ public class GatewayConfig {
     }
 
     @Bean
-    public RouteLocator myRoutes(RouteLocatorBuilder builder) {
+    public RouteLocator myRoutes(RouteLocatorBuilder builder, UriConfiguration uriConfiguration) {
         return builder.routes()
             .route(p -> p
                     .path("/study/**")
                     .filters(f -> f.rewritePath("/study/(.*)", "/$1"))
-                    .uri(studyServerBaseUri)
+                    .uri(uriConfiguration.getStudyServerBaseUri())
             )
             .route(p -> p
                     .path("/case/**")
                     .filters(f -> f.rewritePath("/case/(.*)", "/$1"))
-                    .uri(caseServerBaseUri)
+                    .uri(uriConfiguration.getCaseServerBaseUri())
             )
             .build();
+    }
+}
+
+@ConfigurationProperties
+class UriConfiguration {
+    @Value("${backing-services.case.base-uri:http://case-server/}") String caseServerBaseUri;
+    @Value("${backing-services.study-server.base-uri:http://study-server/}") String studyServerBaseUri;
+    boolean ignoreTokenValidation = false;
+
+    public String getCaseServerBaseUri() {
+        return caseServerBaseUri;
+    }
+
+    public void setCaseServerBaseUri(String caseServerBaseUri) {
+        this.caseServerBaseUri = caseServerBaseUri;
+    }
+
+    public String getStudyServerBaseUri() {
+        return studyServerBaseUri;
+    }
+
+    public void setStudyServerBaseUri(String studyServerBaseUri) {
+        this.studyServerBaseUri = studyServerBaseUri;
+    }
+
+    public boolean getIgnoreTokenValidation() {
+        return ignoreTokenValidation;
+    }
+
+    public void setIgnoreTokenValidation(Boolean ignoreTokenValidation) {
+        this.ignoreTokenValidation = ignoreTokenValidation;
     }
 }
