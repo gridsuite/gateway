@@ -40,7 +40,10 @@ public class GatewayConfig {
     private static final Logger LOGGER = LoggerFactory.getLogger(GatewayConfig.class);
 
     private final GatewayService gatewayService;
-    private boolean ignoreTokenValidation = false;
+    private boolean ignoreTokenValidation;
+
+    @Value("${allowed-issuers}")
+    private List<String> allowedIssuers;
 
     public GatewayConfig(GatewayService gatewayService, UriConfiguration uriConfiguration) {
         this.gatewayService = gatewayService;
@@ -56,14 +59,20 @@ public class GatewayConfig {
             }
             LOGGER.debug("checking authorization");
             List<String> ls = exchange.getRequest().getHeaders().get("Authorization");
-            assert ls != null;
+            if (ls == null) {
+                throw new GatewayException("Authorization header is required");
+            }
+
+            LOGGER.debug("checking issuer");
             String authorization = ls.get(0);
             String token = authorization.split(" ")[1];
             DecodedJWT jwt = com.auth0.jwt.JWT.decode(token);
+            if (!allowedIssuers.contains(jwt.getIssuer())) {
+                throw new GatewayException(jwt.getIssuer() + " Issuer is not in the issuers white list");
+            }
 
             try {
                 JWT idToken = JWTParser.parse(token);
-                // The required parameters
                 Issuer iss = new Issuer(jwt.getIssuer());
                 ClientID clientID = new ClientID(jwt.getAudience().get(0));
 
@@ -80,10 +89,10 @@ public class GatewayConfig {
 
                 IDTokenClaimsSet claims  = validator.validate(idToken, null);
                 // we can safely trust the JWT
-                LOGGER.debug("The token is valid");
+                LOGGER.debug("Token verified, it can be trusted");
             } catch (Exception e) {
                 LOGGER.debug("The token cannot be trusted");
-                throw new IllegalArgumentException("The token cannot be trusted : " + e.getMessage());
+                throw new GatewayException("The token cannot be trusted : " + e.getMessage());
             }
             return chain.filter(exchange);
         }

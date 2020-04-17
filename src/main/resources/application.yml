@@ -6,3 +6,5 @@ backing-services:
     base-uri: http://localhost:5000
   study-server:
     base-uri: http://localhost:5001
+
+allowed-issuers: #, #
