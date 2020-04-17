@@ -24,25 +24,32 @@ public class GatewayTest {
         stubFor(get(urlEqualTo("/v1/studies"))
                 .willReturn(aResponse()
                         .withHeader("Content-Type", "application/json")
-                        .withBody("{\"studyName\": \"CgmesStudy\", \"caseFormat\" :\"CGMES\"}")));
+                        .withBody("[{\"studyName\": \"CgmesStudy\", \"caseFormat\" :\"CGMES\"}, {\"studyName\": \"IIDMStudy\", \"caseFormat\" :\"IIDM\"}]")));
 
         stubFor(get(urlEqualTo("/v1/cases"))
                 .willReturn(aResponse()
                         .withHeader("Content-Type", "application/json")
-                        .withBody("{\"name\": \"testCase\", \"format\" :\"XIIDM\"}")));
+                        .withBody("[{\"name\": \"testCase\", \"format\" :\"XIIDM\"}, {\"name\": \"testCase2\", \"format\" :\"CGMES\"}]")));
 
         webClient
                 .get().uri("case/v1/cases")
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
-                .jsonPath("$.name").isEqualTo("testCase");
+                .jsonPath("$[0].name").isEqualTo("testCase")
+                .jsonPath("$[1].name").isEqualTo("testCase2")
+                .jsonPath("$[0].format").isEqualTo("XIIDM")
+                .jsonPath("$[1].format").isEqualTo("CGMES");
 
         webClient
                 .get().uri("study/v1/studies")
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
-                .jsonPath("$.caseFormat").isEqualTo("CGMES");
+                //.consumeWith()
+                .jsonPath("$[0].caseFormat").isEqualTo("CGMES")
+                .jsonPath("$[1].caseFormat").isEqualTo("IIDM")
+                .jsonPath("$[0].studyName").isEqualTo("CgmesStudy")
+                .jsonPath("$[1].studyName").isEqualTo("IIDMStudy");
     }
 }
