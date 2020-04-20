@@ -24,6 +24,8 @@ import reactor.core.publisher.Mono;
 import java.util.List;
 
 import java.net.*;
+import java.util.stream.Collectors;
+
 import com.nimbusds.jose.*;
 import com.nimbusds.jwt.*;
 import com.nimbusds.oauth2.sdk.id.*;
@@ -75,7 +77,7 @@ public class GatewayConfig {
                 throw new GatewayException("Invalid plain JOSE object encoding");
             }
 
-            if (!allowedIssuers.contains(jwtClaimsSet.getIssuer())) {
+            if (allowedIssuers.stream().noneMatch(iss -> iss.startsWith(jwtClaimsSet.getIssuer()))) {
                 throw new GatewayException(jwtClaimsSet.getIssuer() + " Issuer is not in the issuers white list");
             }
 
