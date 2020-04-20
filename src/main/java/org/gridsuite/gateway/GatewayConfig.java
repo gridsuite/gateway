@@ -6,8 +6,6 @@
  */
 package org.gridsuite.gateway;
 
-import com.auth0.jwt.interfaces.DecodedJWT;
-import com.nimbusds.openid.connect.sdk.claims.IDTokenClaimsSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -26,10 +24,13 @@ import reactor.core.publisher.Mono;
 import java.util.List;
 
 import java.net.*;
+
 import com.nimbusds.jose.*;
 import com.nimbusds.jwt.*;
 import com.nimbusds.oauth2.sdk.id.*;
 import com.nimbusds.openid.connect.sdk.validators.*;
+import com.nimbusds.openid.connect.sdk.claims.IDTokenClaimsSet;
+import com.auth0.jwt.interfaces.DecodedJWT;
 
 /**
  * @author Chamseddine Benhamed <chamseddine.benhamed at rte-france.com>

@@ -20,7 +20,7 @@ public class GatewayTest {
     WebTestClient webClient;
 
     @Test
-    public void contextLoads() throws Exception {
+    public void gatewayTest() throws Exception {
         stubFor(get(urlEqualTo("/v1/studies"))
                 .willReturn(aResponse()
                         .withHeader("Content-Type", "application/json")
