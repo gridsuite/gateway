@@ -89,12 +89,6 @@
 	<dependencies>
 		<!-- Compilation dependencies -->
 		<dependency>
-			<groupId>com.auth0</groupId>
-			<artifactId>java-jwt</artifactId>
-			<version>3.10.0</version>
-		</dependency>
-
-		<dependency>
 			<groupId>com.nimbusds</groupId>
 			<artifactId>nimbus-jose-jwt</artifactId>
 			<version>8.14</version>

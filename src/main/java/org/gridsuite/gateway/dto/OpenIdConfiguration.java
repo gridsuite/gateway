@@ -1,15 +1,20 @@
 package org.gridsuite.gateway.dto;
 
-public class OpenIdConfiguration {
-    @SuppressWarnings({"membername"})
-    String jwks_uri;
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonGetter;
+import com.fasterxml.jackson.annotation.JsonSetter;
 
-    @SuppressWarnings("methodname")
-    public String getJwks_uri() {
-        return jwks_uri;
+public class OpenIdConfiguration {
+    @JsonAlias("jwks_uri")
+    String jwksUri;
+
+    @JsonGetter("jwksUri")
+    public String getJwksUri() {
+        return jwksUri;
     }
 
-    public void setJwks_uri(String jwks_uri) {
-        this.jwks_uri = jwks_uri;
+    @JsonSetter("jwksUri")
+    public void setJwksUri(String jwksUri) {
+        this.jwksUri = jwksUri;
     }
 }

@@ -32,6 +32,6 @@ public class GatewayService {
                 HttpEntity.EMPTY,
                 OpenIdConfiguration.class);
 
-        return Objects.requireNonNull(responseEntity.getBody()).getJwks_uri();
+        return Objects.requireNonNull(responseEntity.getBody()).getJwksUri();
     }
 }

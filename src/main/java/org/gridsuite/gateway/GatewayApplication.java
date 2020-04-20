@@ -12,6 +12,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 /**
  * @author Chamseddine Benhamed <chamseddine.benhamed at rte-france.com>
  */
+@SuppressWarnings("checkstyle:HideUtilityClassConstructor")
 @SpringBootApplication
 public class GatewayApplication {
     public static void main(String[] args) {

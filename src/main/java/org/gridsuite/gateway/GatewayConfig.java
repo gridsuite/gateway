@@ -24,13 +24,11 @@ import reactor.core.publisher.Mono;
 import java.util.List;
 
 import java.net.*;
-
 import com.nimbusds.jose.*;
 import com.nimbusds.jwt.*;
 import com.nimbusds.oauth2.sdk.id.*;
 import com.nimbusds.openid.connect.sdk.validators.*;
 import com.nimbusds.openid.connect.sdk.claims.IDTokenClaimsSet;
-import com.auth0.jwt.interfaces.DecodedJWT;
 
 /**
  * @author Chamseddine Benhamed <chamseddine.benhamed at rte-france.com>
@@ -67,20 +65,29 @@ public class GatewayConfig {
             LOGGER.debug("checking issuer");
             String authorization = ls.get(0);
             String token = authorization.split(" ")[1];
-            DecodedJWT jwt = com.auth0.jwt.JWT.decode(token);
-            if (!allowedIssuers.contains(jwt.getIssuer())) {
-                throw new GatewayException(jwt.getIssuer() + " Issuer is not in the issuers white list");
+            JWT jwt;
+            JWTClaimsSet jwtClaimsSet;
+            try {
+                jwt = JWTParser.parse(token);
+                jwtClaimsSet = jwt.getJWTClaimsSet();
+            } catch (java.text.ParseException e) {
+                // Invalid plain JOSE object encoding
+                throw new GatewayException("Invalid plain JOSE object encoding");
+            }
+
+            if (!allowedIssuers.contains(jwtClaimsSet.getIssuer())) {
+                throw new GatewayException(jwtClaimsSet.getIssuer() + " Issuer is not in the issuers white list");
             }
 
             try {
                 JWT idToken = JWTParser.parse(token);
-                Issuer iss = new Issuer(jwt.getIssuer());
-                ClientID clientID = new ClientID(jwt.getAudience().get(0));
+                Issuer iss = new Issuer(jwt.getJWTClaimsSet().getIssuer());
+                ClientID clientID = new ClientID(jwt.getJWTClaimsSet().getAudience().get(0));
 
-                JWSAlgorithm jwsAlg = JWSAlgorithm.parse(jwt.getAlgorithm());
+                JWSAlgorithm jwsAlg = JWSAlgorithm.parse(jwt.getHeader().getAlgorithm().getName());
                 URL jwkSetURL = null;
                 try {
-                    jwkSetURL = new URL(gatewayService.getJwksUrl(jwt.getIssuer()));
+                    jwkSetURL = new URL(gatewayService.getJwksUrl(jwt.getJWTClaimsSet().getIssuer()));
                 } catch (MalformedURLException e) {
                     throw new GatewayException("MalformedURLException : " + e.getMessage());
                 }
