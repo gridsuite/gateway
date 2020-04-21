@@ -17,6 +17,7 @@ import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
@@ -40,23 +41,19 @@ public class GatewayConfig {
     private static final Logger LOGGER = LoggerFactory.getLogger(GatewayConfig.class);
 
     private final GatewayService gatewayService;
-    private boolean ignoreTokenValidation;
 
     @Value("${allowed-issuers}")
     private List<String> allowedIssuers;
 
-    public GatewayConfig(GatewayService gatewayService, UriConfiguration uriConfiguration) {
+    public GatewayConfig(GatewayService gatewayService) {
         this.gatewayService = gatewayService;
-        this.ignoreTokenValidation = uriConfiguration.getIgnoreTokenValidation();
     }
 
     @Component
+    @Profile({ "production" })
     public class TokenValidatorGlobalPreFilter implements GlobalFilter {
         @Override
         public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
-            if (ignoreTokenValidation) {
-                return chain.filter(exchange);
-            }
             LOGGER.debug("checking authorization");
             List<String> ls = exchange.getRequest().getHeaders().get("Authorization");
             if (ls == null) {
@@ -128,7 +125,6 @@ public class GatewayConfig {
 class UriConfiguration {
     @Value("${backing-services.case.base-uri:http://case-server/}") String caseServerBaseUri;
     @Value("${backing-services.study-server.base-uri:http://study-server/}") String studyServerBaseUri;
-    boolean ignoreTokenValidation = false;
 
     public String getCaseServerBaseUri() {
         return caseServerBaseUri;
@@ -144,13 +140,5 @@ class UriConfiguration {
 
     public void setStudyServerBaseUri(String studyServerBaseUri) {
         this.studyServerBaseUri = studyServerBaseUri;
-    }
-
-    public boolean getIgnoreTokenValidation() {
-        return ignoreTokenValidation;
-    }
-
-    public void setIgnoreTokenValidation(Boolean ignoreTokenValidation) {
-        this.ignoreTokenValidation = ignoreTokenValidation;
     }
 }
