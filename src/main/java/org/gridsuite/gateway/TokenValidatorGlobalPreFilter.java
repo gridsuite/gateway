@@ -67,7 +67,7 @@ public class TokenValidatorGlobalPreFilter implements GlobalFilter {
             throw new GatewayException("Invalid plain JOSE object encoding");
         }
 
-        if (allowedIssuers.stream().noneMatch(iss -> iss.startsWith(jwtClaimsSet.getIssuer()))) {
+        if (allowedIssuers.stream().noneMatch(iss -> jwtClaimsSet.getIssuer().startsWith(iss))) {
             throw new GatewayException(jwtClaimsSet.getIssuer() + " Issuer is not in the issuers white list");
         }
 

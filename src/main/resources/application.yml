@@ -7,4 +7,4 @@ backing-services:
   study-server:
     base-uri: http://localhost:5001
 
-allowed-issuers: "http://localhost:9091/auth/realms/chmits"
+allowed-issuers: "#, #"
