@@ -6,7 +6,7 @@
  */
 package org.gridsuite.gateway;
 
-import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
 
@@ -14,7 +14,7 @@ import org.springframework.context.annotation.FilterType;
  * @author Chamseddine Benhamed <chamseddine.benhamed at rte-france.com>
  */
 @SuppressWarnings("checkstyle:HideUtilityClassConstructor")
-@SpringBootApplication
+@EnableAutoConfiguration
 @ComponentScan(excludeFilters = { @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, value = { TokenValidatorGlobalPreFilter.class }),
         @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, value = { GatewayApplication.class })})
 public class GatewayTestApplication {
