@@ -133,7 +133,6 @@ public class TokenValidationTest {
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
-                //.consumeWith()
                 .jsonPath("$[0].caseFormat").isEqualTo("CGMES")
                 .jsonPath("$[1].caseFormat").isEqualTo("IIDM")
                 .jsonPath("$[0].studyName").isEqualTo("CgmesStudy")
