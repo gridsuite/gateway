@@ -31,6 +31,10 @@ public class TokenValidationTest {
 
     private String token;
 
+    private String expiredToken;
+
+    private String tokenWithNotAllowedissuer;
+
     private RSAKey rsaKey;
 
     @Autowired
@@ -58,14 +62,36 @@ public class TokenValidationTest {
                 .expirationTime(new Date(new Date().getTime() + 60 * 1000))
                 .build();
 
-        SignedJWT signedJWT = new SignedJWT(
-                new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(rsaJWK.getKeyID()).build(),
-                claimsSet);
+        // Prepare JWT with claims set
+        JWTClaimsSet claimsSetForExpiredToken = new JWTClaimsSet.Builder()
+                .subject("chmits")
+                .audience("test.app")
+                .issuer("http://localhost:" + port)
+                .issueTime(new Date())
+                .expirationTime(new Date(new Date().getTime() - 1000 * 60 * 60))
+                .build();
+
+        // Prepare JWT with claims set
+        JWTClaimsSet claimsSetForTokenWithIssuerNotAllowed = new JWTClaimsSet.Builder()
+                .subject("chmits")
+                .audience("test.app")
+                .issuer("http://notAllowedissuer")
+                .issueTime(new Date())
+                .expirationTime(new Date(new Date().getTime() - 1000 * 60 * 60))
+                .build();
+
+        SignedJWT signedJWT = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(rsaJWK.getKeyID()).build(), claimsSet);
+        SignedJWT signedJWTExpired = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(rsaJWK.getKeyID()).build(), claimsSetForExpiredToken);
+        SignedJWT signedJWTWithIssuerNotAllowed = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(rsaJWK.getKeyID()).build(), claimsSetForTokenWithIssuerNotAllowed);
 
         // Compute the RSA signature
         signedJWT.sign(signer);
+        signedJWTExpired.sign(signer);
+        signedJWTWithIssuerNotAllowed.sign(signer);
 
         token = signedJWT.serialize();
+        expiredToken = signedJWTExpired.serialize();
+        tokenWithNotAllowedissuer = signedJWTWithIssuerNotAllowed.serialize();
     }
 
     @Test
@@ -101,5 +127,71 @@ public class TokenValidationTest {
                 .jsonPath("$[0].format").isEqualTo("XIIDM")
                 .jsonPath("$[1].format").isEqualTo("CGMES");
 
+        webClient
+                .get().uri("study/v1/studies")
+                .header("Authorization", "Bearer " + token)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                //.consumeWith()
+                .jsonPath("$[0].caseFormat").isEqualTo("CGMES")
+                .jsonPath("$[1].caseFormat").isEqualTo("IIDM")
+                .jsonPath("$[0].studyName").isEqualTo("CgmesStudy")
+                .jsonPath("$[1].studyName").isEqualTo("IIDMStudy");
+
+    }
+
+    @Test
+    public void invalidToken() throws Exception {
+
+        stubFor(get(urlEqualTo("/v1/cases"))
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("[{\"name\": \"testCase\", \"format\" :\"XIIDM\"}, {\"name\": \"testCase2\", \"format\" :\"CGMES\"}]")));
+
+        stubFor(get(urlEqualTo("/.well-known/openid-configuration"))
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("{\"jwks_uri\": \"http://localhost:" + port + "/jwks\"}")));
+
+        stubFor(get(urlEqualTo("/jwks"))
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("{\"keys\" : [ " + rsaKey.toJSONString() + " ] }")));
+
+        webClient
+                .get().uri("case/v1/cases")
+                .header("Authorization", "Bearer " + expiredToken)
+                .exchange()
+                .expectStatus().isEqualTo(500)
+                .expectBody()
+                .jsonPath("$.message").isEqualTo("The token cannot be trusted : Expired JWT");
+
+        webClient
+                .get().uri("case/v1/cases")
+                .header("Authorization", "Bearer " + tokenWithNotAllowedissuer)
+                .exchange()
+                .expectStatus().isEqualTo(500)
+                .expectBody()
+                .jsonPath("$.message").isEqualTo("http://notAllowedissuer Issuer is not in the issuers white list");
+
+        String tokenWithFakeAlgorithm = token.replaceFirst("U", "Q");
+        String tokenWithFakeAudience = token.replaceFirst("X", "L");
+
+        webClient
+                .get().uri("case/v1/cases")
+                .header("Authorization", "Bearer " + tokenWithFakeAlgorithm)
+                .exchange()
+                .expectStatus().isEqualTo(500)
+                .expectBody()
+                .jsonPath("$.message").isEqualTo("The token cannot be trusted : Signed JWT rejected: Another algorithm expected, or no matching key(s) found");
+
+        webClient
+                .get().uri("case/v1/cases")
+                .header("Authorization", "Bearer " + tokenWithFakeAudience)
+                .exchange()
+                .expectStatus().isEqualTo(500)
+                .expectBody()
+                .jsonPath("$.message").isEqualTo("The token cannot be trusted : Signed JWT rejected: Invalid signature");
     }
 }
