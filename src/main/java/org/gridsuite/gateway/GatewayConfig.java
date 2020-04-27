@@ -20,6 +20,7 @@ import org.springframework.context.annotation.PropertySource;
  */
 @Configuration
 @PropertySource(value = {"classpath:allowed-issuers.yml"})
+@PropertySource(value = {"file:/config/allowed-issuers.yml"}, ignoreResourceNotFound = true)
 @EnableConfigurationProperties(UriConfiguration.class)
 public class GatewayConfig {
     @Bean
