@@ -8,7 +8,6 @@ package org.gridsuite.gateway;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.context.ApplicationContext;
 
 /**
  * @author Chamseddine Benhamed <chamseddine.benhamed at rte-france.com>
@@ -16,8 +15,6 @@ import org.springframework.context.ApplicationContext;
 @SuppressWarnings("checkstyle:HideUtilityClassConstructor")
 @SpringBootApplication
 public class GatewayApplication {
-    private static ApplicationContext applicationContext;
-
     public static void main(String[] args) {
         SpringApplication.run(GatewayApplication.class, args);
     }

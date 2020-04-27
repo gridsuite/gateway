@@ -6,8 +6,6 @@
  */
 package org.gridsuite.gateway;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -24,8 +22,6 @@ import org.springframework.context.annotation.PropertySource;
 @PropertySource(value = {"classpath:allowed-issuers.yml"})
 @EnableConfigurationProperties(UriConfiguration.class)
 public class GatewayConfig {
-    private static final Logger LOGGER = LoggerFactory.getLogger(GatewayConfig.class);
-
     @Bean
     public RouteLocator myRoutes(RouteLocatorBuilder builder, UriConfiguration uriConfiguration) {
         return builder.routes()

@@ -14,7 +14,6 @@ import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.JWTParser;
 import com.nimbusds.oauth2.sdk.id.ClientID;
 import com.nimbusds.oauth2.sdk.id.Issuer;
-import com.nimbusds.openid.connect.sdk.claims.IDTokenClaimsSet;
 import com.nimbusds.openid.connect.sdk.validators.IDTokenValidator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -87,7 +86,7 @@ public class TokenValidatorGlobalPreFilter implements GlobalFilter {
         }
 
         if (allowedIssuers.stream().noneMatch(iss -> jwtClaimsSet.getIssuer().startsWith(iss))) {
-            LOGGER.debug(jwtClaimsSet.getIssuer() + " Issuer is not in the issuers white list");
+            LOGGER.debug("{} Issuer is not in the issuers white list", jwtClaimsSet.getIssuer());
             // set UNAUTHORIZED 401 response and stop the processing
             exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
             return exchange.getResponse().setComplete();
@@ -106,11 +105,11 @@ public class TokenValidatorGlobalPreFilter implements GlobalFilter {
             // Create validator for signed ID tokens
             IDTokenValidator validator = new IDTokenValidator(iss, clientID, jwsAlg, jwkSetURL);
 
-            IDTokenClaimsSet claims = validator.validate(idToken, null);
+            validator.validate(idToken, null);
             // we can safely trust the JWT
             LOGGER.debug("Token verified, it can be trusted");
         } catch (JOSEException | BadJOSEException | ParseException | MalformedURLException e) {
-            LOGGER.debug("The token cannot be trusted : " + e.getMessage());
+            LOGGER.debug("The token cannot be trusted : {}", e.getMessage());
             // set UNAUTHORIZED 401 response and stop the processing
             exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
             return exchange.getResponse().setComplete();
