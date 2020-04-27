@@ -158,39 +158,42 @@ public class TokenValidationTest {
                         .withHeader("Content-Type", "application/json")
                         .withBody("{\"keys\" : [ " + rsaKey.toJSONString() + " ] }")));
 
+        // test with no token
+        webClient
+                .get().uri("case/v1/cases")
+                .exchange()
+                .expectStatus().isEqualTo(401);
+
+        //test with an expired token
         webClient
                 .get().uri("case/v1/cases")
                 .header("Authorization", "Bearer " + expiredToken)
                 .exchange()
-                .expectStatus().isEqualTo(500)
-                .expectBody()
-                .jsonPath("$.message").isEqualTo("The token cannot be trusted : Expired JWT");
+                .expectStatus().isEqualTo(401);
 
+        //test with with not allowed issuer
         webClient
                 .get().uri("case/v1/cases")
                 .header("Authorization", "Bearer " + tokenWithNotAllowedissuer)
                 .exchange()
-                .expectStatus().isEqualTo(500)
-                .expectBody()
-                .jsonPath("$.message").isEqualTo("http://notAllowedissuer Issuer is not in the issuers white list");
+                .expectStatus().isEqualTo(403);
 
         String tokenWithFakeAlgorithm = token.replaceFirst("U", "Q");
         String tokenWithFakeAudience = token.replaceFirst("X", "L");
 
+        //test with token with a fake algorithm
         webClient
                 .get().uri("case/v1/cases")
                 .header("Authorization", "Bearer " + tokenWithFakeAlgorithm)
                 .exchange()
-                .expectStatus().isEqualTo(500)
-                .expectBody()
-                .jsonPath("$.message").isEqualTo("The token cannot be trusted : Signed JWT rejected: Another algorithm expected, or no matching key(s) found");
+                .expectStatus().isEqualTo(401);
 
+        //test with token with fake audience
         webClient
                 .get().uri("case/v1/cases")
                 .header("Authorization", "Bearer " + tokenWithFakeAudience)
                 .exchange()
-                .expectStatus().isEqualTo(500)
-                .expectBody()
-                .jsonPath("$.message").isEqualTo("The token cannot be trusted : Signed JWT rejected: Invalid signature");
+                .expectStatus().isEqualTo(401);
+
     }
 }

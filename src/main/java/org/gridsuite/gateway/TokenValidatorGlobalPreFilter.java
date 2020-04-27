@@ -20,11 +20,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
-import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.List;
 
@@ -51,7 +51,10 @@ public class TokenValidatorGlobalPreFilter implements GlobalFilter {
         LOGGER.debug("checking authorization");
         List<String> ls = exchange.getRequest().getHeaders().get("Authorization");
         if (ls == null) {
-            throw new GatewayException("Authorization header is required");
+            LOGGER.debug("Authorization header is required");
+            // set UNAUTHORIZED 401 response and stop the processing
+            exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+            return exchange.getResponse().setComplete();
         }
 
         LOGGER.debug("checking issuer");
@@ -64,11 +67,17 @@ public class TokenValidatorGlobalPreFilter implements GlobalFilter {
             jwtClaimsSet = jwt.getJWTClaimsSet();
         } catch (java.text.ParseException e) {
             // Invalid plain JOSE object encoding
-            throw new GatewayException("Invalid plain JOSE object encoding");
+            LOGGER.debug("Invalid plain JOSE object encoding");
+            // set UNAUTHORIZED 401 response and stop the processing
+            exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+            return exchange.getResponse().setComplete();
         }
 
         if (allowedIssuers.stream().noneMatch(iss -> jwtClaimsSet.getIssuer().startsWith(iss))) {
-            throw new GatewayException(jwtClaimsSet.getIssuer() + " Issuer is not in the issuers white list");
+            LOGGER.debug(jwtClaimsSet.getIssuer() + " Issuer is not in the issuers white list");
+            // set UNAUTHORIZED 401 response and stop the processing
+            exchange.getResponse().setStatusCode(HttpStatus.FORBIDDEN);
+            return exchange.getResponse().setComplete();
         }
 
         try {
@@ -78,11 +87,8 @@ public class TokenValidatorGlobalPreFilter implements GlobalFilter {
 
             JWSAlgorithm jwsAlg = JWSAlgorithm.parse(jwt.getHeader().getAlgorithm().getName());
             URL jwkSetURL = null;
-            try {
-                jwkSetURL = new URL(gatewayService.getJwksUrl(jwt.getJWTClaimsSet().getIssuer()));
-            } catch (MalformedURLException e) {
-                throw new GatewayException("MalformedURLException : " + e.getMessage());
-            }
+
+            jwkSetURL = new URL(gatewayService.getJwksUrl(jwt.getJWTClaimsSet().getIssuer()));
 
             // Create validator for signed ID tokens
             IDTokenValidator validator = new IDTokenValidator(iss, clientID, jwsAlg, jwkSetURL);
@@ -90,11 +96,13 @@ public class TokenValidatorGlobalPreFilter implements GlobalFilter {
             IDTokenClaimsSet claims = validator.validate(idToken, null);
             // we can safely trust the JWT
             LOGGER.debug("Token verified, it can be trusted");
+            return chain.filter(exchange);
         } catch (Exception e) {
-            LOGGER.debug("The token cannot be trusted");
-            throw new GatewayException("The token cannot be trusted : " + e.getMessage());
+            LOGGER.debug("The token cannot be trusted : " + e.getMessage());
+            // set UNAUTHORIZED 401 response and stop the processing
+            exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+            return exchange.getResponse().setComplete();
         }
-        return chain.filter(exchange);
     }
 }
 
