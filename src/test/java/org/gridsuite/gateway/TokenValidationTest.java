@@ -198,9 +198,16 @@ public class TokenValidationTest {
         //test with non JSON token
         webClient
                 .get().uri("case/v1/cases")
-                .header("Authorization", "Bearer " + "Non valid Token")
+                .header("Authorization", "Bearer " + "NonValidToken")
                 .exchange()
                 .expectStatus().isEqualTo(401);
+
+        //test with non JSON token
+        webClient
+                .get().uri("case/v1/cases")
+                .header("Authorization", "Bearer" + token)
+                .exchange()
+                .expectStatus().isEqualTo(400);
 
     }
 }

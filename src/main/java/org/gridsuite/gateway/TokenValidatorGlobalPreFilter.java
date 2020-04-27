@@ -6,7 +6,9 @@
  */
 package org.gridsuite.gateway;
 
+import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.proc.BadJOSEException;
 import com.nimbusds.jwt.JWT;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.JWTParser;
@@ -25,7 +27,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
+import java.net.MalformedURLException;
 import java.net.URL;
+import java.text.ParseException;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -59,7 +64,15 @@ public class TokenValidatorGlobalPreFilter implements GlobalFilter {
 
         LOGGER.debug("checking issuer");
         String authorization = ls.get(0);
-        String token = authorization.split(" ")[1];
+        List<String> arr = Arrays.asList(authorization.split(" "));
+
+        if (arr.size() != 2) {
+            // set BAD REQUEST 400 response and stop the processing
+            exchange.getResponse().setStatusCode(HttpStatus.BAD_REQUEST);
+            return exchange.getResponse().setComplete();
+        }
+
+        String token = arr.get(1);
         JWT jwt;
         JWTClaimsSet jwtClaimsSet;
         try {
@@ -97,7 +110,7 @@ public class TokenValidatorGlobalPreFilter implements GlobalFilter {
             // we can safely trust the JWT
             LOGGER.debug("Token verified, it can be trusted");
             return chain.filter(exchange);
-        } catch (Exception e) {
+        } catch (JOSEException | BadJOSEException | ParseException | MalformedURLException e) {
             LOGGER.debug("The token cannot be trusted : " + e.getMessage());
             // set UNAUTHORIZED 401 response and stop the processing
             exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
