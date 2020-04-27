@@ -15,11 +15,13 @@ import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.PropertySource;
 
 /**
  * @author Chamseddine Benhamed <chamseddine.benhamed at rte-france.com>
  */
 @Configuration
+@PropertySource(value = {"classpath:issuers.yml"})
 @EnableConfigurationProperties(UriConfiguration.class)
 public class GatewayConfig {
     private static final Logger LOGGER = LoggerFactory.getLogger(GatewayConfig.class);
