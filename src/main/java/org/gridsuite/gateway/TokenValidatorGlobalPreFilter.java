@@ -52,11 +52,10 @@ public class TokenValidatorGlobalPreFilter implements GlobalFilter {
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
-        LOGGER.info(exchange.getRequest().getPath().toString());
         LOGGER.debug("checking authorization");
         List<String> ls = exchange.getRequest().getHeaders().get("Authorization");
         if (ls == null) {
-            LOGGER.info("Authorization header is required");
+            LOGGER.info(exchange.getRequest().getPath().toString() + ": 401 Unauthorized, Authorization header is required");
             // set UNAUTHORIZED 401 response and stop the processing
             exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
             return exchange.getResponse().setComplete();
@@ -67,6 +66,7 @@ public class TokenValidatorGlobalPreFilter implements GlobalFilter {
         List<String> arr = Arrays.asList(authorization.split(" "));
 
         if (arr.size() != 2) {
+            LOGGER.info(exchange.getRequest().getPath().toString() + ": 400 Bad Request, incorrect Authorization header value");
             // set BAD REQUEST 400 response and stop the processing
             exchange.getResponse().setStatusCode(HttpStatus.BAD_REQUEST);
             return exchange.getResponse().setComplete();
@@ -80,14 +80,14 @@ public class TokenValidatorGlobalPreFilter implements GlobalFilter {
             jwtClaimsSet = jwt.getJWTClaimsSet();
         } catch (java.text.ParseException e) {
             // Invalid plain JOSE object encoding
-            LOGGER.info("Invalid plain JOSE object encoding");
+            LOGGER.info(exchange.getRequest().getPath().toString() + ": 401 Unauthorized, Invalid plain JOSE object encoding");
             // set UNAUTHORIZED 401 response and stop the processing
             exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
             return exchange.getResponse().setComplete();
         }
 
         if (allowedIssuers.stream().noneMatch(iss -> jwtClaimsSet.getIssuer().startsWith(iss))) {
-            LOGGER.info("{} Issuer is not in the issuers white list", jwtClaimsSet.getIssuer());
+            LOGGER.info(exchange.getRequest().getPath().toString() + ": 401 Unauthorized, {} Issuer is not in the issuers white list", jwtClaimsSet.getIssuer());
             // set UNAUTHORIZED 401 response and stop the processing
             exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
             return exchange.getResponse().setComplete();
