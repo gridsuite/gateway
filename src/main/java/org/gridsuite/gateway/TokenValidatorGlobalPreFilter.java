@@ -76,7 +76,7 @@ public class TokenValidatorGlobalPreFilter implements GlobalFilter {
         if (allowedIssuers.stream().noneMatch(iss -> jwtClaimsSet.getIssuer().startsWith(iss))) {
             LOGGER.debug(jwtClaimsSet.getIssuer() + " Issuer is not in the issuers white list");
             // set UNAUTHORIZED 401 response and stop the processing
-            exchange.getResponse().setStatusCode(HttpStatus.FORBIDDEN);
+            exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
             return exchange.getResponse().setComplete();
         }
 

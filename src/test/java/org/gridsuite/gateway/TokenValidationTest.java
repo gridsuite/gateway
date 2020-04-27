@@ -176,7 +176,7 @@ public class TokenValidationTest {
                 .get().uri("case/v1/cases")
                 .header("Authorization", "Bearer " + tokenWithNotAllowedissuer)
                 .exchange()
-                .expectStatus().isEqualTo(403);
+                .expectStatus().isEqualTo(401);
 
         String tokenWithFakeAlgorithm = token.replaceFirst("U", "Q");
         String tokenWithFakeAudience = token.replaceFirst("X", "L");
@@ -192,6 +192,13 @@ public class TokenValidationTest {
         webClient
                 .get().uri("case/v1/cases")
                 .header("Authorization", "Bearer " + tokenWithFakeAudience)
+                .exchange()
+                .expectStatus().isEqualTo(401);
+
+        //test with non JSON token
+        webClient
+                .get().uri("case/v1/cases")
+                .header("Authorization", "Bearer " + "Non valid Token")
                 .exchange()
                 .expectStatus().isEqualTo(401);
 
