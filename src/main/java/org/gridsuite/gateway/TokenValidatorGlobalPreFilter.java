@@ -55,7 +55,7 @@ public class TokenValidatorGlobalPreFilter implements GlobalFilter {
         LOGGER.debug("checking authorization");
         List<String> ls = exchange.getRequest().getHeaders().get("Authorization");
         if (ls == null) {
-            LOGGER.info(exchange.getRequest().getPath().toString() + ": 401 Unauthorized, Authorization header is required");
+            LOGGER.info("{}: 401 Unauthorized, Authorization header is required", exchange.getRequest().getPath().toString());
             // set UNAUTHORIZED 401 response and stop the processing
             exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
             return exchange.getResponse().setComplete();
@@ -66,7 +66,7 @@ public class TokenValidatorGlobalPreFilter implements GlobalFilter {
         List<String> arr = Arrays.asList(authorization.split(" "));
 
         if (arr.size() != 2) {
-            LOGGER.info(exchange.getRequest().getPath().toString() + ": 400 Bad Request, incorrect Authorization header value");
+            LOGGER.info("{}: 400 Bad Request, incorrect Authorization header value", exchange.getRequest().getPath().toString());
             // set BAD REQUEST 400 response and stop the processing
             exchange.getResponse().setStatusCode(HttpStatus.BAD_REQUEST);
             return exchange.getResponse().setComplete();
@@ -80,14 +80,14 @@ public class TokenValidatorGlobalPreFilter implements GlobalFilter {
             jwtClaimsSet = jwt.getJWTClaimsSet();
         } catch (java.text.ParseException e) {
             // Invalid plain JOSE object encoding
-            LOGGER.info(exchange.getRequest().getPath().toString() + ": 401 Unauthorized, Invalid plain JOSE object encoding");
+            LOGGER.info("{}: 401 Unauthorized, Invalid plain JOSE object encoding", exchange.getRequest().getPath().toString());
             // set UNAUTHORIZED 401 response and stop the processing
             exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
             return exchange.getResponse().setComplete();
         }
 
         if (allowedIssuers.stream().noneMatch(iss -> jwtClaimsSet.getIssuer().startsWith(iss))) {
-            LOGGER.info(exchange.getRequest().getPath().toString() + ": 401 Unauthorized, {} Issuer is not in the issuers white list", jwtClaimsSet.getIssuer());
+            LOGGER.info("{}: 401 Unauthorized, {} Issuer is not in the issuers white list", exchange.getRequest().getPath().toString(), jwtClaimsSet.getIssuer());
             // set UNAUTHORIZED 401 response and stop the processing
             exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
             return exchange.getResponse().setComplete();
@@ -110,7 +110,7 @@ public class TokenValidatorGlobalPreFilter implements GlobalFilter {
             // we can safely trust the JWT
             LOGGER.debug("Token verified, it can be trusted");
         } catch (JOSEException | BadJOSEException | ParseException | MalformedURLException e) {
-            LOGGER.info(exchange.getRequest().getPath().toString() + ": 401 Unauthorized, The token cannot be trusted : {}", e.getMessage());
+            LOGGER.info("{}: 401 Unauthorized, The token cannot be trusted : {}", exchange.getRequest().getPath().toString(), e.getMessage());
             // set UNAUTHORIZED 401 response and stop the processing
             exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
             return exchange.getResponse().setComplete();
