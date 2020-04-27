@@ -202,10 +202,10 @@ public class TokenValidationTest {
                 .exchange()
                 .expectStatus().isEqualTo(401);
 
-        //test with non JSON token
+        //test with a incorrect Authorization value
         webClient
                 .get().uri("case/v1/cases")
-                .header("Authorization", "Bearer" + token)
+                .header("Authorization", token)
                 .exchange()
                 .expectStatus().isEqualTo(400);
 
