@@ -52,16 +52,16 @@ public class TokenValidatorGlobalPreFilter implements GlobalFilter {
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
-        LOGGER.debug("checking authorization");
+        LOGGER.info("checking authorization");
         List<String> ls = exchange.getRequest().getHeaders().get("Authorization");
         if (ls == null) {
-            LOGGER.debug("Authorization header is required");
+            LOGGER.info("Authorization header is required");
             // set UNAUTHORIZED 401 response and stop the processing
             exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
             return exchange.getResponse().setComplete();
         }
 
-        LOGGER.debug("checking issuer");
+        LOGGER.info("checking issuer");
         String authorization = ls.get(0);
         List<String> arr = Arrays.asList(authorization.split(" "));
 
@@ -79,14 +79,14 @@ public class TokenValidatorGlobalPreFilter implements GlobalFilter {
             jwtClaimsSet = jwt.getJWTClaimsSet();
         } catch (java.text.ParseException e) {
             // Invalid plain JOSE object encoding
-            LOGGER.debug("Invalid plain JOSE object encoding");
+            LOGGER.info("Invalid plain JOSE object encoding");
             // set UNAUTHORIZED 401 response and stop the processing
             exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
             return exchange.getResponse().setComplete();
         }
 
         if (allowedIssuers.stream().noneMatch(iss -> jwtClaimsSet.getIssuer().startsWith(iss))) {
-            LOGGER.debug("{} Issuer is not in the issuers white list", jwtClaimsSet.getIssuer());
+            LOGGER.info("{} Issuer is not in the issuers white list", jwtClaimsSet.getIssuer());
             // set UNAUTHORIZED 401 response and stop the processing
             exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
             return exchange.getResponse().setComplete();
@@ -107,9 +107,9 @@ public class TokenValidatorGlobalPreFilter implements GlobalFilter {
 
             validator.validate(idToken, null);
             // we can safely trust the JWT
-            LOGGER.debug("Token verified, it can be trusted");
+            LOGGER.info("Token verified, it can be trusted");
         } catch (JOSEException | BadJOSEException | ParseException | MalformedURLException e) {
-            LOGGER.debug("The token cannot be trusted : {}", e.getMessage());
+            LOGGER.info("The token cannot be trusted : {}", e.getMessage());
             // set UNAUTHORIZED 401 response and stop the processing
             exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
             return exchange.getResponse().setComplete();
