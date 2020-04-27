@@ -52,7 +52,8 @@ public class TokenValidatorGlobalPreFilter implements GlobalFilter {
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
-        LOGGER.info("checking authorization");
+        LOGGER.info(exchange.getRequest().getPath().toString());
+        LOGGER.debug("checking authorization");
         List<String> ls = exchange.getRequest().getHeaders().get("Authorization");
         if (ls == null) {
             LOGGER.info("Authorization header is required");
@@ -61,7 +62,7 @@ public class TokenValidatorGlobalPreFilter implements GlobalFilter {
             return exchange.getResponse().setComplete();
         }
 
-        LOGGER.info("checking issuer");
+        LOGGER.debug("checking issuer");
         String authorization = ls.get(0);
         List<String> arr = Arrays.asList(authorization.split(" "));
 
@@ -107,7 +108,7 @@ public class TokenValidatorGlobalPreFilter implements GlobalFilter {
 
             validator.validate(idToken, null);
             // we can safely trust the JWT
-            LOGGER.info("Token verified, it can be trusted");
+            LOGGER.debug("Token verified, it can be trusted");
         } catch (JOSEException | BadJOSEException | ParseException | MalformedURLException e) {
             LOGGER.info("The token cannot be trusted : {}", e.getMessage());
             // set UNAUTHORIZED 401 response and stop the processing
