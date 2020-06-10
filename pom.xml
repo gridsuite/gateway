@@ -48,6 +48,7 @@
 		<springboot.version>2.2.5.RELEASE</springboot.version>
 		<springtest.version>5.1.5.RELEASE</springtest.version>
 		<spring-cloud.version>Hoxton.SR3</spring-cloud.version>
+		<websocket-tyrus.version>1.17</websocket-tyrus.version>
 	</properties>
 
 	<build>
@@ -128,6 +129,13 @@
 					<groupId>org.springframework.boot</groupId>
 				</exclusion>
 			</exclusions>
+		</dependency>
+
+		<dependency>
+			<groupId>org.glassfish.tyrus.bundles</groupId>
+			<artifactId>tyrus-standalone-client</artifactId>
+			<version>${websocket-tyrus.version}</version>
+			<scope>test</scope>
 		</dependency>
 	</dependencies>
 </project>

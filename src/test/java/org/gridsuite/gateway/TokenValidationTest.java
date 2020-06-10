@@ -6,28 +6,48 @@ import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.web.server.LocalServerPort;
 import org.springframework.cloud.contract.wiremock.AutoConfigureWireMock;
+import org.springframework.cloud.contract.wiremock.WireMockConfigurationCustomizer;
+import org.springframework.context.annotation.Bean;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.reactive.server.WebTestClient;
-
+import org.springframework.web.reactive.socket.client.StandardWebSocketClient;
+import org.springframework.web.reactive.socket.client.WebSocketClient;
+import com.github.tomakehurst.wiremock.client.VerificationException;
+import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
+import com.github.tomakehurst.wiremock.extension.responsetemplating.ResponseTemplateTransformer;
+import java.io.IOException;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Base64;
 import java.util.Date;
+import wiremock.com.github.jknack.handlebars.Helper;
+import wiremock.com.github.jknack.handlebars.Options;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 
 @RunWith(SpringRunner.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {"caseServerBaseUri=http://localhost:${wiremock.server.port}", "studyServerBaseUri=http://localhost:${wiremock.server.port}"})
+        properties = {"caseServerBaseUri=http://localhost:${wiremock.server.port}", "studyServerBaseUri=http://localhost:${wiremock.server.port}", "notificationServerBaseUri=http://localhost:${wiremock.server.port}"})
 @AutoConfigureWireMock(port = 0)
 public class TokenValidationTest {
 
     @Value("${wiremock.server.port}")
     int port;
+
+    @LocalServerPort
+    private String localServerPort;
 
     private String token;
 
@@ -116,6 +136,14 @@ public class TokenValidationTest {
                         .withHeader("Content-Type", "application/json")
                         .withBody("{\"keys\" : [ " + rsaKey.toJSONString() + " ] }")));
 
+        stubFor(get(urlPathEqualTo("/notify")).willReturn(aResponse()
+                .withHeader("Sec-WebSocket-Accept", "{{{sec-websocket-accept request.headers.Sec-WebSocket-Key}}}")
+                .withHeader("Upgrade", "websocket")
+                .withHeader("Connection", "Upgrade")
+                .withStatus(101)
+                .withStatusMessage("Switching Protocols")
+        ));
+
         webClient
                 .get().uri("case/v1/cases")
                 .header("Authorization", "Bearer " + token)
@@ -138,6 +166,31 @@ public class TokenValidationTest {
                 .jsonPath("$[0].studyName").isEqualTo("CgmesStudy")
                 .jsonPath("$[1].studyName").isEqualTo("IIDMStudy");
 
+        //Test a websocket with token in query parameters
+        WebSocketClient client = new StandardWebSocketClient();
+        client.execute(
+                URI.create("ws://localhost:" + this.localServerPort + "/notification/notify?access_token=" + token),
+            ws -> ws.receive().then()).subscribe();
+        // Busy loop waiting to check that spring-gateway contacted our wiremock server
+        // Is there a better way to wait for wiremock to complete the request ?
+        boolean done = false;
+        for (int i = 0; i < 100; i++) {
+            Thread.sleep(10);
+            try {
+                verify(getRequestedFor(urlPathEqualTo("/notify"))
+                        .withHeader("Connection", equalTo("Upgrade"))
+                        .withHeader("Upgrade", equalTo("websocket")));
+                done = true;
+            } catch (VerificationException e) {
+                // nothing to do
+            }
+            if (done) {
+                break;
+            }
+        }
+        if (!done) {
+            Assert.fail("Wiremock didn't receive the websocket connection");
+        }
     }
 
     @Test
@@ -209,5 +262,38 @@ public class TokenValidationTest {
                 .exchange()
                 .expectStatus().isEqualTo(400);
 
+        // test without a token
+        WebSocketClient client = new StandardWebSocketClient();
+        client.execute(URI.create("ws://localhost:" +
+                this.localServerPort + "/notification/notify"),
+            ws -> ws.receive().then()).doOnSuccess(s -> Assert.fail("Should have thrown"));
+    }
+
+    @TestConfiguration
+    static class MyTestConfiguration {
+        @Bean
+        WireMockConfigurationCustomizer optionsCustomizer() {
+            return new WireMockConfigurationCustomizer() {
+                private static final String SEC_WEBSOCKET_MAGIC = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+                @Override
+                public void customize(WireMockConfiguration options) {
+                    Helper<Object> secWebsocketAcceptHelper = new Helper<Object>() {
+                        @Override
+                        public String apply(Object context, Options options) throws IOException {
+                            String in = context.toString() + SEC_WEBSOCKET_MAGIC;
+                            byte[] hashed;
+                            try {
+                                hashed = MessageDigest.getInstance("SHA-1").digest(in.getBytes(StandardCharsets.UTF_8));
+                            } catch (NoSuchAlgorithmException e) {
+                                throw new RuntimeException(e);
+                            }
+                            return Base64.getEncoder().encodeToString(hashed);
+                        }
+                    };
+                    options.extensions(
+                            new ResponseTemplateTransformer(true, "sec-websocket-accept", secWebsocketAcceptHelper));
+                }
+            };
+        }
     }
 }
