@@ -36,6 +36,11 @@ public class GatewayConfig {
                     .filters(f -> f.rewritePath("/case/(.*)", "/$1"))
                     .uri(uriConfiguration.getCaseServerBaseUri())
             )
+            .route(p -> p
+                    .path("/notification/**")
+                    .filters(f -> f.rewritePath("/notification/(.*)", "/$1"))
+                    .uri(uriConfiguration.getNotificationServerBaseUri())
+            )
             .build();
     }
 }
@@ -44,6 +49,7 @@ public class GatewayConfig {
 class UriConfiguration {
     @Value("${backing-services.case.base-uri:http://case-server/}") String caseServerBaseUri;
     @Value("${backing-services.study-server.base-uri:http://study-server/}") String studyServerBaseUri;
+    @Value("${backing-services.notification-server.base-uri:http://notification-server/}") String notificationServerBaseUri;
 
     public String getCaseServerBaseUri() {
         return caseServerBaseUri;
@@ -59,5 +65,13 @@ class UriConfiguration {
 
     public void setStudyServerBaseUri(String studyServerBaseUri) {
         this.studyServerBaseUri = studyServerBaseUri;
+    }
+
+    public String getNotificationServerBaseUri() {
+        return notificationServerBaseUri;
+    }
+
+    public void setNotificationServerBaseUri(String notificationServerBaseUri) {
+        this.notificationServerBaseUri = notificationServerBaseUri;
     }
 }

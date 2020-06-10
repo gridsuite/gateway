@@ -21,7 +21,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
+import org.springframework.core.Ordered;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
@@ -36,7 +38,7 @@ import java.util.List;
  * @author Chamseddine Benhamed <chamseddine.benhamed at rte-france.com>
  */
 @Component
-public class TokenValidatorGlobalPreFilter implements GlobalFilter {
+public class TokenValidatorGlobalPreFilter implements GlobalFilter, Ordered {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(TokenValidatorGlobalPreFilter.class);
 
@@ -51,28 +53,46 @@ public class TokenValidatorGlobalPreFilter implements GlobalFilter {
     }
 
     @Override
+    public int getOrder() {
+        // Before WebsocketRoutingFilter to enforce authentication
+        return Ordered.LOWEST_PRECEDENCE - 2;
+    }
+
+    @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         LOGGER.debug("checking authorization");
-        List<String> ls = exchange.getRequest().getHeaders().get("Authorization");
-        if (ls == null) {
-            LOGGER.info("{}: 401 Unauthorized, Authorization header is required", exchange.getRequest().getPath());
+        ServerHttpRequest req = exchange.getRequest();
+        List<String> ls = req.getHeaders().get("Authorization");
+        List<String> queryls = req.getQueryParams().get("access_token");
+
+        if (ls == null && queryls == null) {
+            LOGGER.info("{}: 401 Unauthorized, Authorization header or access_token query parameter is required",
+                    exchange.getRequest().getPath());
             // set UNAUTHORIZED 401 response and stop the processing
             exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
             return exchange.getResponse().setComplete();
         }
 
-        LOGGER.debug("checking issuer");
-        String authorization = ls.get(0);
-        List<String> arr = Arrays.asList(authorization.split(" "));
+        // For now we only handle one token. If needed, we can adapt this code to check
+        // multiple tokens and accept the connection if at least one of them is valid
+        String token;
+        if (ls != null) {
+            String authorization = ls.get(0);
+            List<String> arr = Arrays.asList(authorization.split(" "));
 
-        if (arr.size() != 2 || !arr.get(0).equals("Bearer")) {
-            LOGGER.info("{}: 400 Bad Request, incorrect Authorization header value", exchange.getRequest().getPath());
-            // set BAD REQUEST 400 response and stop the processing
-            exchange.getResponse().setStatusCode(HttpStatus.BAD_REQUEST);
-            return exchange.getResponse().setComplete();
+            if (arr.size() != 2 || !arr.get(0).equals("Bearer")) {
+                LOGGER.info("{}: 400 Bad Request, incorrect Authorization header value",
+                        exchange.getRequest().getPath());
+                // set BAD REQUEST 400 response and stop the processing
+                exchange.getResponse().setStatusCode(HttpStatus.BAD_REQUEST);
+                return exchange.getResponse().setComplete();
+            }
+
+            token = arr.get(1);
+        } else {
+            token = queryls.get(0);
         }
 
-        String token = arr.get(1);
         JWT jwt;
         JWTClaimsSet jwtClaimsSet;
         try {
@@ -86,6 +106,7 @@ public class TokenValidatorGlobalPreFilter implements GlobalFilter {
             return exchange.getResponse().setComplete();
         }
 
+        LOGGER.debug("checking issuer");
         if (allowedIssuers.stream().noneMatch(iss -> jwtClaimsSet.getIssuer().startsWith(iss))) {
             LOGGER.info("{}: 401 Unauthorized, {} Issuer is not in the issuers white list", exchange.getRequest().getPath(), jwtClaimsSet.getIssuer());
             // set UNAUTHORIZED 401 response and stop the processing
@@ -117,5 +138,6 @@ public class TokenValidatorGlobalPreFilter implements GlobalFilter {
         }
         return chain.filter(exchange);
     }
+
 }
 
