@@ -39,7 +39,10 @@ import static com.github.tomakehurst.wiremock.client.WireMock.*;
 
 @RunWith(SpringRunner.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {"caseServerBaseUri=http://localhost:${wiremock.server.port}", "studyServerBaseUri=http://localhost:${wiremock.server.port}", "notificationServerBaseUri=http://localhost:${wiremock.server.port}"})
+        properties = {"caseServerBaseUri=http://localhost:${wiremock.server.port}",
+                "studyServerBaseUri=http://localhost:${wiremock.server.port}",
+                "mergeNotificationServerBaseUri=http://localhost:${wiremock.server.port}",
+                "notificationServerBaseUri=http://localhost:${wiremock.server.port}"})
 @AutoConfigureWireMock(port = 0)
 public class TokenValidationTest {
 
