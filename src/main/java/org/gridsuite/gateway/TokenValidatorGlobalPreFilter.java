@@ -114,6 +114,13 @@ public class TokenValidatorGlobalPreFilter implements GlobalFilter, Ordered {
             return exchange.getResponse().setComplete();
         }
 
+        List<String> subject = req.getHeaders().get("subject");
+        if (subject == null || !jwtClaimsSet.getSubject().equals(subject.get(0))) {
+            LOGGER.info("{} : 401 Unauthorized, subjects are different : subject from header = {} != subject from jwt = {}", exchange.getRequest().getPath(), subject, jwtClaimsSet);
+            exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+            return exchange.getResponse().setComplete();
+        }
+
         try {
             JWT idToken = JWTParser.parse(token);
             Issuer iss = new Issuer(jwt.getJWTClaimsSet().getIssuer());

@@ -18,6 +18,7 @@ import org.springframework.boot.web.server.LocalServerPort;
 import org.springframework.cloud.contract.wiremock.AutoConfigureWireMock;
 import org.springframework.cloud.contract.wiremock.WireMockConfigurationCustomizer;
 import org.springframework.context.annotation.Bean;
+import org.springframework.http.HttpHeaders;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.web.reactive.socket.client.StandardWebSocketClient;
@@ -78,6 +79,7 @@ public class TokenValidationTest {
                 .subject("chmits")
                 .audience("test.app")
                 .issuer("http://localhost:" + port)
+                .subject("subject")
                 .issueTime(new Date())
                 .expirationTime(new Date(new Date().getTime() + 60 * 1000))
                 .build();
@@ -147,6 +149,7 @@ public class TokenValidationTest {
         webClient
                 .get().uri("case/v1/cases")
                 .header("Authorization", "Bearer " + token)
+                .header("subject", "subject")
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
@@ -158,6 +161,7 @@ public class TokenValidationTest {
         webClient
                 .get().uri("study/v1/studies")
                 .header("Authorization", "Bearer " + token)
+                .header("subject", "subject")
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
@@ -166,11 +170,22 @@ public class TokenValidationTest {
                 .jsonPath("$[0].studyName").isEqualTo("CgmesStudy")
                 .jsonPath("$[1].studyName").isEqualTo("IIDMStudy");
 
+        //Unauthorized because no header with jwt subject
+        webClient
+                .get().uri("study/v1/studies")
+                .header("Authorization", "Bearer " + token)
+                .exchange()
+                .expectStatus().isUnauthorized();
+
         //Test a websocket with token in query parameters
         WebSocketClient client = new StandardWebSocketClient();
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("subject", "subject");
         client.execute(
-                URI.create("ws://localhost:" + this.localServerPort + "/notification/notify?access_token=" + token),
-            ws -> ws.receive().then()).subscribe();
+                URI.create("ws://localhost:" + this.localServerPort + "/notification/notify?access_token=" + token), headers,
+            ws -> ws.receive().then())
+                .subscribe();
+
         // Busy loop waiting to check that spring-gateway contacted our wiremock server
         // Is there a better way to wait for wiremock to complete the request ?
         boolean done = false;
