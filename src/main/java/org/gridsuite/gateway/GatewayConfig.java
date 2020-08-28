@@ -44,7 +44,7 @@ public class GatewayConfig {
             .route(p -> p
                     .path("/merge-notification/**")
                     .filters(f -> f.rewritePath("/merge-notification/(.*)", "/$1"))
-                    .uri(uriConfiguration.getNotificationServerBaseUri())
+                    .uri(uriConfiguration.getMergeNotificationServerBaseUri())
             )
             .build();
     }
