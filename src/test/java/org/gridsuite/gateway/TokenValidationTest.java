@@ -117,7 +117,7 @@ public class TokenValidationTest {
 
     @Test
     public void gatewayTest() throws Exception {
-        stubFor(get(urlEqualTo("/v1/studies"))
+        stubFor(get(urlEqualTo("/v1/studies")).withHeader("subject", equalTo("chmits"))
                 .willReturn(aResponse()
                         .withHeader("Content-Type", "application/json")
                         .withBody("[{\"studyName\": \"CgmesStudy\", \"caseFormat\" :\"CGMES\"}, {\"studyName\": \"IIDMStudy\", \"caseFormat\" :\"IIDM\"}]")));
