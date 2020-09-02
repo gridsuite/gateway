@@ -130,6 +130,11 @@ public class TokenValidatorGlobalPreFilter implements GlobalFilter, Ordered {
             validator.validate(idToken, null);
             // we can safely trust the JWT
             LOGGER.debug("Token verified, it can be trusted");
+
+            //we add the subject header
+            exchange.getRequest()
+                    .mutate()
+                    .headers(h -> h.set("subject", jwtClaimsSet.getSubject()));
         } catch (JOSEException | BadJOSEException | ParseException | MalformedURLException e) {
             LOGGER.info("{}: 401 Unauthorized, The token cannot be trusted : {}", exchange.getRequest().getPath(), e.getMessage());
             // set UNAUTHORIZED 401 response and stop the processing

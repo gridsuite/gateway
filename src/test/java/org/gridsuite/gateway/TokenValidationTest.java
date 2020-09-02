@@ -18,6 +18,7 @@ import org.springframework.boot.web.server.LocalServerPort;
 import org.springframework.cloud.contract.wiremock.AutoConfigureWireMock;
 import org.springframework.cloud.contract.wiremock.WireMockConfigurationCustomizer;
 import org.springframework.context.annotation.Bean;
+import org.springframework.http.HttpHeaders;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.web.reactive.socket.client.StandardWebSocketClient;
@@ -119,12 +120,12 @@ public class TokenValidationTest {
 
     @Test
     public void gatewayTest() throws Exception {
-        stubFor(get(urlEqualTo("/v1/studies"))
+        stubFor(get(urlEqualTo("/v1/studies")).withHeader("subject", equalTo("chmits"))
                 .willReturn(aResponse()
                         .withHeader("Content-Type", "application/json")
                         .withBody("[{\"studyName\": \"CgmesStudy\", \"caseFormat\" :\"CGMES\"}, {\"studyName\": \"IIDMStudy\", \"caseFormat\" :\"IIDM\"}]")));
 
-        stubFor(get(urlEqualTo("/v1/cases"))
+        stubFor(get(urlEqualTo("/v1/cases")).withHeader("subject", equalTo("chmits"))
                 .willReturn(aResponse()
                         .withHeader("Content-Type", "application/json")
                         .withBody("[{\"name\": \"testCase\", \"format\" :\"XIIDM\"}, {\"name\": \"testCase2\", \"format\" :\"CGMES\"}]")));
@@ -139,13 +140,13 @@ public class TokenValidationTest {
                         .withHeader("Content-Type", "application/json")
                         .withBody("{\"keys\" : [ " + rsaKey.toJSONString() + " ] }")));
 
-        stubFor(get(urlPathEqualTo("/notify")).willReturn(aResponse()
-                .withHeader("Sec-WebSocket-Accept", "{{{sec-websocket-accept request.headers.Sec-WebSocket-Key}}}")
-                .withHeader("Upgrade", "websocket")
-                .withHeader("Connection", "Upgrade")
-                .withStatus(101)
-                .withStatusMessage("Switching Protocols")
-        ));
+        stubFor(get(urlPathEqualTo("/notify")).withHeader("subject", equalTo("chmits"))
+                .willReturn(aResponse()
+                        .withHeader("Sec-WebSocket-Accept", "{{{sec-websocket-accept request.headers.Sec-WebSocket-Key}}}")
+                        .withHeader("Upgrade", "websocket")
+                        .withHeader("Connection", "Upgrade")
+                        .withStatus(101)
+                        .withStatusMessage("Switching Protocols")));
 
         webClient
                 .get().uri("case/v1/cases")
@@ -171,9 +172,12 @@ public class TokenValidationTest {
 
         //Test a websocket with token in query parameters
         WebSocketClient client = new StandardWebSocketClient();
+        HttpHeaders headers = new HttpHeaders();
         client.execute(
-                URI.create("ws://localhost:" + this.localServerPort + "/notification/notify?access_token=" + token),
-            ws -> ws.receive().then()).subscribe();
+                URI.create("ws://localhost:" + this.localServerPort + "/notification/notify?access_token=" + token), headers,
+            ws -> ws.receive().then())
+                .subscribe();
+
         // Busy loop waiting to check that spring-gateway contacted our wiremock server
         // Is there a better way to wait for wiremock to complete the request ?
         boolean done = false;
