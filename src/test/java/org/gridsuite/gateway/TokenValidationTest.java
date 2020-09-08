@@ -120,12 +120,12 @@ public class TokenValidationTest {
 
     @Test
     public void gatewayTest() throws Exception {
-        stubFor(get(urlEqualTo("/v1/studies")).withHeader("subject", equalTo("chmits"))
+        stubFor(get(urlEqualTo("/v1/studies")).withHeader("subject", equalTo("chmits")).withHeader("issuer", equalTo("http://localhost:" + port))
                 .willReturn(aResponse()
                         .withHeader("Content-Type", "application/json")
                         .withBody("[{\"studyName\": \"CgmesStudy\", \"caseFormat\" :\"CGMES\"}, {\"studyName\": \"IIDMStudy\", \"caseFormat\" :\"IIDM\"}]")));
 
-        stubFor(get(urlEqualTo("/v1/cases")).withHeader("subject", equalTo("chmits"))
+        stubFor(get(urlEqualTo("/v1/cases")).withHeader("subject", equalTo("chmits")).withHeader("issuer", equalTo("http://localhost:" + port))
                 .willReturn(aResponse()
                         .withHeader("Content-Type", "application/json")
                         .withBody("[{\"name\": \"testCase\", \"format\" :\"XIIDM\"}, {\"name\": \"testCase2\", \"format\" :\"CGMES\"}]")));
@@ -140,7 +140,7 @@ public class TokenValidationTest {
                         .withHeader("Content-Type", "application/json")
                         .withBody("{\"keys\" : [ " + rsaKey.toJSONString() + " ] }")));
 
-        stubFor(get(urlPathEqualTo("/notify")).withHeader("subject", equalTo("chmits"))
+        stubFor(get(urlPathEqualTo("/notify")).withHeader("subject", equalTo("chmits")).withHeader("issuer", equalTo("http://localhost:" + port))
                 .willReturn(aResponse()
                         .withHeader("Sec-WebSocket-Accept", "{{{sec-websocket-accept request.headers.Sec-WebSocket-Key}}}")
                         .withHeader("Upgrade", "websocket")

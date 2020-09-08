@@ -134,7 +134,10 @@ public class TokenValidatorGlobalPreFilter implements GlobalFilter, Ordered {
             //we add the subject header
             exchange.getRequest()
                     .mutate()
-                    .headers(h -> h.set("subject", jwtClaimsSet.getSubject()));
+                    .headers(h -> {
+                        h.set("subject", jwtClaimsSet.getSubject());
+                        h.set("issuer", iss.getValue());
+                    });
         } catch (JOSEException | BadJOSEException | ParseException | MalformedURLException e) {
             LOGGER.info("{}: 401 Unauthorized, The token cannot be trusted : {}", exchange.getRequest().getPath(), e.getMessage());
             // set UNAUTHORIZED 401 response and stop the processing
