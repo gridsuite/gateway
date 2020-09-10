@@ -1,6 +1,18 @@
+/**
+ * Copyright (c) 2020, RTE (http://www.rte-france.com)
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
 package org.gridsuite.gateway;
 
-import com.nimbusds.jose.*;
+import com.github.tomakehurst.wiremock.client.VerificationException;
+import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
+import com.github.tomakehurst.wiremock.extension.responsetemplating.ResponseTemplateTransformer;
+import com.nimbusds.jose.JOSEException;
+import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.JWSHeader;
+import com.nimbusds.jose.JWSSigner;
 import com.nimbusds.jose.crypto.RSASSASigner;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator;
@@ -23,9 +35,9 @@ import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.web.reactive.socket.client.StandardWebSocketClient;
 import org.springframework.web.reactive.socket.client.WebSocketClient;
-import com.github.tomakehurst.wiremock.client.VerificationException;
-import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
-import com.github.tomakehurst.wiremock.extension.responsetemplating.ResponseTemplateTransformer;
+import wiremock.com.github.jknack.handlebars.Helper;
+import wiremock.com.github.jknack.handlebars.Options;
+
 import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -33,15 +45,17 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
 import java.util.Date;
-import wiremock.com.github.jknack.handlebars.Helper;
-import wiremock.com.github.jknack.handlebars.Options;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 
+/**
+ * @author Chamseddine Benhamed <chamseddine.benhamed at rte-france.com>
+ */
 @RunWith(SpringRunner.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {"caseServerBaseUri=http://localhost:${wiremock.server.port}",
                 "studyServerBaseUri=http://localhost:${wiremock.server.port}",
+                "mergeOrchestratorServerBaseUri=http://localhost:${wiremock.server.port}",
                 "mergeNotificationServerBaseUri=http://localhost:${wiremock.server.port}",
                 "notificationServerBaseUri=http://localhost:${wiremock.server.port}"})
 @AutoConfigureWireMock(port = 0)
@@ -118,6 +132,37 @@ public class TokenValidationTest {
         tokenWithNotAllowedissuer = signedJWTWithIssuerNotAllowed.serialize();
     }
 
+    private void testWebsocket(String name) throws InterruptedException {
+        //Test a websocket with token in query parameters
+        WebSocketClient client = new StandardWebSocketClient();
+        HttpHeaders headers = new HttpHeaders();
+        client.execute(
+            URI.create("ws://localhost:" + this.localServerPort + "/" + name + "/notify?access_token=" + token), headers,
+            ws -> ws.receive().then())
+            .subscribe();
+
+        // Busy loop waiting to check that spring-gateway contacted our wiremock server
+        // Is there a better way to wait for wiremock to complete the request ?
+        boolean done = false;
+        for (int i = 0; i < 100; i++) {
+            Thread.sleep(10);
+            try {
+                verify(getRequestedFor(urlPathEqualTo("/notify"))
+                        .withHeader("Connection", equalTo("Upgrade"))
+                        .withHeader("Upgrade", equalTo("websocket")));
+                done = true;
+            } catch (VerificationException e) {
+                // nothing to do
+            }
+            if (done) {
+                break;
+            }
+        }
+        if (!done) {
+            Assert.fail("Wiremock didn't receive the websocket connection");
+        }
+    }
+
     @Test
     public void gatewayTest() throws Exception {
         stubFor(get(urlEqualTo("/v1/studies")).withHeader("subject", equalTo("chmits")).withHeader("issuer", equalTo("http://localhost:" + port))
@@ -129,6 +174,11 @@ public class TokenValidationTest {
                 .willReturn(aResponse()
                         .withHeader("Content-Type", "application/json")
                         .withBody("[{\"name\": \"testCase\", \"format\" :\"XIIDM\"}, {\"name\": \"testCase2\", \"format\" :\"CGMES\"}]")));
+
+        stubFor(get(urlEqualTo("/v1/configs")).withHeader("subject", equalTo("chmits")).withHeader("issuer", equalTo("http://localhost:" + port))
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("[{\"process\": \"TEST\", \"tsos\" : [\"BE\", \"NL\"]}]")));
 
         stubFor(get(urlEqualTo("/.well-known/openid-configuration"))
                 .willReturn(aResponse()
@@ -170,34 +220,18 @@ public class TokenValidationTest {
                 .jsonPath("$[0].studyName").isEqualTo("CgmesStudy")
                 .jsonPath("$[1].studyName").isEqualTo("IIDMStudy");
 
-        //Test a websocket with token in query parameters
-        WebSocketClient client = new StandardWebSocketClient();
-        HttpHeaders headers = new HttpHeaders();
-        client.execute(
-                URI.create("ws://localhost:" + this.localServerPort + "/notification/notify?access_token=" + token), headers,
-            ws -> ws.receive().then())
-                .subscribe();
+        webClient
+                .get().uri("merge/v1/configs")
+                .header("Authorization", "Bearer " + token)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$[0].process").isEqualTo("TEST")
+                .jsonPath("$[0].tsos[0]").isEqualTo("BE")
+                .jsonPath("$[0].tsos[1]").isEqualTo("NL");
 
-        // Busy loop waiting to check that spring-gateway contacted our wiremock server
-        // Is there a better way to wait for wiremock to complete the request ?
-        boolean done = false;
-        for (int i = 0; i < 100; i++) {
-            Thread.sleep(10);
-            try {
-                verify(getRequestedFor(urlPathEqualTo("/notify"))
-                        .withHeader("Connection", equalTo("Upgrade"))
-                        .withHeader("Upgrade", equalTo("websocket")));
-                done = true;
-            } catch (VerificationException e) {
-                // nothing to do
-            }
-            if (done) {
-                break;
-            }
-        }
-        if (!done) {
-            Assert.fail("Wiremock didn't receive the websocket connection");
-        }
+        testWebsocket("notification");
+        testWebsocket("merge-notification");
     }
 
     @Test

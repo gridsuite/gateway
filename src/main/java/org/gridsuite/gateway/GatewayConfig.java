@@ -37,6 +37,11 @@ public class GatewayConfig {
                     .uri(uriConfiguration.getCaseServerBaseUri())
             )
             .route(p -> p
+                    .path("/merge/**")
+                    .filters(f -> f.rewritePath("/merge/(.*)", "/$1"))
+                    .uri(uriConfiguration.getMergeOrchestratorServerBaseUri())
+            )
+            .route(p -> p
                     .path("/notification/**")
                     .filters(f -> f.rewritePath("/notification/(.*)", "/$1"))
                     .uri(uriConfiguration.getNotificationServerBaseUri())
@@ -54,6 +59,7 @@ public class GatewayConfig {
 class UriConfiguration {
     @Value("${backing-services.case.base-uri:http://case-server/}") String caseServerBaseUri;
     @Value("${backing-services.study-server.base-uri:http://study-server/}") String studyServerBaseUri;
+    @Value("${backing-services.merge-orchestrator-server.base-uri:http://study-server/}") String mergeOrchestratorServerBaseUri;
     @Value("${backing-services.notification-server.base-uri:http://notification-server/}") String notificationServerBaseUri;
     @Value("${backing-services.merge-notification-server.base-uri:http://merge-notification-server/}") String mergeNotificationServerBaseUri;
 
@@ -71,6 +77,14 @@ class UriConfiguration {
 
     public void setStudyServerBaseUri(String studyServerBaseUri) {
         this.studyServerBaseUri = studyServerBaseUri;
+    }
+
+    public String getMergeOrchestratorServerBaseUri() {
+        return mergeOrchestratorServerBaseUri;
+    }
+
+    public void setMergeOrchestratorServerBaseUri(String mergeOrchestratorServerBaseUri) {
+        this.mergeOrchestratorServerBaseUri = mergeOrchestratorServerBaseUri;
     }
 
     public String getNotificationServerBaseUri() {
