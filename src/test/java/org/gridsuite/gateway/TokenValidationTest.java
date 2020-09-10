@@ -6,7 +6,13 @@
  */
 package org.gridsuite.gateway;
 
-import com.nimbusds.jose.*;
+import com.github.tomakehurst.wiremock.client.VerificationException;
+import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
+import com.github.tomakehurst.wiremock.extension.responsetemplating.ResponseTemplateTransformer;
+import com.nimbusds.jose.JOSEException;
+import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.JWSHeader;
+import com.nimbusds.jose.JWSSigner;
 import com.nimbusds.jose.crypto.RSASSASigner;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator;
@@ -29,9 +35,9 @@ import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.web.reactive.socket.client.StandardWebSocketClient;
 import org.springframework.web.reactive.socket.client.WebSocketClient;
-import com.github.tomakehurst.wiremock.client.VerificationException;
-import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
-import com.github.tomakehurst.wiremock.extension.responsetemplating.ResponseTemplateTransformer;
+import wiremock.com.github.jknack.handlebars.Helper;
+import wiremock.com.github.jknack.handlebars.Options;
+
 import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -39,8 +45,6 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
 import java.util.Date;
-import wiremock.com.github.jknack.handlebars.Helper;
-import wiremock.com.github.jknack.handlebars.Options;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 
@@ -139,6 +143,11 @@ public class TokenValidationTest {
                         .withHeader("Content-Type", "application/json")
                         .withBody("[{\"name\": \"testCase\", \"format\" :\"XIIDM\"}, {\"name\": \"testCase2\", \"format\" :\"CGMES\"}]")));
 
+        stubFor(get(urlEqualTo("/v1/configs")).withHeader("subject", equalTo("chmits")).withHeader("issuer", equalTo("http://localhost:" + port))
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("[{\"process\": \"TEST\", \"tsos\" : [\"BE\", \"NL\"]}]")));
+
         stubFor(get(urlEqualTo("/.well-known/openid-configuration"))
                 .willReturn(aResponse()
                         .withHeader("Content-Type", "application/json")
@@ -178,6 +187,16 @@ public class TokenValidationTest {
                 .jsonPath("$[1].caseFormat").isEqualTo("IIDM")
                 .jsonPath("$[0].studyName").isEqualTo("CgmesStudy")
                 .jsonPath("$[1].studyName").isEqualTo("IIDMStudy");
+
+        webClient
+                .get().uri("merge/v1/configs")
+                .header("Authorization", "Bearer " + token)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$[0].process").isEqualTo("TEST")
+                .jsonPath("$[0].tsos[0]").isEqualTo("BE")
+                .jsonPath("$[0].tsos[1]").isEqualTo("NL");
 
         //Test a websocket with token in query parameters
         WebSocketClient client = new StandardWebSocketClient();
