@@ -137,9 +137,9 @@ public class TokenValidationTest {
         WebSocketClient client = new StandardWebSocketClient();
         HttpHeaders headers = new HttpHeaders();
         client.execute(
-                URI.create("ws://localhost:" + this.localServerPort + "/" + name + "/notify?access_token=" + token), headers,
-                ws -> ws.receive().then())
-                .subscribe();
+            URI.create("ws://localhost:" + this.localServerPort + "/" + name + "/notify?access_token=" + token), headers,
+            ws -> ws.receive().then())
+            .subscribe();
 
         // Busy loop waiting to check that spring-gateway contacted our wiremock server
         // Is there a better way to wait for wiremock to complete the request ?
