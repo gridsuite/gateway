@@ -132,6 +132,37 @@ public class TokenValidationTest {
         tokenWithNotAllowedissuer = signedJWTWithIssuerNotAllowed.serialize();
     }
 
+    private void testWebsocket(String name) throws InterruptedException {
+        //Test a websocket with token in query parameters
+        WebSocketClient client = new StandardWebSocketClient();
+        HttpHeaders headers = new HttpHeaders();
+        client.execute(
+                URI.create("ws://localhost:" + this.localServerPort + "/" + name + "/notify?access_token=" + token), headers,
+                ws -> ws.receive().then())
+                .subscribe();
+
+        // Busy loop waiting to check that spring-gateway contacted our wiremock server
+        // Is there a better way to wait for wiremock to complete the request ?
+        boolean done = false;
+        for (int i = 0; i < 100; i++) {
+            Thread.sleep(10);
+            try {
+                verify(getRequestedFor(urlPathEqualTo("/notify"))
+                        .withHeader("Connection", equalTo("Upgrade"))
+                        .withHeader("Upgrade", equalTo("websocket")));
+                done = true;
+            } catch (VerificationException e) {
+                // nothing to do
+            }
+            if (done) {
+                break;
+            }
+        }
+        if (!done) {
+            Assert.fail("Wiremock didn't receive the websocket connection");
+        }
+    }
+
     @Test
     public void gatewayTest() throws Exception {
         stubFor(get(urlEqualTo("/v1/studies")).withHeader("subject", equalTo("chmits")).withHeader("issuer", equalTo("http://localhost:" + port))
@@ -199,34 +230,8 @@ public class TokenValidationTest {
                 .jsonPath("$[0].tsos[0]").isEqualTo("BE")
                 .jsonPath("$[0].tsos[1]").isEqualTo("NL");
 
-        //Test a websocket with token in query parameters
-        WebSocketClient client = new StandardWebSocketClient();
-        HttpHeaders headers = new HttpHeaders();
-        client.execute(
-                URI.create("ws://localhost:" + this.localServerPort + "/notification/notify?access_token=" + token), headers,
-            ws -> ws.receive().then())
-                .subscribe();
-
-        // Busy loop waiting to check that spring-gateway contacted our wiremock server
-        // Is there a better way to wait for wiremock to complete the request ?
-        boolean done = false;
-        for (int i = 0; i < 100; i++) {
-            Thread.sleep(10);
-            try {
-                verify(getRequestedFor(urlPathEqualTo("/notify"))
-                        .withHeader("Connection", equalTo("Upgrade"))
-                        .withHeader("Upgrade", equalTo("websocket")));
-                done = true;
-            } catch (VerificationException e) {
-                // nothing to do
-            }
-            if (done) {
-                break;
-            }
-        }
-        if (!done) {
-            Assert.fail("Wiremock didn't receive the websocket connection");
-        }
+        testWebsocket("notification");
+        testWebsocket("merge-notification");
     }
 
     @Test
