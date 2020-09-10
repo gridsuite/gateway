@@ -35,6 +35,7 @@ import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.web.reactive.socket.client.StandardWebSocketClient;
 import org.springframework.web.reactive.socket.client.WebSocketClient;
+import reactor.core.publisher.Mono;
 import wiremock.com.github.jknack.handlebars.Helper;
 import wiremock.com.github.jknack.handlebars.Options;
 
@@ -43,6 +44,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
 import java.util.Base64;
 import java.util.Date;
 
@@ -136,10 +138,10 @@ public class TokenValidationTest {
         //Test a websocket with token in query parameters
         WebSocketClient client = new StandardWebSocketClient();
         HttpHeaders headers = new HttpHeaders();
-        client.execute(
+        Mono<Void> wsconnection = client.execute(
             URI.create("ws://localhost:" + this.localServerPort + "/" + name + "/notify?access_token=" + token), headers,
-            ws -> ws.receive().then())
-            .subscribe();
+            ws -> ws.receive().then());
+        wsconnection.subscribe();
 
         // Busy loop waiting to check that spring-gateway contacted our wiremock server
         // Is there a better way to wait for wiremock to complete the request ?
@@ -160,6 +162,12 @@ public class TokenValidationTest {
         }
         if (!done) {
             Assert.fail("Wiremock didn't receive the websocket connection");
+        }
+        try {
+            wsconnection.timeout(Duration.ofMillis(100)).block();
+            Assert.fail("websocket client was closed but should remain open");
+        } catch (Exception ignored) {
+            //should timeout
         }
     }
 
