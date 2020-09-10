@@ -83,6 +83,10 @@ class UriConfiguration {
         return mergeOrchestratorServerBaseUri;
     }
 
+    public void setMergeOrchestratorServerBaseUri(String mergeOrchestratorServerBaseUri) {
+        this.mergeOrchestratorServerBaseUri = mergeOrchestratorServerBaseUri;
+    }
+
     public String getNotificationServerBaseUri() {
         return notificationServerBaseUri;
     }

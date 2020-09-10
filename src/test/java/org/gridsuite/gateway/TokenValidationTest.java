@@ -55,6 +55,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.*;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {"caseServerBaseUri=http://localhost:${wiremock.server.port}",
                 "studyServerBaseUri=http://localhost:${wiremock.server.port}",
+                "mergeOrchestratorServerBaseUri=http://localhost:${wiremock.server.port}",
                 "mergeNotificationServerBaseUri=http://localhost:${wiremock.server.port}",
                 "notificationServerBaseUri=http://localhost:${wiremock.server.port}"})
 @AutoConfigureWireMock(port = 0)
