@@ -12,3 +12,5 @@ backing-services:
     base-uri: http://localhost:5009
   merge-notification-server:
     base-uri: http://localhost:5002
+  actions-server:
+    base-uri: http://localhost:5022
