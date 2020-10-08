@@ -59,7 +59,9 @@ import static com.github.tomakehurst.wiremock.client.WireMock.*;
                 "studyServerBaseUri=http://localhost:${wiremock.server.port}",
                 "mergeOrchestratorServerBaseUri=http://localhost:${wiremock.server.port}",
                 "mergeNotificationServerBaseUri=http://localhost:${wiremock.server.port}",
+                "actionsServerBaseUri=http://localhost:${wiremock.server.port}",
                 "notificationServerBaseUri=http://localhost:${wiremock.server.port}"})
+
 @AutoConfigureWireMock(port = 0)
 public class TokenValidationTest {
 
@@ -178,6 +180,11 @@ public class TokenValidationTest {
                         .withHeader("Content-Type", "application/json")
                         .withBody("[{\"studyName\": \"CgmesStudy\", \"caseFormat\" :\"CGMES\"}, {\"studyName\": \"IIDMStudy\", \"caseFormat\" :\"IIDM\"}]")));
 
+        stubFor(get(urlEqualTo("/v1/contingency-lists")).withHeader("userId", equalTo("chmits"))
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("[{\"name\": \"test\", \"script\" :\"mys cript\"}]")));
+
         stubFor(get(urlEqualTo("/v1/cases")).withHeader("userId", equalTo("chmits"))
                 .willReturn(aResponse()
                         .withHeader("Content-Type", "application/json")
@@ -237,6 +244,14 @@ public class TokenValidationTest {
                 .jsonPath("$[0].process").isEqualTo("TEST")
                 .jsonPath("$[0].tsos[0]").isEqualTo("BE")
                 .jsonPath("$[0].tsos[1]").isEqualTo("NL");
+
+        webClient
+                .get().uri("actions/v1/contingency-lists")
+                .header("Authorization", "Bearer " + token)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$[0].name").isEqualTo("test");
 
         testWebsocket("notification");
         testWebsocket("merge-notification");
