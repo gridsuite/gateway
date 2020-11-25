@@ -22,6 +22,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
@@ -68,9 +69,7 @@ public class TokenValidatorGlobalPreFilter implements GlobalFilter, Ordered {
         if (ls == null && queryls == null) {
             LOGGER.info("{}: 401 Unauthorized, Authorization header or access_token query parameter is required",
                     exchange.getRequest().getPath());
-            // set UNAUTHORIZED 401 response and stop the processing
-            exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
-            return exchange.getResponse().setComplete();
+            return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
         }
 
         // For now we only handle one token. If needed, we can adapt this code to check
@@ -83,9 +82,7 @@ public class TokenValidatorGlobalPreFilter implements GlobalFilter, Ordered {
             if (arr.size() != 2 || !arr.get(0).equals("Bearer")) {
                 LOGGER.info("{}: 400 Bad Request, incorrect Authorization header value",
                         exchange.getRequest().getPath());
-                // set BAD REQUEST 400 response and stop the processing
-                exchange.getResponse().setStatusCode(HttpStatus.BAD_REQUEST);
-                return exchange.getResponse().setComplete();
+                return completeWithCode(exchange, HttpStatus.BAD_REQUEST);
             }
 
             token = arr.get(1);
@@ -101,17 +98,13 @@ public class TokenValidatorGlobalPreFilter implements GlobalFilter, Ordered {
         } catch (java.text.ParseException e) {
             // Invalid plain JOSE object encoding
             LOGGER.info("{}: 401 Unauthorized, Invalid plain JOSE object encoding", exchange.getRequest().getPath());
-            // set UNAUTHORIZED 401 response and stop the processing
-            exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
-            return exchange.getResponse().setComplete();
+            return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
         }
 
         LOGGER.debug("checking issuer");
         if (allowedIssuers.stream().noneMatch(iss -> jwtClaimsSet.getIssuer().startsWith(iss))) {
             LOGGER.info("{}: 401 Unauthorized, {} Issuer is not in the issuers white list", exchange.getRequest().getPath(), jwtClaimsSet.getIssuer());
-            // set UNAUTHORIZED 401 response and stop the processing
-            exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
-            return exchange.getResponse().setComplete();
+            return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
         }
 
         try {
@@ -137,11 +130,19 @@ public class TokenValidatorGlobalPreFilter implements GlobalFilter, Ordered {
                     .headers(h -> h.set("userId", jwtClaimsSet.getSubject()));
         } catch (JOSEException | BadJOSEException | ParseException | MalformedURLException e) {
             LOGGER.info("{}: 401 Unauthorized, The token cannot be trusted : {}", exchange.getRequest().getPath(), e.getMessage());
-            // set UNAUTHORIZED 401 response and stop the processing
-            exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
-            return exchange.getResponse().setComplete();
+            return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
         }
         return chain.filter(exchange);
+    }
+
+    private static Mono<Void> completeWithCode(ServerWebExchange exchange, HttpStatus code) {
+        exchange.getResponse().setStatusCode(code);
+        if ("websocket".equalsIgnoreCase(exchange.getRequest().getHeaders().getUpgrade())) {
+            // Force the connection to close for websockets handshakes to workaround apache
+            // httpd reusing the connection for all subsequent requests in this connection.
+            exchange.getResponse().getHeaders().set(HttpHeaders.CONNECTION, "close");
+        }
+        return exchange.getResponse().setComplete();
     }
 
 }
