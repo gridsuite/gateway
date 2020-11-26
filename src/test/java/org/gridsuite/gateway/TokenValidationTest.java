@@ -61,7 +61,9 @@ import static com.github.tomakehurst.wiremock.client.WireMock.*;
                 "mergeNotificationServerBaseUri=http://localhost:${wiremock.server.port}",
                 "actionsServerBaseUri=http://localhost:${wiremock.server.port}",
                 "notificationServerBaseUri=http://localhost:${wiremock.server.port}",
-                "configUiServerBaseUri=http://localhost:${wiremock.server.port}"})
+                "notificationServerBaseUri=http://localhost:${wiremock.server.port}",
+                "configUiServerBaseUri=http://localhost:${wiremock.server.port}",
+                "configNotificationServerBaseUri=http://localhost:${wiremock.server.port}"})
 
 @AutoConfigureWireMock(port = 0)
 public class TokenValidationTest {
@@ -266,8 +268,8 @@ public class TokenValidationTest {
                 .jsonPath("$[0].theme").isEqualTo("dark");
 
         testWebsocket("notification");
-        testWebsocket("merge-notification");
         testWebsocket("config-notification");
+        testWebsocket("merge-notification");
     }
 
     @Test
