@@ -57,9 +57,9 @@ public class GatewayConfig {
                     .uri(uriConfiguration.getActionsServerBaseUri())
             )
             .route(p -> p
-                    .path("/config-ui/**")
-                    .filters(f -> f.rewritePath("/config-ui/(.*)", "/$1"))
-                    .uri(uriConfiguration.getConfigUiServerBaseUri())
+                    .path("/config/**")
+                    .filters(f -> f.rewritePath("/config/(.*)", "/$1"))
+                    .uri(uriConfiguration.getConfigServerBaseUri())
             )
             .route(p -> p
                     .path("/config-notification/**")
@@ -79,7 +79,7 @@ class UriConfiguration {
     @Value("${backing-services.notification-server.base-uri:http://notification-server/}") String notificationServerBaseUri;
     @Value("${backing-services.merge-notification-server.base-uri:http://merge-notification-server/}") String mergeNotificationServerBaseUri;
     @Value("${backing-services.actions-server.base-uri:http://actions-server/}") String actionsServerBaseUri;
-    @Value("${backing-services.config-ui-server.base-uri:http://config-ui-server/}") String configUiServerBaseUri;
+    @Value("${backing-services.config-server.base-uri:http://config-server/}") String configServerBaseUri;
     @Value("${backing-services.config-notification-server.base-uri:http://config-notification-server/}") String configNotificationServerBaseUri;
 
     public String getCaseServerBaseUri() {
@@ -130,12 +130,12 @@ class UriConfiguration {
         this.actionsServerBaseUri = actionsServerBaseUri;
     }
 
-    public String getConfigUiServerBaseUri() {
-        return configUiServerBaseUri;
+    public String getConfigServerBaseUri() {
+        return configServerBaseUri;
     }
 
-    public void setConfigUiServerBaseUri(String configUiServerBaseUri) {
-        this.configUiServerBaseUri = configUiServerBaseUri;
+    public void setConfigServerBaseUri(String configServerBaseUri) {
+        this.configServerBaseUri = configServerBaseUri;
     }
 
     public String getConfigNotificationServerBaseUri() {

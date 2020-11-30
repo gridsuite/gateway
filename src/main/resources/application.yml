@@ -14,10 +14,10 @@ backing-services:
     base-uri: http://localhost:5002
   actions-server:
     base-uri: http://localhost:5022
-  config-ui-server:
-    base-uri: http://localhost:5011
+  config-server:
+    base-uri: http://localhost:5025
   config-notification-server:
-    base-uri: http://localhost:5010
+    base-uri: http://localhost:5024
 
 info:
   hostname: ${HOSTNAME}
