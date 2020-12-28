@@ -61,7 +61,6 @@ public class TokenValidatorGlobalPreFilter implements GlobalFilter, Ordered {
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
-        LOGGER.info(exchange.getRequest().getPath().toString());
         LOGGER.debug("checking authorization");
         ServerHttpRequest req = exchange.getRequest();
         List<String> ls = req.getHeaders().get("Authorization");
