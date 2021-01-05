@@ -56,6 +56,17 @@ public class GatewayConfig {
                     .filters(f -> f.rewritePath("/actions/(.*)", "/$1"))
                     .uri(uriConfiguration.getActionsServerBaseUri())
             )
+            .route(p -> p
+                    .path("/config/**")
+                    .filters(f -> f.rewritePath("/config/(.*)", "/$1"))
+                    .uri(uriConfiguration.getConfigServerBaseUri())
+            )
+            .route(p -> p
+                    .path("/config-notification/**")
+                    .filters(f -> f.rewritePath("/config-notification/(.*)", "/$1"))
+                    .uri(uriConfiguration.getConfigNotificationServerBaseUri())
+            )
+
             .build();
     }
 }
@@ -68,6 +79,8 @@ class UriConfiguration {
     @Value("${backing-services.notification-server.base-uri:http://notification-server/}") String notificationServerBaseUri;
     @Value("${backing-services.merge-notification-server.base-uri:http://merge-notification-server/}") String mergeNotificationServerBaseUri;
     @Value("${backing-services.actions-server.base-uri:http://actions-server/}") String actionsServerBaseUri;
+    @Value("${backing-services.config-server.base-uri:http://config-server/}") String configServerBaseUri;
+    @Value("${backing-services.config-notification-server.base-uri:http://config-notification-server/}") String configNotificationServerBaseUri;
 
     public String getCaseServerBaseUri() {
         return caseServerBaseUri;
@@ -115,5 +128,21 @@ class UriConfiguration {
 
     public void setActionsServerBaseUri(String actionsServerBaseUri) {
         this.actionsServerBaseUri = actionsServerBaseUri;
+    }
+
+    public String getConfigServerBaseUri() {
+        return configServerBaseUri;
+    }
+
+    public void setConfigServerBaseUri(String configServerBaseUri) {
+        this.configServerBaseUri = configServerBaseUri;
+    }
+
+    public String getConfigNotificationServerBaseUri() {
+        return configNotificationServerBaseUri;
+    }
+
+    public void setConfigNotificationServerBaseUri(String configNotificationServerBaseUri) {
+        this.configNotificationServerBaseUri = configNotificationServerBaseUri;
     }
 }

@@ -60,7 +60,9 @@ import static com.github.tomakehurst.wiremock.client.WireMock.*;
                 "mergeOrchestratorServerBaseUri=http://localhost:${wiremock.server.port}",
                 "mergeNotificationServerBaseUri=http://localhost:${wiremock.server.port}",
                 "actionsServerBaseUri=http://localhost:${wiremock.server.port}",
-                "notificationServerBaseUri=http://localhost:${wiremock.server.port}"})
+                "notificationServerBaseUri=http://localhost:${wiremock.server.port}",
+                "configServerBaseUri=http://localhost:${wiremock.server.port}",
+                "configNotificationServerBaseUri=http://localhost:${wiremock.server.port}"})
 
 @AutoConfigureWireMock(port = 0)
 public class TokenValidationTest {
@@ -189,7 +191,10 @@ public class TokenValidationTest {
                 .willReturn(aResponse()
                         .withHeader("Content-Type", "application/json")
                         .withBody("[{\"name\": \"testCase\", \"format\" :\"XIIDM\"}, {\"name\": \"testCase2\", \"format\" :\"CGMES\"}]")));
-
+        stubFor(get(urlEqualTo("/v1/parameters")).withHeader("userId", equalTo("chmits"))
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("[{\"theme\": \"dark\"}]")));
         stubFor(get(urlEqualTo("/v1/configs")).withHeader("userId", equalTo("chmits"))
                 .willReturn(aResponse()
                         .withHeader("Content-Type", "application/json")
@@ -253,7 +258,16 @@ public class TokenValidationTest {
                 .expectBody()
                 .jsonPath("$[0].name").isEqualTo("test");
 
+        webClient
+                .get().uri("config/v1/parameters")
+                .header("Authorization", "Bearer " + token)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$[0].theme").isEqualTo("dark");
+
         testWebsocket("notification");
+        testWebsocket("config-notification");
         testWebsocket("merge-notification");
     }
 
