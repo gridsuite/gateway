@@ -150,6 +150,7 @@ class UriConfiguration {
     public void setConfigNotificationServerBaseUri(String configNotificationServerBaseUri) {
         this.configNotificationServerBaseUri = configNotificationServerBaseUri;
     }
+
     public String getDirectoryServerBaseUri() {
         return directoryServerBaseUri;
     }
