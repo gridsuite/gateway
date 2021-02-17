@@ -62,7 +62,8 @@ import static com.github.tomakehurst.wiremock.client.WireMock.*;
                 "actionsServerBaseUri=http://localhost:${wiremock.server.port}",
                 "notificationServerBaseUri=http://localhost:${wiremock.server.port}",
                 "configServerBaseUri=http://localhost:${wiremock.server.port}",
-                "configNotificationServerBaseUri=http://localhost:${wiremock.server.port}"})
+                "configNotificationServerBaseUri=http://localhost:${wiremock.server.port}",
+                "directoryServerBaseUri=http://localhost:${wiremock.server.port}"})
 
 @AutoConfigureWireMock(port = 0)
 public class TokenValidationTest {
@@ -187,6 +188,11 @@ public class TokenValidationTest {
                         .withHeader("Content-Type", "application/json")
                         .withBody("[{\"name\": \"test\", \"script\" :\"mys cript\"}]")));
 
+        stubFor(get(urlEqualTo("/v1/directories")).withHeader("userId", equalTo("chmits"))
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("[{\"name\": \"test\"}]")));
+
         stubFor(get(urlEqualTo("/v1/cases")).withHeader("userId", equalTo("chmits"))
                 .willReturn(aResponse()
                         .withHeader("Content-Type", "application/json")
@@ -265,6 +271,14 @@ public class TokenValidationTest {
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$[0].theme").isEqualTo("dark");
+
+        webClient
+                .get().uri("directory/v1/directories")
+                .header("Authorization", "Bearer " + token)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$[0].name").isEqualTo("test");
 
         testWebsocket("notification");
         testWebsocket("config-notification");

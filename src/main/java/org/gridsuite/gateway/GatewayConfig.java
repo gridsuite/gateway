@@ -66,7 +66,11 @@ public class GatewayConfig {
                     .filters(f -> f.rewritePath("/config-notification/(.*)", "/$1"))
                     .uri(uriConfiguration.getConfigNotificationServerBaseUri())
             )
-
+            .route(p -> p
+                    .path("/directory/**")
+                    .filters(f -> f.rewritePath("/directory/(.*)", "/$1"))
+                    .uri(uriConfiguration.getDirectoryServerBaseUri())
+            )
             .build();
     }
 }
@@ -81,6 +85,7 @@ class UriConfiguration {
     @Value("${backing-services.actions-server.base-uri:http://actions-server/}") String actionsServerBaseUri;
     @Value("${backing-services.config-server.base-uri:http://config-server/}") String configServerBaseUri;
     @Value("${backing-services.config-notification-server.base-uri:http://config-notification-server/}") String configNotificationServerBaseUri;
+    @Value("${backing-services.directory-server.base-uri:http://directory-server/}") String directoryServerBaseUri;
 
     public String getCaseServerBaseUri() {
         return caseServerBaseUri;
@@ -145,4 +150,13 @@ class UriConfiguration {
     public void setConfigNotificationServerBaseUri(String configNotificationServerBaseUri) {
         this.configNotificationServerBaseUri = configNotificationServerBaseUri;
     }
+
+    public String getDirectoryServerBaseUri() {
+        return directoryServerBaseUri;
+    }
+
+    public void setDirectoryServerBaseUri(String directoryServerBaseUri) {
+        this.directoryServerBaseUri = directoryServerBaseUri;
+    }
+
 }
