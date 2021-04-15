@@ -71,6 +71,11 @@ public class GatewayConfig {
                     .filters(f -> f.rewritePath("/directory/(.*)", "/$1"))
                     .uri(uriConfiguration.getDirectoryServerBaseUri())
             )
+            .route(p -> p
+                .path("/boundary/**")
+                .filters(f -> f.rewritePath("/boundary/(.*)", "/$1"))
+                .uri(uriConfiguration.getBoundaryServerBaseUri())
+            )
             .build();
     }
 }
@@ -86,6 +91,7 @@ class UriConfiguration {
     @Value("${backing-services.config-server.base-uri:http://config-server/}") String configServerBaseUri;
     @Value("${backing-services.config-notification-server.base-uri:http://config-notification-server/}") String configNotificationServerBaseUri;
     @Value("${backing-services.directory-server.base-uri:http://directory-server/}") String directoryServerBaseUri;
+    @Value("${backing-services.cgmes-boundary-server.base-uri:http://cgmes-boundary-server/}") String boundaryServerBaseUri;
 
     public String getCaseServerBaseUri() {
         return caseServerBaseUri;
@@ -159,4 +165,11 @@ class UriConfiguration {
         this.directoryServerBaseUri = directoryServerBaseUri;
     }
 
+    public String getBoundaryServerBaseUri() {
+        return boundaryServerBaseUri;
+    }
+
+    public void setBoundaryServerBaseUri(String boundaryServerBaseUri) {
+        this.boundaryServerBaseUri = boundaryServerBaseUri;
+    }
 }

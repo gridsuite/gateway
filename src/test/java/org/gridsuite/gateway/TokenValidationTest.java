@@ -55,15 +55,16 @@ import static com.github.tomakehurst.wiremock.client.WireMock.*;
  */
 @RunWith(SpringRunner.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {"caseServerBaseUri=http://localhost:${wiremock.server.port}",
-                "studyServerBaseUri=http://localhost:${wiremock.server.port}",
-                "mergeOrchestratorServerBaseUri=http://localhost:${wiremock.server.port}",
-                "mergeNotificationServerBaseUri=http://localhost:${wiremock.server.port}",
-                "actionsServerBaseUri=http://localhost:${wiremock.server.port}",
-                "notificationServerBaseUri=http://localhost:${wiremock.server.port}",
-                "configServerBaseUri=http://localhost:${wiremock.server.port}",
-                "configNotificationServerBaseUri=http://localhost:${wiremock.server.port}",
-                "directoryServerBaseUri=http://localhost:${wiremock.server.port}"})
+    properties = {"caseServerBaseUri=http://localhost:${wiremock.server.port}",
+        "studyServerBaseUri=http://localhost:${wiremock.server.port}",
+        "mergeOrchestratorServerBaseUri=http://localhost:${wiremock.server.port}",
+        "mergeNotificationServerBaseUri=http://localhost:${wiremock.server.port}",
+        "actionsServerBaseUri=http://localhost:${wiremock.server.port}",
+        "notificationServerBaseUri=http://localhost:${wiremock.server.port}",
+        "configServerBaseUri=http://localhost:${wiremock.server.port}",
+        "configNotificationServerBaseUri=http://localhost:${wiremock.server.port}",
+        "directoryServerBaseUri=http://localhost:${wiremock.server.port}",
+        "boundaryServerBaseUri=http://localhost:${wiremock.server.port}"})
 
 @AutoConfigureWireMock(port = 0)
 public class TokenValidationTest {
@@ -197,14 +198,21 @@ public class TokenValidationTest {
                 .willReturn(aResponse()
                         .withHeader("Content-Type", "application/json")
                         .withBody("[{\"name\": \"testCase\", \"format\" :\"XIIDM\"}, {\"name\": \"testCase2\", \"format\" :\"CGMES\"}]")));
+
         stubFor(get(urlEqualTo("/v1/parameters")).withHeader("userId", equalTo("chmits"))
                 .willReturn(aResponse()
                         .withHeader("Content-Type", "application/json")
                         .withBody("[{\"theme\": \"dark\"}]")));
+
         stubFor(get(urlEqualTo("/v1/configs")).withHeader("userId", equalTo("chmits"))
                 .willReturn(aResponse()
                         .withHeader("Content-Type", "application/json")
                         .withBody("[{\"process\": \"TEST\", \"tsos\" : [\"BE\", \"NL\"]}]")));
+
+        stubFor(get(urlEqualTo("/v1/boundaries")).withHeader("userId", equalTo("chmits"))
+            .willReturn(aResponse()
+                .withHeader("Content-Type", "application/json")
+                .withBody("[{\"name\": \"boundary1\", \"id\" :\"da47a173-22d2-47e8-8a84-aa66e2d0fafb\"}]")));
 
         stubFor(get(urlEqualTo("/.well-known/openid-configuration"))
                 .willReturn(aResponse()
@@ -279,6 +287,15 @@ public class TokenValidationTest {
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$[0].name").isEqualTo("test");
+
+        webClient
+            .get().uri("boundary/v1/boundaries")
+            .header("Authorization", "Bearer " + token)
+            .exchange()
+            .expectStatus().isOk()
+            .expectBody()
+            .jsonPath("$[0].name").isEqualTo("boundary1")
+            .jsonPath("$[0].id").isEqualTo("da47a173-22d2-47e8-8a84-aa66e2d0fafb");
 
         testWebsocket("notification");
         testWebsocket("config-notification");
