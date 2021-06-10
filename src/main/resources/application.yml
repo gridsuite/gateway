@@ -22,6 +22,8 @@ backing-services:
     base-uri: http://localhost:5026
   cgmes-boundary-server:
     base-uri: http://localhost:5021
+  dynamic-mapping-server:
+    base-uri: http://localhost:5036
 
 info:
   hostname: ${HOSTNAME}
