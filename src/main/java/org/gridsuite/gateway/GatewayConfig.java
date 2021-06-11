@@ -180,7 +180,7 @@ class UriConfiguration {
     }
 
     public String getDynamicMappingServerBaseUri() {
-        return boundaryServerBaseUri;
+        return dynamicMappingServerBaseUri;
     }
 
     public void setDynamicMappingServerBaseUri(String dynamicMappingServerBaseUri) {
