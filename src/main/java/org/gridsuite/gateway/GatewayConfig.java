@@ -81,6 +81,11 @@ public class GatewayConfig {
                 .filters(f -> f.rewritePath("/dynamic-mapping/(.*)", "/$1"))
                 .uri(uriConfiguration.getDynamicMappingServerBaseUri())
             )
+            .route(p -> p
+                    .path("/filter/**")
+                    .filters(f -> f.rewritePath("/filter/(.*)", "/$1"))
+                    .uri(uriConfiguration.getFilterServerBaseUri())
+            )
             .build();
     }
 }
@@ -98,6 +103,7 @@ class UriConfiguration {
     @Value("${backing-services.directory-server.base-uri:http://directory-server/}") String directoryServerBaseUri;
     @Value("${backing-services.cgmes-boundary-server.base-uri:http://cgmes-boundary-server/}") String boundaryServerBaseUri;
     @Value("${backing-services.dynamic-mapping-server.base-uri:http://dynamic-mapping-server/}") String dynamicMappingServerBaseUri;
+    @Value("${backing-services.filter-server.base-uri:http://filter-server/}") String filterServerBaseUri;
 
     public String getCaseServerBaseUri() {
         return caseServerBaseUri;
@@ -185,5 +191,13 @@ class UriConfiguration {
 
     public void setDynamicMappingServerBaseUri(String dynamicMappingServerBaseUri) {
         this.dynamicMappingServerBaseUri = dynamicMappingServerBaseUri;
+    }
+
+    public String getFilterServerBaseUri() {
+        return filterServerBaseUri;
+    }
+
+    public void setFilterServerBaseUri(String filterServerBaseUri) {
+        this.filterServerBaseUri = filterServerBaseUri;
     }
 }

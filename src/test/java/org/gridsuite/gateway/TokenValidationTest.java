@@ -65,7 +65,8 @@ import static com.github.tomakehurst.wiremock.client.WireMock.*;
         "configNotificationServerBaseUri=http://localhost:${wiremock.server.port}",
         "directoryServerBaseUri=http://localhost:${wiremock.server.port}",
         "boundaryServerBaseUri=http://localhost:${wiremock.server.port}",
-        "dynamicMappingServerBaseUri=http://localhost:${wiremock.server.port}"})
+        "dynamicMappingServerBaseUri=http://localhost:${wiremock.server.port}",
+        "filterServerBaseUri=http://localhost:${wiremock.server.port}"})
 
 @AutoConfigureWireMock(port = 0)
 public class TokenValidationTest {
@@ -220,6 +221,11 @@ public class TokenValidationTest {
                         .withHeader("Content-Type", "application/json")
                         .withBody("[{\"name\": \"mapping1\", \"rules\":[]}]")));
 
+        stubFor(get(urlEqualTo("/v1/filters")).withHeader("userId", equalTo("chmits"))
+            .willReturn(aResponse()
+                .withHeader("Content-Type", "application/json")
+                .withBody("[{\"name\": \"filter1\", \"type\" :\"LINE\"}]")));
+
         stubFor(get(urlEqualTo("/.well-known/openid-configuration"))
                 .willReturn(aResponse()
                         .withHeader("Content-Type", "application/json")
@@ -310,6 +316,15 @@ public class TokenValidationTest {
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$[0].name").isEqualTo("mapping1");
+
+        webClient
+            .get().uri("filter/v1/filters")
+            .header("Authorization", "Bearer " + token)
+            .exchange()
+            .expectStatus().isOk()
+            .expectBody()
+            .jsonPath("$[0].name").isEqualTo("filter1")
+            .jsonPath("$[0].type").isEqualTo("LINE");
 
         testWebsocket("notification");
         testWebsocket("config-notification");
