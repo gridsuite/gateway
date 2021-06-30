@@ -65,6 +65,8 @@ import static com.github.tomakehurst.wiremock.client.WireMock.*;
         "configNotificationServerBaseUri=http://localhost:${wiremock.server.port}",
         "directoryServerBaseUri=http://localhost:${wiremock.server.port}",
         "boundaryServerBaseUri=http://localhost:${wiremock.server.port}",
+        "dynamicMappingServerBaseUri=http://localhost:${wiremock.server.port}",
+        "filterServerBaseUri=http://localhost:${wiremock.server.port}",
         "reportServerBaseUri=http://localhost:${wiremock.server.port}"})
 
 @AutoConfigureWireMock(port = 0)
@@ -215,6 +217,16 @@ public class TokenValidationTest {
                 .withHeader("Content-Type", "application/json")
                 .withBody("[{\"name\": \"boundary1\", \"id\" :\"da47a173-22d2-47e8-8a84-aa66e2d0fafb\"}]")));
 
+        stubFor(get(urlEqualTo("/mappings")).withHeader("userId", equalTo("chmits"))
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("[{\"name\": \"mapping1\", \"rules\":[]}]")));
+
+        stubFor(get(urlEqualTo("/v1/filters")).withHeader("userId", equalTo("chmits"))
+            .willReturn(aResponse()
+                .withHeader("Content-Type", "application/json")
+                .withBody("[{\"name\": \"filter1\", \"type\" :\"LINE\"}]")));
+
         stubFor(get(urlEqualTo("/v1/reports")).withHeader("userId", equalTo("chmits"))
             .willReturn(aResponse()
                 .withHeader("Content-Type", "application/json")
@@ -302,6 +314,23 @@ public class TokenValidationTest {
             .expectBody()
             .jsonPath("$[0].name").isEqualTo("boundary1")
             .jsonPath("$[0].id").isEqualTo("da47a173-22d2-47e8-8a84-aa66e2d0fafb");
+
+        webClient
+                .get().uri("dynamic-mapping/mappings")
+                .header("Authorization", "Bearer " + token)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$[0].name").isEqualTo("mapping1");
+
+        webClient
+            .get().uri("filter/v1/filters")
+            .header("Authorization", "Bearer " + token)
+            .exchange()
+            .expectStatus().isOk()
+            .expectBody()
+            .jsonPath("$[0].name").isEqualTo("filter1")
+            .jsonPath("$[0].type").isEqualTo("LINE");
 
         webClient
             .get().uri("report/v1/reports")
