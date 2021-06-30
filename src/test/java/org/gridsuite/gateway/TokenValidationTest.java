@@ -66,7 +66,8 @@ import static com.github.tomakehurst.wiremock.client.WireMock.*;
         "directoryServerBaseUri=http://localhost:${wiremock.server.port}",
         "boundaryServerBaseUri=http://localhost:${wiremock.server.port}",
         "dynamicMappingServerBaseUri=http://localhost:${wiremock.server.port}",
-        "filterServerBaseUri=http://localhost:${wiremock.server.port}"})
+        "filterServerBaseUri=http://localhost:${wiremock.server.port}",
+        "reportServerBaseUri=http://localhost:${wiremock.server.port}"})
 
 @AutoConfigureWireMock(port = 0)
 public class TokenValidationTest {
@@ -226,6 +227,11 @@ public class TokenValidationTest {
                 .withHeader("Content-Type", "application/json")
                 .withBody("[{\"name\": \"filter1\", \"type\" :\"LINE\"}]")));
 
+        stubFor(get(urlEqualTo("/v1/reports")).withHeader("userId", equalTo("chmits"))
+            .willReturn(aResponse()
+                .withHeader("Content-Type", "application/json")
+                .withBody("{\"id\": \"report1\", \"reports\" :[{\"date\":\"2001:01:01T11:11\", \"report\": \"Lets Rock\" }]}")));
+
         stubFor(get(urlEqualTo("/.well-known/openid-configuration"))
                 .willReturn(aResponse()
                         .withHeader("Content-Type", "application/json")
@@ -325,6 +331,16 @@ public class TokenValidationTest {
             .expectBody()
             .jsonPath("$[0].name").isEqualTo("filter1")
             .jsonPath("$[0].type").isEqualTo("LINE");
+
+        webClient
+            .get().uri("report/v1/reports")
+            .header("Authorization", "Bearer " + token)
+            .exchange()
+            .expectStatus().isOk()
+            .expectBody()
+            .jsonPath("$.id").isEqualTo("report1")
+            .jsonPath("$.reports[0].report").isEqualTo("Lets Rock")
+            .jsonPath("$.reports[0].date").isEqualTo("2001:01:01T11:11");
 
         testWebsocket("notification");
         testWebsocket("config-notification");

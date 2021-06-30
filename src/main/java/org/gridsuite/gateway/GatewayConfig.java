@@ -86,6 +86,11 @@ public class GatewayConfig {
                     .filters(f -> f.rewritePath("/filter/(.*)", "/$1"))
                     .uri(uriConfiguration.getFilterServerBaseUri())
             )
+            .route(p -> p
+                    .path("/report/**")
+                    .filters(f -> f.rewritePath("/report/(.*)", "/$1"))
+                    .uri(uriConfiguration.getReportServerBaseUri())
+            )
             .build();
     }
 }
@@ -104,6 +109,7 @@ class UriConfiguration {
     @Value("${backing-services.cgmes-boundary-server.base-uri:http://cgmes-boundary-server/}") String boundaryServerBaseUri;
     @Value("${backing-services.dynamic-mapping-server.base-uri:http://dynamic-mapping-server/}") String dynamicMappingServerBaseUri;
     @Value("${backing-services.filter-server.base-uri:http://filter-server/}") String filterServerBaseUri;
+    @Value("${backing-services.report-server.base-uri:http://report-server/}") String reportServerBaseUri;
 
     public String getCaseServerBaseUri() {
         return caseServerBaseUri;
@@ -199,5 +205,13 @@ class UriConfiguration {
 
     public void setFilterServerBaseUri(String filterServerBaseUri) {
         this.filterServerBaseUri = filterServerBaseUri;
+    }
+
+    public String getReportServerBaseUri() {
+        return reportServerBaseUri;
+    }
+
+    public void setReportServerBaseUri(String reportServerBaseUri) {
+        this.reportServerBaseUri = reportServerBaseUri;
     }
 }

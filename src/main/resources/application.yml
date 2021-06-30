@@ -26,6 +26,8 @@ backing-services:
     base-uri: http://localhost:5036
   filter-server:
     base-uri: http://localhost:5027
+  report-server:
+    base-uri: http://localhost:5028
 
 info:
   hostname: ${HOSTNAME}
