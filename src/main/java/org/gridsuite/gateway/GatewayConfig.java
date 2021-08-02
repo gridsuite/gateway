@@ -52,6 +52,11 @@ public class GatewayConfig {
                     .uri(uriConfiguration.getMergeNotificationServerBaseUri())
             )
             .route(p -> p
+                    .path("/directory-notification/**")
+                    .filters(f -> f.rewritePath("/directory-notification/(.*)", "/$1"))
+                    .uri(uriConfiguration.getDirectoryNotificationServerBaseUri())
+            )
+            .route(p -> p
                     .path("/actions/**")
                     .filters(f -> f.rewritePath("/actions/(.*)", "/$1"))
                     .uri(uriConfiguration.getActionsServerBaseUri())
@@ -110,6 +115,7 @@ class UriConfiguration {
     @Value("${backing-services.dynamic-mapping-server.base-uri:http://dynamic-mapping-server/}") String dynamicMappingServerBaseUri;
     @Value("${backing-services.filter-server.base-uri:http://filter-server/}") String filterServerBaseUri;
     @Value("${backing-services.report-server.base-uri:http://report-server/}") String reportServerBaseUri;
+    @Value("${backing-services.directory-notification-server.base-uri:http://directory-notification-server/}") String directoryNotificationServerBaseUri;
 
     public String getCaseServerBaseUri() {
         return caseServerBaseUri;
@@ -149,6 +155,14 @@ class UriConfiguration {
 
     public void setMergeNotificationServerBaseUri(String mergeNotificationServerBaseUri) {
         this.mergeNotificationServerBaseUri = mergeNotificationServerBaseUri;
+    }
+
+    public String getDirectoryNotificationServerBaseUri() {
+        return directoryNotificationServerBaseUri;
+    }
+
+    public void setDirectoryNotificationServerBaseUri(String directoryNotificationServerBaseUri) {
+        this.directoryNotificationServerBaseUri = directoryNotificationServerBaseUri;
     }
 
     public String getActionsServerBaseUri() {
