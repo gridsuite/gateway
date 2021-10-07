@@ -50,6 +50,7 @@
 
         <nimbus-jose-jwt.version>8.14</nimbus-jose-jwt.version>
         <oauth2-oidc-sdk.version>7.3</oauth2-oidc-sdk.version>
+        <jib.container.environment>SPRING_PROFILES_ACTIVE=default</jib.container.environment>
     </properties>
 
     <build>
