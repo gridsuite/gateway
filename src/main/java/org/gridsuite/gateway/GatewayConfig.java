@@ -104,7 +104,7 @@ public class GatewayConfig {
 class UriConfiguration {
     @Value("${backing-services.case.base-uri:http://case-server/}") String caseServerBaseUri;
     @Value("${backing-services.study-server.base-uri:http://study-server/}") String studyServerBaseUri;
-    @Value("${backing-services.merge-orchestrator-server.base-uri:http://study-server/}") String mergeOrchestratorServerBaseUri;
+    @Value("${backing-services.merge-orchestrator-server.base-uri:http://merge-orchestrator-server/}") String mergeOrchestratorServerBaseUri;
     @Value("${backing-services.notification-server.base-uri:http://notification-server/}") String notificationServerBaseUri;
     @Value("${backing-services.merge-notification-server.base-uri:http://merge-notification-server/}") String mergeNotificationServerBaseUri;
     @Value("${backing-services.actions-server.base-uri:http://actions-server/}") String actionsServerBaseUri;
