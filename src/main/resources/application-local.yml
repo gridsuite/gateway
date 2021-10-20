@@ -30,4 +30,6 @@ backing-services:
     base-uri: http://localhost:5027
   report-server:
     base-uri: http://localhost:5028
+  explore-server:
+    base-uri: http://localhost:5029
 

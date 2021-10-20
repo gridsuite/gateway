@@ -77,6 +77,11 @@ public class GatewayConfig {
                     .uri(uriConfiguration.getDirectoryServerBaseUri())
             )
             .route(p -> p
+                    .path("/explore/**")
+                    .filters(f -> f.rewritePath("/explore/(.*)", "/$1"))
+                    .uri(uriConfiguration.getDirectoryServerBaseUri())
+            )
+            .route(p -> p
                 .path("/boundary/**")
                 .filters(f -> f.rewritePath("/boundary/(.*)", "/$1"))
                 .uri(uriConfiguration.getBoundaryServerBaseUri())
