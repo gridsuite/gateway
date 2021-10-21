@@ -79,7 +79,7 @@ public class GatewayConfig {
             .route(p -> p
                     .path("/explore/**")
                     .filters(f -> f.rewritePath("/explore/(.*)", "/$1"))
-                    .uri(uriConfiguration.getDirectoryServerBaseUri())
+                    .uri(uriConfiguration.getExploreServerBaseUri())
             )
             .route(p -> p
                 .path("/boundary/**")
@@ -201,6 +201,14 @@ class UriConfiguration {
 
     public void setDirectoryServerBaseUri(String directoryServerBaseUri) {
         this.directoryServerBaseUri = directoryServerBaseUri;
+    }
+
+    public String getExploreServerBaseUri() {
+        return exploreServerBaseUri;
+    }
+
+    public void setExploreServerBaseUri(String exploreServerBaseUri) {
+        this.exploreServerBaseUri = exploreServerBaseUri;
     }
 
     public String getBoundaryServerBaseUri() {
