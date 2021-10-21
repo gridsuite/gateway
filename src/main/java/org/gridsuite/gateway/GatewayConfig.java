@@ -116,6 +116,7 @@ class UriConfiguration {
     @Value("${backing-services.config-server.base-uri:http://config-server/}") String configServerBaseUri;
     @Value("${backing-services.config-notification-server.base-uri:http://config-notification-server/}") String configNotificationServerBaseUri;
     @Value("${backing-services.directory-server.base-uri:http://directory-server/}") String directoryServerBaseUri;
+    @Value("${backing-services.explore-server.base-uri:http://explore-server/}") String exploreServerBaseUri;
     @Value("${backing-services.cgmes-boundary-server.base-uri:http://cgmes-boundary-server/}") String boundaryServerBaseUri;
     @Value("${backing-services.dynamic-mapping-server.base-uri:http://dynamic-mapping-server/}") String dynamicMappingServerBaseUri;
     @Value("${backing-services.filter-server.base-uri:http://filter-server/}") String filterServerBaseUri;
