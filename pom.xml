@@ -15,7 +15,7 @@
     <parent>
         <groupId>com.powsybl</groupId>
         <artifactId>powsybl-parent-ws</artifactId>
-        <version>5</version>
+        <version>7</version>
         <relativePath/>
     </parent>
 
@@ -46,11 +46,10 @@
     <properties>
         <java.version>11</java.version>
 
-        <gridsuite-dependencies.version>11</gridsuite-dependencies.version>
+        <gridsuite-dependencies.version>12</gridsuite-dependencies.version>
 
         <nimbus-jose-jwt.version>8.14</nimbus-jose-jwt.version>
         <oauth2-oidc-sdk.version>7.3</oauth2-oidc-sdk.version>
-        <jib.container.environment>SPRING_PROFILES_ACTIVE=default</jib.container.environment>
     </properties>
 
     <build>
@@ -108,13 +107,19 @@
             <artifactId>oauth2-oidc-sdk</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-actuator</artifactId>
-            <scope>runtime</scope>
+            <groupId>com.powsybl</groupId>
+            <artifactId>powsybl-ws-commons</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-gateway</artifactId>
+        </dependency>
+
+        <!-- runtime dependencies -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+            <scope>runtime</scope>
         </dependency>
 
         <!-- Test dependencies -->
