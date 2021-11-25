@@ -1,3 +1,6 @@
 spring:
   application:
     name: gateway
+server:
+  # unset forward-headers-strategy from the common conf, otherwise we get 404 on all apis
+  forward-headers-strategy: ~
