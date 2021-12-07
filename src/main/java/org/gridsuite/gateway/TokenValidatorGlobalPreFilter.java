@@ -17,12 +17,10 @@ import com.nimbusds.oauth2.sdk.id.Issuer;
 import com.nimbusds.openid.connect.sdk.validators.IDTokenValidator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
@@ -35,6 +33,8 @@ import java.text.ParseException;
 import java.util.Arrays;
 import java.util.List;
 
+import static org.gridsuite.gateway.GatewayService.completeWithCode;
+
 /**
  * @author Chamseddine Benhamed <chamseddine.benhamed at rte-france.com>
  */
@@ -46,7 +46,6 @@ public class TokenValidatorGlobalPreFilter implements GlobalFilter, Ordered {
     @Value("${allowed-issuers}")
     private List<String> allowedIssuers;
 
-    @Autowired
     private final GatewayService gatewayService;
 
     public TokenValidatorGlobalPreFilter(GatewayService gatewayService) {
@@ -55,20 +54,20 @@ public class TokenValidatorGlobalPreFilter implements GlobalFilter, Ordered {
 
     @Override
     public int getOrder() {
-        // Before WebsocketRoutingFilter to enforce authentication
-        return Ordered.LOWEST_PRECEDENCE - 2;
+        // Before DirectoryAccessRightsPreFilter to enforce authentication
+        return Ordered.LOWEST_PRECEDENCE - 3;
     }
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
-        LOGGER.debug("checking authorization");
+        LOGGER.debug("Filter : {}", getClass().getSimpleName());
         ServerHttpRequest req = exchange.getRequest();
         List<String> ls = req.getHeaders().get("Authorization");
         List<String> queryls = req.getQueryParams().get("access_token");
 
         if (ls == null && queryls == null) {
             LOGGER.info("{}: 401 Unauthorized, Authorization header or access_token query parameter is required",
-                    exchange.getRequest().getPath());
+                exchange.getRequest().getPath());
             return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
         }
 
@@ -81,7 +80,7 @@ public class TokenValidatorGlobalPreFilter implements GlobalFilter, Ordered {
 
             if (arr.size() != 2 || !arr.get(0).equals("Bearer")) {
                 LOGGER.info("{}: 400 Bad Request, incorrect Authorization header value",
-                        exchange.getRequest().getPath());
+                    exchange.getRequest().getPath());
                 return completeWithCode(exchange, HttpStatus.BAD_REQUEST);
             }
 
@@ -113,9 +112,7 @@ public class TokenValidatorGlobalPreFilter implements GlobalFilter, Ordered {
             ClientID clientID = new ClientID(jwt.getJWTClaimsSet().getAudience().get(0));
 
             JWSAlgorithm jwsAlg = JWSAlgorithm.parse(jwt.getHeader().getAlgorithm().getName());
-            URL jwkSetURL = null;
-
-            jwkSetURL = new URL(gatewayService.getJwksUrl(jwt.getJWTClaimsSet().getIssuer()));
+            URL jwkSetURL = new URL(gatewayService.getJwksUrl(jwt.getJWTClaimsSet().getIssuer()));
 
             // Create validator for signed ID tokens
             IDTokenValidator validator = new IDTokenValidator(iss, clientID, jwsAlg, jwkSetURL);
@@ -126,24 +123,13 @@ public class TokenValidatorGlobalPreFilter implements GlobalFilter, Ordered {
 
             //we add the subject header
             exchange.getRequest()
-                    .mutate()
-                    .headers(h -> h.set("userId", jwtClaimsSet.getSubject()));
+                .mutate()
+                .headers(h -> h.set("userId", jwtClaimsSet.getSubject()));
         } catch (JOSEException | BadJOSEException | ParseException | MalformedURLException e) {
             LOGGER.info("{}: 401 Unauthorized, The token cannot be trusted : {}", exchange.getRequest().getPath(), e.getMessage());
             return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
         }
         return chain.filter(exchange);
     }
-
-    private static Mono<Void> completeWithCode(ServerWebExchange exchange, HttpStatus code) {
-        exchange.getResponse().setStatusCode(code);
-        if ("websocket".equalsIgnoreCase(exchange.getRequest().getHeaders().getUpgrade())) {
-            // Force the connection to close for websockets handshakes to workaround apache
-            // httpd reusing the connection for all subsequent requests in this connection.
-            exchange.getResponse().getHeaders().set(HttpHeaders.CONNECTION, "close");
-        }
-        return exchange.getResponse().setComplete();
-    }
-
 }
 

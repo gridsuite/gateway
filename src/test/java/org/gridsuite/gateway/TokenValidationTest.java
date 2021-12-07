@@ -39,7 +39,6 @@ import reactor.core.publisher.Mono;
 import wiremock.com.github.jknack.handlebars.Helper;
 import wiremock.com.github.jknack.handlebars.Options;
 
-import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -55,20 +54,21 @@ import static com.github.tomakehurst.wiremock.client.WireMock.*;
  */
 @RunWith(SpringRunner.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-    properties = {"caseServerBaseUri=http://localhost:${wiremock.server.port}",
-        "studyServerBaseUri=http://localhost:${wiremock.server.port}",
-        "mergeOrchestratorServerBaseUri=http://localhost:${wiremock.server.port}",
-        "mergeNotificationServerBaseUri=http://localhost:${wiremock.server.port}",
-        "directoryNotificationServerBaseUri=http://localhost:${wiremock.server.port}",
-        "actionsServerBaseUri=http://localhost:${wiremock.server.port}",
-        "notificationServerBaseUri=http://localhost:${wiremock.server.port}",
-        "configServerBaseUri=http://localhost:${wiremock.server.port}",
-        "configNotificationServerBaseUri=http://localhost:${wiremock.server.port}",
-        "directoryServerBaseUri=http://localhost:${wiremock.server.port}",
-        "boundaryServerBaseUri=http://localhost:${wiremock.server.port}",
-        "dynamicMappingServerBaseUri=http://localhost:${wiremock.server.port}",
-        "filterServerBaseUri=http://localhost:${wiremock.server.port}",
-        "reportServerBaseUri=http://localhost:${wiremock.server.port}"})
+    properties = {"backing-services.case.base-uri=http://localhost:${wiremock.server.port}",
+        "backing-services.study-server.base-uri=http://localhost:${wiremock.server.port}",
+        "backing-services.merge-orchestrator-server.base-uri=http://localhost:${wiremock.server.port}",
+        "backing-services.merge-notification-server.base-uri=http://localhost:${wiremock.server.port}",
+        "backing-services.directory-notification-server.base-uri=http://localhost:${wiremock.server.port}",
+        "backing-services.actions-server.base-uri=http://localhost:${wiremock.server.port}",
+        "backing-services.notification-server.base-uri=http://localhost:${wiremock.server.port}",
+        "backing-services.config-server.base-uri=http://localhost:${wiremock.server.port}",
+        "backing-services.config-notification-server.base-uri=http://localhost:${wiremock.server.port}",
+        "backing-services.directory-server.base-uri=http://localhost:${wiremock.server.port}",
+        "backing-services.explore-server.base-uri=http://localhost:${wiremock.server.port}",
+        "backing-services.cgmes-boundary-server.base-uri=http://localhost:${wiremock.server.port}",
+        "backing-services.dynamic-mapping-server.base-uri=http://localhost:${wiremock.server.port}",
+        "backing-services.filter-server.base-uri=http://localhost:${wiremock.server.port}",
+        "backing-services.report-server.base-uri=http://localhost:${wiremock.server.port}"})
 
 @AutoConfigureWireMock(port = 0)
 public class TokenValidationTest {
@@ -193,7 +193,7 @@ public class TokenValidationTest {
                         .withHeader("Content-Type", "application/json")
                         .withBody("[{\"name\": \"test\", \"script\" :\"mys cript\"}]")));
 
-        stubFor(get(urlEqualTo("/v1/directories")).withHeader("userId", equalTo("chmits"))
+        stubFor(get(urlEqualTo("/v1/root_directories")).withHeader("userId", equalTo("chmits"))
                 .willReturn(aResponse()
                         .withHeader("Content-Type", "application/json")
                         .withBody("[{\"name\": \"test\"}]")));
@@ -300,7 +300,7 @@ public class TokenValidationTest {
                 .jsonPath("$[0].theme").isEqualTo("dark");
 
         webClient
-                .get().uri("directory/v1/directories")
+                .get().uri("directory/v1/root_directories")
                 .header("Authorization", "Bearer " + token)
                 .exchange()
                 .expectStatus().isOk()
@@ -350,7 +350,7 @@ public class TokenValidationTest {
     }
 
     @Test
-    public void invalidToken() throws Exception {
+    public void invalidToken() {
 
         stubFor(get(urlEqualTo("/v1/cases"))
                 .willReturn(aResponse()
@@ -435,7 +435,7 @@ public class TokenValidationTest {
                 public void customize(WireMockConfiguration options) {
                     Helper<Object> secWebsocketAcceptHelper = new Helper<Object>() {
                         @Override
-                        public String apply(Object context, Options options) throws IOException {
+                        public String apply(Object context, Options options) {
                             String in = context.toString() + SEC_WEBSOCKET_MAGIC;
                             byte[] hashed;
                             try {
