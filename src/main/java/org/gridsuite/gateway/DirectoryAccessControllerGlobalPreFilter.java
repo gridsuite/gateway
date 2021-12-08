@@ -35,9 +35,9 @@ import static org.gridsuite.gateway.GatewayService.completeWithCode;
  * @author Slimane Amar <slimane.amar at rte-france.com>
  */
 @Component
-public class DirectoryAccessRightsPreFilter implements GlobalFilter, Ordered {
+public class DirectoryAccessControllerGlobalPreFilter implements GlobalFilter, Ordered {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(DirectoryAccessRightsPreFilter.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(DirectoryAccessControllerGlobalPreFilter.class);
 
     private static final String ROOT_CATEGORY_REACTOR = "reactor.";
 
@@ -49,10 +49,17 @@ public class DirectoryAccessRightsPreFilter implements GlobalFilter, Ordered {
 
     private static final String ELEMENTS_ROOT_PATH = "elements";
 
-    private final WebClient webClient;
+    private WebClient webClient;
 
-    public DirectoryAccessRightsPreFilter(ServicesURIsConfig servicesURIsConfig, WebClient.Builder webClientBuilder) {
+    private final WebClient.Builder webClientBuilder;
+
+    public DirectoryAccessControllerGlobalPreFilter(ServicesURIsConfig servicesURIsConfig, WebClient.Builder webClientBuilder) {
+        this.webClientBuilder = webClientBuilder;
         this.webClient = webClientBuilder.baseUrl(servicesURIsConfig.getDirectoryServerBaseUri()).build();
+    }
+
+    public void initWebClient(String baseUrl) {
+        this.webClient = webClientBuilder.baseUrl(baseUrl).build();
     }
 
     @Override
@@ -89,8 +96,8 @@ public class DirectoryAccessRightsPreFilter implements GlobalFilter, Ordered {
                     return completeWithCode(exchange, HttpStatus.FORBIDDEN);
                 }
             case ELEMENTS_ROOT_PATH:
-                if (path.elements().size() == 4 ||                                                  // path = /v*/directories/elements ?
-                    (path.elements().size() == 6 && isUuid(path.elements().get(5).value()))) {      // path = /v*/directories/elements/{elementUuid} ?
+                if (path.elements().size() == 4 ||                                                  // path = /v*/elements ?
+                    (path.elements().size() == 6 && isUuid(path.elements().get(5).value()))) {      // path = /v*/elements/{elementUuid} ?
                     return isElementsAccessAllowed(exchange, chain);
 
                 } else {
