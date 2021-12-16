@@ -45,21 +45,16 @@ public class DirectoryAccessControllerGlobalPreFilter implements GlobalFilter, O
         HttpMethod.PUT.name(), HttpMethod.POST.name(), HttpMethod.DELETE.name()
     );
 
+    private static final Set<String> ALLOWED_ROOT_PATHS = Set.of("studies");
+
     private static final String DIRECTORIES_ROOT_PATH = "directories";
 
     private static final String ELEMENTS_ROOT_PATH = "elements";
 
-    private WebClient webClient;
+    private final WebClient webClient;
 
-    private final WebClient.Builder webClientBuilder;
-
-    public DirectoryAccessControllerGlobalPreFilter(ServicesURIsConfig servicesURIsConfig, WebClient.Builder webClientBuilder) {
-        this.webClientBuilder = webClientBuilder;
+    public DirectoryAccessControllerGlobalPreFilter(ServiceURIsConfig servicesURIsConfig, WebClient.Builder webClientBuilder) {
         this.webClient = webClientBuilder.baseUrl(servicesURIsConfig.getDirectoryServerBaseUri()).build();
-    }
-
-    public void initWebClient(String baseUrl) {
-        this.webClient = webClientBuilder.baseUrl(baseUrl).build();
     }
 
     @Override

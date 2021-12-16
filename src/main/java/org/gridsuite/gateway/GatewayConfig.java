@@ -23,7 +23,7 @@ public class GatewayConfig {
     static final String HEADER_USER_ID = "userId";
 
     @Bean
-    public RouteLocator myRoutes(RouteLocatorBuilder builder, ServicesURIsConfig servicesURIsConfig) {
+    public RouteLocator myRoutes(RouteLocatorBuilder builder, ServiceURIsConfig servicesURIsConfig) {
         return builder.routes()
             .route(p -> p
                 .path("/study/**")

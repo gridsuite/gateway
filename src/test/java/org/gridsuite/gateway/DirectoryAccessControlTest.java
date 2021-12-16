@@ -23,7 +23,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.web.server.LocalServerPort;
 import org.springframework.cloud.contract.wiremock.AutoConfigureWireMock;
-import org.springframework.http.HttpStatus;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
@@ -55,7 +54,7 @@ public class DirectoryAccessControlTest {
     WebTestClient webClient;
 
     @Autowired
-    ServicesURIsConfig servicesURIsConfig;
+    ServiceURIsConfig servicesURIsConfig;
 
     private String tokenUser1;
 

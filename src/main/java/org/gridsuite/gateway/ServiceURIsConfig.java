@@ -20,7 +20,7 @@ import org.springframework.context.annotation.Configuration;
 @Getter
 @Setter
 @ConfigurationProperties(prefix = "gateway")
-public class ServicesURIsConfig {
+public class ServiceURIsConfig {
     @Value("${backing-services.case.base-uri:http://case-server/}")
     String caseServerBaseUri;
 
