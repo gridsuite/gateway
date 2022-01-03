@@ -33,6 +33,7 @@ import java.text.ParseException;
 import java.util.Arrays;
 import java.util.List;
 
+import static org.gridsuite.gateway.GatewayConfig.HEADER_USER_ID;
 import static org.gridsuite.gateway.GatewayService.completeWithCode;
 
 /**
@@ -54,7 +55,7 @@ public class TokenValidatorGlobalPreFilter implements GlobalFilter, Ordered {
 
     @Override
     public int getOrder() {
-        // Before DirectoryAccessRightsPreFilter to enforce authentication
+        // Before ElementAccessControllerGlobalPreFilter to enforce authentication
         return Ordered.LOWEST_PRECEDENCE - 3;
     }
 
@@ -124,7 +125,7 @@ public class TokenValidatorGlobalPreFilter implements GlobalFilter, Ordered {
             //we add the subject header
             exchange.getRequest()
                 .mutate()
-                .headers(h -> h.set("userId", jwtClaimsSet.getSubject()));
+                .headers(h -> h.set(HEADER_USER_ID, jwtClaimsSet.getSubject()));
         } catch (JOSEException | BadJOSEException | ParseException | MalformedURLException e) {
             LOGGER.info("{}: 401 Unauthorized, The token cannot be trusted : {}", exchange.getRequest().getPath(), e.getMessage());
             return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
