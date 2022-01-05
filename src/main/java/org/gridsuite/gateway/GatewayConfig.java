@@ -101,6 +101,12 @@ public class GatewayConfig {
                     .filters(f -> f.rewritePath("/report/(.*)", "/$1"))
                     .uri(uriConfiguration.getReportServerBaseUri())
             )
+            .route(p -> p
+                .path("/network-modification/**")
+                .filters(f -> f.rewritePath("/network-modification/(.*)", "/$1"))
+                .uri(uriConfiguration.getNetworkModificationServerBaseUri())
+            )
+
             .build();
     }
 }
@@ -122,6 +128,7 @@ class UriConfiguration {
     @Value("${backing-services.filter-server.base-uri:http://filter-server/}") String filterServerBaseUri;
     @Value("${backing-services.report-server.base-uri:http://report-server/}") String reportServerBaseUri;
     @Value("${backing-services.directory-notification-server.base-uri:http://directory-notification-server/}") String directoryNotificationServerBaseUri;
+    @Value("${backing-services.network-modification-server.base-uri:http://network-modification-server/}") String networkModificationServerBaseUri;
 
     public String getCaseServerBaseUri() {
         return caseServerBaseUri;
@@ -241,5 +248,13 @@ class UriConfiguration {
 
     public void setReportServerBaseUri(String reportServerBaseUri) {
         this.reportServerBaseUri = reportServerBaseUri;
+    }
+
+    public String getNetworkModificationServerBaseUri() {
+        return networkModificationServerBaseUri;
+    }
+
+    public void setNetworkModificationServerBaseUri(String networkModificationServerBaseUri) {
+        this.networkModificationServerBaseUri = networkModificationServerBaseUri;
     }
 }

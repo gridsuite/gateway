@@ -68,7 +68,9 @@ import static com.github.tomakehurst.wiremock.client.WireMock.*;
         "boundaryServerBaseUri=http://localhost:${wiremock.server.port}",
         "dynamicMappingServerBaseUri=http://localhost:${wiremock.server.port}",
         "filterServerBaseUri=http://localhost:${wiremock.server.port}",
-        "reportServerBaseUri=http://localhost:${wiremock.server.port}"})
+        "reportServerBaseUri=http://localhost:${wiremock.server.port}",
+        "networkModificationServerBaseUri=http://localhost:${wiremock.server.port}"
+    })
 
 @AutoConfigureWireMock(port = 0)
 public class TokenValidationTest {
@@ -347,6 +349,7 @@ public class TokenValidationTest {
         testWebsocket("config-notification");
         testWebsocket("merge-notification");
         testWebsocket("directory-notification");
+        testWebsocket("network-modification");
     }
 
     @Test
