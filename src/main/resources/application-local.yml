@@ -32,4 +32,6 @@ backing-services:
     base-uri: http://localhost:5028
   explore-server:
     base-uri: http://localhost:5029
+  network-modification-server:
+    base-uri: http://localhost:5007
 

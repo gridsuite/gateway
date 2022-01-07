@@ -65,4 +65,7 @@ public class ServiceURIsConfig {
 
     @Value("${backing-services.directory-notification-server.base-uri:http://directory-notification-server/}")
     String directoryNotificationServerBaseUri;
+
+    @Value("${backing-services.network-modification-server.base-uri:http://network-modification-server/}")
+    String networkModificationServerBaseUri;
 }

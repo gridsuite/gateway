@@ -69,7 +69,9 @@ import static com.github.tomakehurst.wiremock.client.WireMock.*;
         "backing-services.cgmes-boundary-server.base-uri=http://localhost:${wiremock.server.port}",
         "backing-services.dynamic-mapping-server.base-uri=http://localhost:${wiremock.server.port}",
         "backing-services.filter-server.base-uri=http://localhost:${wiremock.server.port}",
-        "backing-services.report-server.base-uri=http://localhost:${wiremock.server.port}"})
+        "backing-services.report-server.base-uri=http://localhost:${wiremock.server.port}",
+        "backing-services.network-modification-server.base-uri=http://localhost:${wiremock.server.port}"
+    })
 
 @AutoConfigureWireMock(port = 0)
 public class TokenValidationTest {
