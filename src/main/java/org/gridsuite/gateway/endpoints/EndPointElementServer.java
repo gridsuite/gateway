@@ -7,14 +7,12 @@
 package org.gridsuite.gateway.endpoints;
 
 import lombok.NonNull;
+import org.gridsuite.gateway.dto.AccessControlInfos;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.server.RequestPath;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -22,13 +20,13 @@ import java.util.stream.Collectors;
  */
 public interface EndPointElementServer extends EndPointServer {
 
-    String QUERY_PARAM_ID = "id";
+    String QUERY_PARAM_IDS = "ids";
 
     Set<HttpMethod> ALLOWED_HTTP_METHODS = Set.of(HttpMethod.GET, HttpMethod.HEAD,
         HttpMethod.PUT, HttpMethod.POST, HttpMethod.DELETE
     );
 
-    private static UUID getUuid(String uuid) {
+    static UUID getUuid(String uuid) {
         try {
             return UUID.fromString(uuid);
         } catch (IllegalArgumentException e) {
@@ -36,7 +34,7 @@ public interface EndPointElementServer extends EndPointServer {
         }
     }
 
-    static UUID getElementUuidIfExist(@NonNull RequestPath path) {
+    default UUID getElementUuidIfExist(@NonNull RequestPath path) {
         return (path.elements().size() > 5) ? getUuid(path.elements().get(5).value()) : null;
     }
 
@@ -57,29 +55,33 @@ public interface EndPointElementServer extends EndPointServer {
         return true;
     }
 
-    default List<UUID> getElementsUuids(@NonNull ServerHttpRequest request) {
+    default Optional<AccessControlInfos> getAccessControlInfos(@NonNull ServerHttpRequest request) {
         RequestPath path = Objects.requireNonNull(request.getPath());
-        UUID elementUuid = EndPointElementServer.getElementUuidIfExist(path);
+        UUID elementUuid = getElementUuidIfExist(path);
 
-        // /<elements>/{studyUuid} or /<elements>/**?id=
+        // /<elements>/{elementUuid} or /<elements>/**?id=
         switch (Objects.requireNonNull(request.getMethod())) {
             case GET: {
                 if (elementUuid != null) {
-                    return List.of(elementUuid);
+                    return Optional.of(AccessControlInfos.createElementType(List.of(elementUuid)));
                 } else {
-                    if (request.getQueryParams().get(QUERY_PARAM_ID) == null) {
-                        return List.of();
+                    if (request.getQueryParams().get(QUERY_PARAM_IDS) == null) {
+                        return Optional.empty();
                     } else {
-                        return request.getQueryParams().get(QUERY_PARAM_ID).stream().map(UUID::fromString).collect(Collectors.toList());
+                        List<String> ids = request.getQueryParams().get(QUERY_PARAM_IDS);
+                        List<UUID> elementUuids = ids.stream().map(EndPointElementServer::getUuid).filter(Objects::nonNull).collect(Collectors.toList());
+                        return elementUuids.size() == ids.size() ? Optional.of(AccessControlInfos.createElementType(elementUuids)) : Optional.empty();
                     }
                 }
             }
-            case POST:
+            case POST: { // Not allowed by default
+                return Optional.empty();
+            }
             case PUT:
             case DELETE:
-                return elementUuid == null ? List.of() : List.of(elementUuid);
+                return elementUuid == null ? Optional.empty() : Optional.of(AccessControlInfos.createElementType(List.of(elementUuid)));
             default:
-                return List.of();
+                return Optional.empty();
         }
     }
 }

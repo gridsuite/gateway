@@ -7,6 +7,8 @@
 
 package org.gridsuite.gateway;
 
+import lombok.NonNull;
+import org.gridsuite.gateway.dto.AccessControlInfos;
 import org.gridsuite.gateway.endpoints.EndPointElementServer;
 import org.gridsuite.gateway.endpoints.EndPointServer;
 import org.slf4j.Logger;
@@ -18,7 +20,6 @@ import org.springframework.cloud.gateway.support.ServerWebExchangeUtils;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.Ordered;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.RequestPath;
 import org.springframework.http.server.reactive.ServerHttpRequest;
@@ -28,16 +29,15 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
-import java.util.List;
 import java.util.Objects;
-import java.util.UUID;
+import java.util.Optional;
 import java.util.logging.Level;
 import java.util.regex.Pattern;
 
 import static org.gridsuite.gateway.GatewayConfig.END_POINT_SERVICE_NAME;
 import static org.gridsuite.gateway.GatewayConfig.HEADER_USER_ID;
 import static org.gridsuite.gateway.GatewayService.completeWithCode;
-import static org.gridsuite.gateway.endpoints.EndPointElementServer.QUERY_PARAM_ID;
+import static org.gridsuite.gateway.endpoints.EndPointElementServer.QUERY_PARAM_IDS;
 
 /**
  * @author Slimane Amar <slimane.amar at rte-france.com>
@@ -49,7 +49,9 @@ public class ElementAccessControllerGlobalPreFilter implements GlobalFilter, Ord
 
     private static final String ROOT_CATEGORY_REACTOR = "reactor.";
 
-    private static final String DIRECTORY_ELEMENTS_ROOT_PATH = "elements";
+    private static final String DIRECTORIES_ROOT_PATH = "directories";
+
+    private static final String ELEMENTS_ROOT_PATH = "elements";
 
     private final WebClient webClient;
 
@@ -67,53 +69,47 @@ public class ElementAccessControllerGlobalPreFilter implements GlobalFilter, Ord
     }
 
     @Override
-    public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
+    public Mono<Void> filter(@NonNull ServerWebExchange exchange, @NonNull GatewayFilterChain chain) {
         LOGGER.debug("Filter : {}", getClass().getSimpleName());
 
         RequestPath path = exchange.getRequest().getPath();
 
-        // Filter only requests to the applications with this pattern : /v<number>/<appli_root_path>
+        // Filter only requests to the endpoint servers with this pattern : /v<number>/<appli_root_path>
         if (!Pattern.matches("/v(\\d)+/.*", path.value())) {
             return chain.filter(exchange);
         }
 
-        // Is a controlled application ?
+        // Is a elements endpoint with a controlled access ?
         String endPointServiceName = Objects.requireNonNull((String) (Objects.requireNonNull((Route) exchange.getAttribute(ServerWebExchangeUtils.GATEWAY_ROUTE_ATTR)).getMetadata()).get(END_POINT_SERVICE_NAME));
         EndPointServer endPointServer = applicationContext.containsBean(endPointServiceName) ? (EndPointServer) applicationContext.getBean(endPointServiceName) : null;
         if (endPointServer == null || !endPointServer.hasElementsAccessControl()) {
             return chain.filter(exchange);
         }
 
+        // Is a root path with a controlled access ?
         EndPointElementServer endPointElementServer = (EndPointElementServer) endPointServer;
         if (endPointElementServer.isNotControlledRootPath(path.elements().get(3).value())) {
             return chain.filter(exchange);
         }
 
-        // Only allowed methods
+        // Is a method allowed ?
         if (!endPointElementServer.isAllowedMethod(exchange.getRequest().getMethod())) {
             return completeWithCode(exchange, HttpStatus.FORBIDDEN);
         }
 
-        // Elements creation ?
-        if (Objects.requireNonNull(exchange.getRequest().getMethod()) == HttpMethod.POST
-            && EndPointElementServer.getElementUuidIfExist(path) == null
-        ) {
-            return chain.filter(exchange);
-        }
-
-        List<UUID> elementUuids = endPointElementServer.getElementsUuids(exchange.getRequest());
-        return elementUuids.isEmpty() ? completeWithCode(exchange, HttpStatus.FORBIDDEN) : isElementsAccessAllowed(exchange, chain, elementUuids);
+        Optional<AccessControlInfos> accessControlInfos = endPointElementServer.getAccessControlInfos(exchange.getRequest());
+        return accessControlInfos.isEmpty() ? completeWithCode(exchange, HttpStatus.FORBIDDEN) : isAccessAllowed(exchange, chain, accessControlInfos.get());
     }
 
-    private Mono<Void> isElementsAccessAllowed(ServerWebExchange exchange, GatewayFilterChain chain, List<UUID> elementUuids) {
+    private Mono<Void> isAccessAllowed(ServerWebExchange exchange, GatewayFilterChain chain, AccessControlInfos accessControlInfos) {
         ServerHttpRequest httpRequest = exchange.getRequest();
         HttpHeaders httpHeaders = exchange.getRequest().getHeaders();
         return webClient
             .head()
             .uri(uriBuilder -> uriBuilder
                 .path(httpRequest.getPath().subPath(0, 3).value()) // version
-                .path(DIRECTORY_ELEMENTS_ROOT_PATH)
-                .queryParam(QUERY_PARAM_ID, elementUuids)
+                .path(accessControlInfos.getType() == AccessControlInfos.Type.DIRECTORY ? DIRECTORIES_ROOT_PATH : ELEMENTS_ROOT_PATH)
+                .queryParam(QUERY_PARAM_IDS, accessControlInfos.getDirectoryOrElementUuids())
                 .build()
             )
             .header(HEADER_USER_ID, Objects.requireNonNull(httpHeaders.get(HEADER_USER_ID)).get(0))
@@ -121,6 +117,8 @@ public class ElementAccessControllerGlobalPreFilter implements GlobalFilter, Ord
                 switch (response.statusCode()) {
                     case OK:
                         return chain.filter(exchange);
+                    case NOT_FOUND:
+                        return completeWithCode(exchange, HttpStatus.NOT_FOUND);
                     case FORBIDDEN:
                         return completeWithCode(exchange, HttpStatus.FORBIDDEN);
                     default:

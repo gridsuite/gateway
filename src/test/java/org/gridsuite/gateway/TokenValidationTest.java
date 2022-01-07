@@ -186,18 +186,18 @@ public class TokenValidationTest {
     public void gatewayTest() throws Exception {
         UUID elementUuid = UUID.randomUUID();
 
-        stubFor(get(urlEqualTo(String.format("/v1/elements?id=%s", elementUuid))).withHeader("userId", equalTo("chmits"))
+        stubFor(head(urlEqualTo(String.format("/v1/elements?ids=%s", elementUuid))).withPort(port).withHeader("userId", equalTo("chmits"))
             .willReturn(aResponse()));
 
-        stubFor(get(urlEqualTo(String.format("/v1/studies/%s", elementUuid))).withHeader("userId", equalTo("chmits"))
+        stubFor(get(urlEqualTo(String.format("/v1/studies/metadata?ids=%s", elementUuid))).withHeader("userId", equalTo("chmits"))
                 .willReturn(aResponse()
                         .withHeader("Content-Type", "application/json")
-                        .withBody("[{\"studyName\": \"CgmesStudy\", \"caseFormat\" :\"CGMES\"}, {\"studyName\": \"IIDMStudy\", \"caseFormat\" :\"IIDM\"}]")));
+                        .withBody(String.format("[{\"id\" : \"%s\", \"caseFormat\" : \"IIDM\"}]", elementUuid))));
 
-        stubFor(get(urlEqualTo("/v1/contingency-lists")).withHeader("userId", equalTo("chmits"))
-                .willReturn(aResponse()
+        stubFor(get(urlEqualTo(String.format("/v1/contingency-lists/metadata?ids=%s", elementUuid))).withHeader("userId", equalTo("chmits"))
+            .willReturn(aResponse()
                         .withHeader("Content-Type", "application/json")
-                        .withBody("[{\"name\": \"test\", \"script\" :\"mys cript\"}]")));
+                        .withBody(String.format("[{\"id\" : \"%s\", \"type\" : \"SCRIPT\"}]", elementUuid))));
 
         stubFor(get(urlEqualTo("/v1/root_directories")).withHeader("userId", equalTo("chmits"))
                 .willReturn(aResponse()
@@ -229,10 +229,10 @@ public class TokenValidationTest {
                         .withHeader("Content-Type", "application/json")
                         .withBody("[{\"name\": \"mapping1\", \"rules\":[]}]")));
 
-        stubFor(get(urlEqualTo("/v1/filters")).withHeader("userId", equalTo("chmits"))
+        stubFor(get(urlEqualTo(String.format("/v1/filters/metadata?ids=%s", elementUuid))).withHeader("userId", equalTo("chmits"))
             .willReturn(aResponse()
                 .withHeader("Content-Type", "application/json")
-                .withBody("[{\"name\": \"filter1\", \"type\" :\"LINE\"}]")));
+                .withBody(String.format("[{\"id\": \"%s\", \"type\" :\"LINE\"}]", elementUuid))));
 
         stubFor(get(urlEqualTo("/v1/reports")).withHeader("userId", equalTo("chmits"))
             .willReturn(aResponse()
@@ -268,14 +268,14 @@ public class TokenValidationTest {
                 .jsonPath("$[0].format").isEqualTo("XIIDM")
                 .jsonPath("$[1].format").isEqualTo("CGMES");
 
-//        webClient
-//                .get().uri("study/v1/studies/{studyUuid}", elementUuid)
-//                .header("Authorization", "Bearer " + token)
-//                .exchange()
-//                .expectStatus().isOk()
-//                .expectBody()
-//                .jsonPath("$[0].caseFormat").isEqualTo("IIDM")
-//                .jsonPath("$[0].studyName").isEqualTo("IIDMStudy");
+        webClient
+                .get().uri("study/v1/studies/metadata?ids=" + elementUuid)
+                .header("Authorization", "Bearer " + token)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$[0].id").isEqualTo(elementUuid.toString())
+                .jsonPath("$[0].caseFormat").isEqualTo("IIDM");
 
         webClient
                 .get().uri("merge/v1/configs")
@@ -288,12 +288,13 @@ public class TokenValidationTest {
                 .jsonPath("$[0].tsos[1]").isEqualTo("NL");
 
         webClient
-                .get().uri("actions/v1/contingency-lists")
+                .get().uri("actions/v1/contingency-lists/metadata?ids=" + elementUuid)
                 .header("Authorization", "Bearer " + token)
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
-                .jsonPath("$[0].name").isEqualTo("test");
+                .jsonPath("$[0].id").isEqualTo(elementUuid.toString())
+                .jsonPath("$[0].type").isEqualTo("SCRIPT");
 
         webClient
                 .get().uri("config/v1/parameters")
@@ -329,12 +330,12 @@ public class TokenValidationTest {
                 .jsonPath("$[0].name").isEqualTo("mapping1");
 
         webClient
-            .get().uri("filter/v1/filters")
+            .get().uri("filter/v1/filters/metadata?ids=" + elementUuid)
             .header("Authorization", "Bearer " + token)
             .exchange()
             .expectStatus().isOk()
             .expectBody()
-            .jsonPath("$[0].name").isEqualTo("filter1")
+            .jsonPath("$[0].id").isEqualTo(elementUuid.toString())
             .jsonPath("$[0].type").isEqualTo("LINE");
 
         webClient
