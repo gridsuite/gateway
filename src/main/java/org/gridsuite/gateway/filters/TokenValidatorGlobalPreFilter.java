@@ -4,7 +4,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-package org.gridsuite.gateway;
+package org.gridsuite.gateway.filters;
 
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSAlgorithm;
@@ -15,11 +15,11 @@ import com.nimbusds.jwt.JWTParser;
 import com.nimbusds.oauth2.sdk.id.ClientID;
 import com.nimbusds.oauth2.sdk.id.Issuer;
 import com.nimbusds.openid.connect.sdk.validators.IDTokenValidator;
+import org.gridsuite.gateway.GatewayService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
-import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
@@ -34,20 +34,19 @@ import java.util.Arrays;
 import java.util.List;
 
 import static org.gridsuite.gateway.GatewayConfig.HEADER_USER_ID;
-import static org.gridsuite.gateway.GatewayService.completeWithCode;
 
 /**
  * @author Chamseddine Benhamed <chamseddine.benhamed at rte-france.com>
  */
 @Component
-public class TokenValidatorGlobalPreFilter implements GlobalFilter, Ordered {
+public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(TokenValidatorGlobalPreFilter.class);
 
+    private final GatewayService gatewayService;
+
     @Value("${allowed-issuers}")
     private List<String> allowedIssuers;
-
-    private final GatewayService gatewayService;
 
     public TokenValidatorGlobalPreFilter(GatewayService gatewayService) {
         this.gatewayService = gatewayService;

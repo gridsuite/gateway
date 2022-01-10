@@ -5,16 +5,16 @@
   file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-package org.gridsuite.gateway;
+package org.gridsuite.gateway.filters;
 
 import lombok.NonNull;
+import org.gridsuite.gateway.ServiceURIsConfig;
 import org.gridsuite.gateway.dto.AccessControlInfos;
 import org.gridsuite.gateway.endpoints.EndPointElementServer;
 import org.gridsuite.gateway.endpoints.EndPointServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
-import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.cloud.gateway.route.Route;
 import org.springframework.cloud.gateway.support.ServerWebExchangeUtils;
 import org.springframework.context.ApplicationContext;
@@ -36,14 +36,13 @@ import java.util.regex.Pattern;
 
 import static org.gridsuite.gateway.GatewayConfig.END_POINT_SERVICE_NAME;
 import static org.gridsuite.gateway.GatewayConfig.HEADER_USER_ID;
-import static org.gridsuite.gateway.GatewayService.completeWithCode;
 import static org.gridsuite.gateway.endpoints.EndPointElementServer.QUERY_PARAM_IDS;
 
 /**
  * @author Slimane Amar <slimane.amar at rte-france.com>
  */
 @Component
-public class ElementAccessControllerGlobalPreFilter implements GlobalFilter, Ordered {
+public class ElementAccessControllerGlobalPreFilter extends AbstractGlobalPreFilter {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ElementAccessControllerGlobalPreFilter.class);
 
