@@ -18,6 +18,7 @@ import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
+import lombok.SneakyThrows;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -37,7 +38,6 @@ import org.springframework.web.reactive.socket.client.StandardWebSocketClient;
 import org.springframework.web.reactive.socket.client.WebSocketClient;
 import reactor.core.publisher.Mono;
 import wiremock.com.github.jknack.handlebars.Helper;
-import wiremock.com.github.jknack.handlebars.Options;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -185,11 +185,18 @@ public class TokenValidationTest {
     }
 
     @Test
-    public void gatewayTest() throws Exception {
+    public void gatewayTest() {
+        initStubForJwk();
+
         UUID elementUuid = UUID.randomUUID();
 
         stubFor(head(urlEqualTo(String.format("/v1/elements?ids=%s", elementUuid))).withPort(port).withHeader("userId", equalTo("chmits"))
             .willReturn(aResponse()));
+
+        stubFor(get(urlEqualTo(String.format("/v1/explore/elements/metadata?ids=%s", elementUuid))).withHeader("userId", equalTo("chmits"))
+            .willReturn(aResponse()
+                .withHeader("Content-Type", "application/json")
+                .withBody(String.format("[{\"elementUuid\" : \"%s\", \"type\" : \"STUDY\", \"subdirectoriesCount\" : \"0\", \"specificMetadata\" : {\"id\" : \"%s\", \"caseFormat\" : \"IIDM\"}}]", elementUuid, elementUuid))));
 
         stubFor(get(urlEqualTo(String.format("/v1/studies/metadata?ids=%s", elementUuid))).withHeader("userId", equalTo("chmits"))
                 .willReturn(aResponse()
@@ -200,6 +207,11 @@ public class TokenValidationTest {
             .willReturn(aResponse()
                         .withHeader("Content-Type", "application/json")
                         .withBody(String.format("[{\"id\" : \"%s\", \"type\" : \"SCRIPT\"}]", elementUuid))));
+
+        stubFor(get(urlEqualTo(String.format("/v1/filters/metadata?ids=%s", elementUuid))).withHeader("userId", equalTo("chmits"))
+            .willReturn(aResponse()
+                .withHeader("Content-Type", "application/json")
+                .withBody(String.format("[{\"id\": \"%s\", \"type\" :\"LINE\"}]", elementUuid))));
 
         stubFor(get(urlEqualTo("/v1/root_directories")).withHeader("userId", equalTo("chmits"))
                 .willReturn(aResponse()
@@ -231,33 +243,10 @@ public class TokenValidationTest {
                         .withHeader("Content-Type", "application/json")
                         .withBody("[{\"name\": \"mapping1\", \"rules\":[]}]")));
 
-        stubFor(get(urlEqualTo(String.format("/v1/filters/metadata?ids=%s", elementUuid))).withHeader("userId", equalTo("chmits"))
-            .willReturn(aResponse()
-                .withHeader("Content-Type", "application/json")
-                .withBody(String.format("[{\"id\": \"%s\", \"type\" :\"LINE\"}]", elementUuid))));
-
         stubFor(get(urlEqualTo("/v1/reports")).withHeader("userId", equalTo("chmits"))
             .willReturn(aResponse()
                 .withHeader("Content-Type", "application/json")
                 .withBody("{\"id\": \"report1\", \"reports\" :[{\"date\":\"2001:01:01T11:11\", \"report\": \"Lets Rock\" }]}")));
-
-        stubFor(get(urlEqualTo("/.well-known/openid-configuration"))
-                .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
-                        .withBody("{\"jwks_uri\": \"http://localhost:" + port + "/jwks\"}")));
-
-        stubFor(get(urlEqualTo("/jwks"))
-                .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
-                        .withBody("{\"keys\" : [ " + rsaKey.toJSONString() + " ] }")));
-
-        stubFor(get(urlPathEqualTo("/notify")).withHeader("userId", equalTo("chmits"))
-                .willReturn(aResponse()
-                        .withHeader("Sec-WebSocket-Accept", "{{{sec-websocket-accept request.headers.Sec-WebSocket-Key}}}")
-                        .withHeader("Upgrade", "websocket")
-                        .withHeader("Connection", "Upgrade")
-                        .withStatus(101)
-                        .withStatusMessage("Switching Protocols")));
 
         webClient
                 .get().uri("case/v1/cases")
@@ -350,10 +339,46 @@ public class TokenValidationTest {
             .jsonPath("$.reports[0].report").isEqualTo("Lets Rock")
             .jsonPath("$.reports[0].date").isEqualTo("2001:01:01T11:11");
 
+        webClient
+            .get().uri("explore/v1/explore/elements/metadata?ids=" + elementUuid)
+            .header("Authorization", "Bearer " + token)
+            .exchange()
+            .expectStatus().isOk()
+            .expectBody()
+            .jsonPath("$[0].elementUuid").isEqualTo(elementUuid.toString())
+            .jsonPath("$[0].type").isEqualTo("STUDY")
+            .jsonPath("$[0].subdirectoriesCount").isEqualTo(0);
+    }
+
+    @Test
+    @SneakyThrows
+    public void testWebsockets() {
+        initStubForJwk();
+
+        stubFor(get(urlPathEqualTo("/notify")).withHeader("userId", equalTo("chmits"))
+            .willReturn(aResponse()
+                .withHeader("Sec-WebSocket-Accept", "{{{sec-websocket-accept request.headers.Sec-WebSocket-Key}}}")
+                .withHeader("Upgrade", "websocket")
+                .withHeader("Connection", "Upgrade")
+                .withStatus(101)
+                .withStatusMessage("Switching Protocols")));
+
         testWebsocket("notification");
         testWebsocket("config-notification");
         testWebsocket("merge-notification");
         testWebsocket("directory-notification");
+    }
+
+    private void initStubForJwk() {
+        stubFor(get(urlEqualTo("/.well-known/openid-configuration"))
+            .willReturn(aResponse()
+                .withHeader("Content-Type", "application/json")
+                .withBody("{\"jwks_uri\": \"http://localhost:" + port + "/jwks\"}")));
+
+        stubFor(get(urlEqualTo("/jwks"))
+            .willReturn(aResponse()
+                .withHeader("Content-Type", "application/json")
+                .withBody("{\"keys\" : [ " + rsaKey.toJSONString() + " ] }")));
     }
 
     @Test
@@ -440,18 +465,15 @@ public class TokenValidationTest {
                 private static final String SEC_WEBSOCKET_MAGIC = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
                 @Override
                 public void customize(WireMockConfiguration options) {
-                    Helper<Object> secWebsocketAcceptHelper = new Helper<Object>() {
-                        @Override
-                        public String apply(Object context, Options options) {
-                            String in = context.toString() + SEC_WEBSOCKET_MAGIC;
-                            byte[] hashed;
-                            try {
-                                hashed = MessageDigest.getInstance("SHA-1").digest(in.getBytes(StandardCharsets.UTF_8));
-                            } catch (NoSuchAlgorithmException e) {
-                                throw new RuntimeException(e);
-                            }
-                            return Base64.getEncoder().encodeToString(hashed);
+                    Helper<Object> secWebsocketAcceptHelper = (context, options1) -> {
+                        String in = context.toString() + SEC_WEBSOCKET_MAGIC;
+                        byte[] hashed;
+                        try {
+                            hashed = MessageDigest.getInstance("SHA-1").digest(in.getBytes(StandardCharsets.UTF_8));
+                        } catch (NoSuchAlgorithmException e) {
+                            throw new RuntimeException(e);
                         }
+                        return Base64.getEncoder().encodeToString(hashed);
                     };
                     options.extensions(
                             new ResponseTemplateTransformer(true, "sec-websocket-accept", secWebsocketAcceptHelper));

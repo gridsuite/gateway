@@ -78,7 +78,7 @@ public class ElementAccessControllerGlobalPreFilter extends AbstractGlobalPreFil
             return chain.filter(exchange);
         }
 
-        // Is a elements endpoint with a controlled access ?
+        // Is an elements' endpoint with a controlled access ?
         String endPointServiceName = Objects.requireNonNull((String) (Objects.requireNonNull((Route) exchange.getAttribute(ServerWebExchangeUtils.GATEWAY_ROUTE_ATTR)).getMetadata()).get(END_POINT_SERVICE_NAME));
         EndPointServer endPointServer = applicationContext.containsBean(endPointServiceName) ? (EndPointServer) applicationContext.getBean(endPointServiceName) : null;
         if (endPointServer == null || !endPointServer.hasElementsAccessControl()) {

@@ -27,7 +27,7 @@ public class ExploreServer implements EndPointElementServer {
 
     public static final String ENDPOINT_NAME = "explore";
 
-    private static final String QUERY_PARAM_PARENT_DIRECTORY_ID = "parentDirectoryUuid";
+    public static final String QUERY_PARAM_PARENT_DIRECTORY_ID = "parentDirectoryUuid";
 
     private final ServiceURIsConfig servicesURIsConfig;
 
