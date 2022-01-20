@@ -21,16 +21,16 @@ public class GatewayService {
         issRest = restTemplateBuilder.build();
     }
 
-    String getJwksUrl(String issBaseUri) {
+    public String getJwksUrl(String issBaseUri) {
         issRest.setUriTemplateHandler(new DefaultUriBuilderFactory(issBaseUri));
 
         String path = UriComponentsBuilder.fromPath("/.well-known/openid-configuration")
-                .toUriString();
+            .toUriString();
 
         ResponseEntity<OpenIdConfiguration> responseEntity = issRest.exchange(path,
-                HttpMethod.GET,
-                HttpEntity.EMPTY,
-                OpenIdConfiguration.class);
+            HttpMethod.GET,
+            HttpEntity.EMPTY,
+            OpenIdConfiguration.class);
 
         return Objects.requireNonNull(responseEntity.getBody()).getJwksUri();
     }
