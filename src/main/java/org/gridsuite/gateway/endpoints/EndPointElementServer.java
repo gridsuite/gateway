@@ -61,6 +61,7 @@ public interface EndPointElementServer extends EndPointServer {
 
         // /<elements>/{elementUuid} or /<elements>/**?id=
         switch (Objects.requireNonNull(request.getMethod())) {
+            case HEAD:
             case GET: {
                 if (elementUuid != null) {
                     return Optional.of(AccessControlInfos.createElementType(List.of(elementUuid)));
