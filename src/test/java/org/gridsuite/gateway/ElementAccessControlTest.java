@@ -332,6 +332,33 @@ public class ElementAccessControlTest {
             .header("Authorization", "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isOk();
+
+    }
+
+    @Test
+    public void testCreateSubElements() {
+        initStubForJwk();
+
+        UUID uuid = UUID.randomUUID();
+
+        // user1 allowed
+        stubFor(head(urlEqualTo(String.format("/v1/elements?ids=%s", uuid))).withPort(port).withHeader("userId", equalTo("user1"))
+            .willReturn(aResponse()));
+
+        stubFor(post(urlEqualTo(String.format("/v1/studies/%s/tree/nodes", uuid))).withHeader("userId", equalTo("user1"))
+            .willReturn(aResponse()));
+
+        webClient
+            .post().uri("study/v1/studies")
+            .header("Authorization", "Bearer " + tokenUser1)
+            .exchange()
+            .expectStatus().isForbidden();
+
+        webClient
+            .post().uri(String.format("study/v1/studies/%s/tree/nodes", uuid))
+            .header("Authorization", "Bearer " + tokenUser1)
+            .exchange()
+            .expectStatus().isOk();
     }
 
     @Test

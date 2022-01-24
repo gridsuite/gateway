@@ -75,9 +75,7 @@ public interface EndPointElementServer extends EndPointServer {
                     }
                 }
             }
-            case POST: { // Not allowed by default
-                return Optional.empty();
-            }
+            case POST: // Only sub elements (elements only via explore server)
             case PUT:
             case DELETE:
                 return elementUuid == null ? Optional.empty() : Optional.of(AccessControlInfos.createElementType(List.of(elementUuid)));
