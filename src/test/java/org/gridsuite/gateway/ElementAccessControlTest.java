@@ -498,10 +498,7 @@ public class ElementAccessControlTest {
     public void testAccessControlInfos() {
         List<UUID> emptyList = List.of();
 
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> AccessControlInfos.createDirectoryType(emptyList));
-        assertEquals("List of directories is empty", exception.getMessage());
-
-        exception = assertThrows(IllegalArgumentException.class, () -> AccessControlInfos.createElementType(emptyList));
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> AccessControlInfos.create(emptyList));
         assertEquals("List of elements is empty", exception.getMessage());
     }
 

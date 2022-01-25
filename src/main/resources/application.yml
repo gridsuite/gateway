@@ -1,0 +1,11 @@
+spring:
+  profiles:
+    active: default,local
+
+info:
+  hostname: ${HOSTNAME}
+
+
+logging:
+  level:
+    org.gridsuite.gateway: DEBUG

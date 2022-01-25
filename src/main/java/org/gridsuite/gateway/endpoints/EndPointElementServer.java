@@ -64,21 +64,21 @@ public interface EndPointElementServer extends EndPointServer {
             case HEAD:
             case GET: {
                 if (elementUuid != null) {
-                    return Optional.of(AccessControlInfos.createElementType(List.of(elementUuid)));
+                    return Optional.of(AccessControlInfos.create(List.of(elementUuid)));
                 } else {
                     if (request.getQueryParams().get(QUERY_PARAM_IDS) == null) {
                         return Optional.empty();
                     } else {
                         List<String> ids = request.getQueryParams().get(QUERY_PARAM_IDS);
                         List<UUID> elementUuids = ids.stream().map(EndPointElementServer::getUuid).filter(Objects::nonNull).collect(Collectors.toList());
-                        return elementUuids.size() == ids.size() ? Optional.of(AccessControlInfos.createElementType(elementUuids)) : Optional.empty();
+                        return elementUuids.size() == ids.size() ? Optional.of(AccessControlInfos.create(elementUuids)) : Optional.empty();
                     }
                 }
             }
             case POST: // Only sub elements (elements only via explore server)
             case PUT:
             case DELETE:
-                return elementUuid == null ? Optional.empty() : Optional.of(AccessControlInfos.createElementType(List.of(elementUuid)));
+                return elementUuid == null ? Optional.empty() : Optional.of(AccessControlInfos.create(List.of(elementUuid)));
             default:
                 return Optional.empty();
         }
