@@ -18,27 +18,13 @@ import java.util.UUID;
 @Getter
 @Setter
 public class AccessControlInfos {
-    private Type type;
 
-    private List<UUID> directoryOrElementUuids;
+    private List<UUID> elementUuids;
 
-    public static AccessControlInfos createDirectoryType(@NonNull List<UUID> uuids) {
-        if (uuids.isEmpty()) {
-            throw new IllegalArgumentException("List of directories is empty");
-        }
-        return new AccessControlInfos(Type.DIRECTORY, uuids);
-    }
-
-    public static AccessControlInfos createElementType(@NonNull List<UUID> uuids) {
+    public static AccessControlInfos create(@NonNull List<UUID> uuids) {
         if (uuids.isEmpty()) {
             throw new IllegalArgumentException("List of elements is empty");
         }
-        return new AccessControlInfos(Type.ELEMENT, uuids);
+        return new AccessControlInfos(uuids);
     }
-
-    public enum Type {
-        ELEMENT,
-        DIRECTORY
-    }
-
 }

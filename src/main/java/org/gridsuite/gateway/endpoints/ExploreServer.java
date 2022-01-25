@@ -63,14 +63,14 @@ public class ExploreServer implements EndPointElementServer {
         // Elements creation
         if (Objects.requireNonNull(request.getMethod()) == HttpMethod.POST) {
             if (elementUuid != null) {
-                return Optional.of(AccessControlInfos.createElementType(List.of(elementUuid)));
+                return Optional.of(AccessControlInfos.create(List.of(elementUuid)));
             } else {
                 List<String> ids = request.getQueryParams().get(QUERY_PARAM_PARENT_DIRECTORY_ID);
                 if (ids == null || ids.size() != 1) {
                     return Optional.empty();
                 } else {
                     UUID uuid = EndPointElementServer.getUuid(ids.get(0));
-                    return uuid == null ? Optional.empty() : Optional.of(AccessControlInfos.createDirectoryType(List.of(uuid)));
+                    return uuid == null ? Optional.empty() : Optional.of(AccessControlInfos.create(List.of(uuid)));
                 }
             }
         } else {

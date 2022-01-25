@@ -48,8 +48,6 @@ public class ElementAccessControllerGlobalPreFilter extends AbstractGlobalPreFil
 
     private static final String ROOT_CATEGORY_REACTOR = "reactor.";
 
-    private static final String DIRECTORIES_ROOT_PATH = "directories";
-
     private static final String ELEMENTS_ROOT_PATH = "elements";
 
     private final WebClient webClient;
@@ -107,8 +105,8 @@ public class ElementAccessControllerGlobalPreFilter extends AbstractGlobalPreFil
             .head()
             .uri(uriBuilder -> uriBuilder
                 .path(httpRequest.getPath().subPath(0, 3).value()) // version
-                .path(accessControlInfos.getType() == AccessControlInfos.Type.DIRECTORY ? DIRECTORIES_ROOT_PATH : ELEMENTS_ROOT_PATH)
-                .queryParam(QUERY_PARAM_IDS, accessControlInfos.getDirectoryOrElementUuids())
+                .path(ELEMENTS_ROOT_PATH)
+                .queryParam(QUERY_PARAM_IDS, accessControlInfos.getElementUuids())
                 .build()
             )
             .header(HEADER_USER_ID, Objects.requireNonNull(httpHeaders.get(HEADER_USER_ID)).get(0))
