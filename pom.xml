@@ -46,7 +46,7 @@
     <properties>
         <java.version>11</java.version>
 
-        <gridsuite-dependencies.version>17</gridsuite-dependencies.version>
+        <gridsuite-dependencies.version>18</gridsuite-dependencies.version>
 
         <nimbus-jose-jwt.version>8.14</nimbus-jose-jwt.version>
         <oauth2-oidc-sdk.version>7.3</oauth2-oidc-sdk.version>
