@@ -31,7 +31,9 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.text.ParseException;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.gridsuite.gateway.GatewayConfig.HEADER_USER_ID;
 
@@ -48,6 +50,8 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
     @Value("${allowed-issuers}")
     private List<String> allowedIssuers;
 
+    private Map<String, List<String>> headersMap = new HashMap<>();
+
     public TokenValidatorGlobalPreFilter(GatewayService gatewayService) {
         this.gatewayService = gatewayService;
     }
@@ -58,14 +62,17 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
         return Ordered.LOWEST_PRECEDENCE - 3;
     }
 
+    int i = 0;
+
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         LOGGER.debug("Filter : {}", getClass().getSimpleName());
         ServerHttpRequest req = exchange.getRequest();
-        List<String> ls = req.getHeaders().get("Authorization");
-        List<String> queryls = req.getQueryParams().get("access_token");
+        // use HashMap to store Authorization and access_token headers
+        headersMap.putIfAbsent("Authorization", req.getHeaders().get("Authorization"));
+        headersMap.putIfAbsent("access_token", req.getQueryParams().get("access_token"));
 
-        if (ls == null && queryls == null) {
+        if (headersMap.get("Authorization") == null && headersMap.get("access_token") == null) {
             LOGGER.info("{}: 401 Unauthorized, Authorization header or access_token query parameter is required",
                 exchange.getRequest().getPath());
             return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
@@ -74,8 +81,8 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
         // For now we only handle one token. If needed, we can adapt this code to check
         // multiple tokens and accept the connection if at least one of them is valid
         String token;
-        if (ls != null) {
-            String authorization = ls.get(0);
+        if (headersMap.get("Authorization") != null) {
+            String authorization = headersMap.get("Authorization").get(0);
             List<String> arr = Arrays.asList(authorization.split(" "));
 
             if (arr.size() != 2 || !arr.get(0).equals("Bearer")) {
@@ -86,7 +93,7 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
 
             token = arr.get(1);
         } else {
-            token = queryls.get(0);
+            token = headersMap.get("access_token").get(0);
         }
 
         JWT jwt;
@@ -120,12 +127,18 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
             validator.validate(idToken, null);
             // we can safely trust the JWT
             LOGGER.debug("Token verified, it can be trusted");
-
             //we add the subject header
             exchange.getRequest()
                 .mutate()
                 .headers(h -> h.set(HEADER_USER_ID, jwtClaimsSet.getSubject()));
-        } catch (JOSEException | BadJOSEException | ParseException | MalformedURLException e) {
+        } catch (BadJOSEException | JOSEException er) {
+            LOGGER.info("test access  not valid");
+            headersMap.clear();
+            req = exchange.getRequest();
+            headersMap.put("Authorization", req.getHeaders().get("Authorization"));
+            headersMap.put("access_token", req.getQueryParams().get("access_token"));
+        } catch (ParseException | MalformedURLException e) {
+            LOGGER.info("test access  not valid");
             LOGGER.info("{}: 401 Unauthorized, The token cannot be trusted : {}", exchange.getRequest().getPath(), e.getMessage());
             return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
         }
