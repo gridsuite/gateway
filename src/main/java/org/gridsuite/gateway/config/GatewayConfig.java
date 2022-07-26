@@ -4,7 +4,7 @@
   License, v. 2.0. If a copy of the MPL was not distributed with this
   file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-package org.gridsuite.gateway;
+package org.gridsuite.gateway.config;
 
 import org.gridsuite.gateway.endpoints.*;
 import org.springframework.cloud.gateway.route.RouteLocator;
@@ -29,6 +29,7 @@ public class GatewayConfig {
 
     @Bean
     public RouteLocator myRoutes(RouteLocatorBuilder builder, ApplicationContext context) {
+
         return builder.routes()
             .route(p -> context.getBean(StudyServer.class).getRoute(p))
             .route(p -> context.getBean(CaseServer.class).getRoute(p))
@@ -47,5 +48,6 @@ public class GatewayConfig {
             .route(p -> context.getBean(ReportServer.class).getRoute(p))
             .route(p -> context.getBean(NetworkModificationServer.class).getRoute(p))
             .build();
+
     }
 }

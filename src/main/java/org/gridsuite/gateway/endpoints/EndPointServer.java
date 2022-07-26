@@ -11,7 +11,7 @@ import org.springframework.cloud.gateway.route.Route;
 import org.springframework.cloud.gateway.route.builder.Buildable;
 import org.springframework.cloud.gateway.route.builder.PredicateSpec;
 
-import static org.gridsuite.gateway.GatewayConfig.END_POINT_SERVICE_NAME;
+import static org.gridsuite.gateway.config.GatewayConfig.END_POINT_SERVICE_NAME;
 
 /**
  * @author Slimane Amar <slimane.amar at rte-france.com>

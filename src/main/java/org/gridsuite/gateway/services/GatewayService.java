@@ -1,4 +1,4 @@
-package org.gridsuite.gateway;
+package org.gridsuite.gateway.services;
 
 import org.gridsuite.gateway.dto.OpenIdConfiguration;
 import org.springframework.boot.web.client.RestTemplateBuilder;

@@ -6,7 +6,7 @@
  */
 package org.gridsuite.gateway.endpoints;
 
-import org.gridsuite.gateway.ServiceURIsConfig;
+import org.gridsuite.gateway.config.ServiceURIsConfig;
 import org.springframework.stereotype.Component;
 
 import java.util.Set;
