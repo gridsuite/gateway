@@ -5,8 +5,7 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          jwk-set-uri: http://172.17.0.1:9090/jwks
-          issuer-uri: http://172.17.0.1:9090/
+          jwk-set-uri: http://172.17.0.1:9090/.well-known/openid-configuration
 server:
   # unset forward-headers-strategy from the common conf, otherwise we get 404 on all apis
   forward-headers-strategy: ~

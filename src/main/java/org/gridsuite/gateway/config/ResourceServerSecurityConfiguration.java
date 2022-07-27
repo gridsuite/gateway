@@ -7,28 +7,44 @@
 
 package org.gridsuite.gateway.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+//import org.springframework.core.annotation.Order;
+import org.springframework.security.config.annotation.method.configuration.EnableReactiveMethodSecurity;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
+import org.springframework.security.oauth2.server.resource.authentication.JwtIssuerReactiveAuthenticationManagerResolver;
 import org.springframework.security.oauth2.server.resource.web.server.ServerBearerTokenAuthenticationConverter;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.security.web.server.authentication.ServerAuthenticationConverter;
+import java.util.List;
+
 
 /**
  * @author bendaamerahm </ahmed.bendaamer@rte-france.com>
  */
+
 @Configuration
 @EnableWebFluxSecurity
+@EnableReactiveMethodSecurity
 public class ResourceServerSecurityConfiguration {
 
+    @Value("${allowed-issuers}")
+    private List<String> allowedIssuers;
+
+    JwtIssuerReactiveAuthenticationManagerResolver reactiveAuthenticationManagerResolver;
+
     @Bean
-    public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
+    public SecurityWebFilterChain securityWebFilterChainForJwtIssuer(ServerHttpSecurity http) {
+        reactiveAuthenticationManagerResolver = new JwtIssuerReactiveAuthenticationManagerResolver(allowedIssuers);
         http
-                .authorizeExchange()
-                .anyExchange().authenticated()
-                .and()
-                .oauth2ResourceServer(oauth2 -> oauth2.bearerTokenConverter(bearerTokenConverter()).jwt());
+            .authorizeExchange(exchanges -> exchanges
+                    .anyExchange().authenticated()
+            )
+            .oauth2ResourceServer(oauth2 -> oauth2
+                    .authenticationManagerResolver(reactiveAuthenticationManagerResolver).bearerTokenConverter(bearerTokenConverter())
+            );
         return http.build();
     }
 
@@ -37,4 +53,5 @@ public class ResourceServerSecurityConfiguration {
         bearerTokenConverter.setAllowUriQueryParameter(true);
         return bearerTokenConverter;
     }
+
 }
