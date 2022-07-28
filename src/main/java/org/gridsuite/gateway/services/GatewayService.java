@@ -31,7 +31,6 @@ public class GatewayService {
 
     @Cacheable(cacheNames = {"JwksUrl"}, key = "#issBaseUri")
     public String getJwksUrl(String issBaseUri) {
-        System.out.println("calling gaia");
         issRest.setUriTemplateHandler(new DefaultUriBuilderFactory(issBaseUri));
 
         String path = UriComponentsBuilder.fromPath("/.well-known/openid-configuration")

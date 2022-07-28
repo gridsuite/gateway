@@ -134,7 +134,8 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
                 cacheService.evictSingleCacheValue("JwksUrl", jwt.getJWTClaimsSet().getIssuer());
                 gatewayService.getJwksUrl(jwt.getJWTClaimsSet().getIssuer());
             } catch (ParseException e) {
-                throw new RuntimeException(e);
+                LOGGER.info("{}: 401 Unauthorized, The token cannot be trusted : {}", exchange.getRequest().getPath(), e.getMessage());
+                return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
             }
             LOGGER.info("{}: 401 Unauthorized, The token cannot be trusted : {}", exchange.getRequest().getPath(), err.getMessage());
             return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
