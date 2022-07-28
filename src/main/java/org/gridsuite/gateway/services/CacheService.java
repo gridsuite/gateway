@@ -21,7 +21,7 @@ public class CacheService {
 
     public void evictAllCacheValuesByName(String cacheName) {
         Cache cache = cacheManager.getCache(cacheName);
-        if(cacheManager.getCache(cacheName) != null) {
+        if (cacheManager.getCache(cacheName) != null) {
             cache.clear();
         }
     }
