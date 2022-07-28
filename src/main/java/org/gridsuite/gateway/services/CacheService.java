@@ -31,6 +31,7 @@ public class CacheService {
                 .forEach(cacheName -> cacheManager.getCache(cacheName).clear());
     }
 
+    //clear all cache every 5 min
     @Scheduled(fixedRate = 300000)
     public void evictAllcachesAtIntervals() {
         evictAllCaches();

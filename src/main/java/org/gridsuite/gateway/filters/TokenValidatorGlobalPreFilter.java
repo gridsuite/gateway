@@ -43,6 +43,7 @@ import static org.gridsuite.gateway.config.GatewayConfig.HEADER_USER_ID;
 public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(TokenValidatorGlobalPreFilter.class);
+    public static final String UNAUTHORIZED_THE_TOKEN_CANNOT_BE_TRUSTED = "{}: 401 Unauthorized, The token cannot be trusted : {}";
 
     private final GatewayService gatewayService;
 
@@ -134,13 +135,13 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
                 cacheService.evictSingleCacheValue("JwksUrl", jwt.getJWTClaimsSet().getIssuer());
                 gatewayService.getJwksUrl(jwt.getJWTClaimsSet().getIssuer());
             } catch (ParseException e) {
-                LOGGER.info("{}: 401 Unauthorized, The token cannot be trusted : {}", exchange.getRequest().getPath(), e.getMessage());
+                LOGGER.info(UNAUTHORIZED_THE_TOKEN_CANNOT_BE_TRUSTED, exchange.getRequest().getPath(), e.getMessage());
                 return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
             }
-            LOGGER.info("{}: 401 Unauthorized, The token cannot be trusted : {}", exchange.getRequest().getPath(), err.getMessage());
+            LOGGER.info(UNAUTHORIZED_THE_TOKEN_CANNOT_BE_TRUSTED, exchange.getRequest().getPath(), err.getMessage());
             return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
         } catch (ParseException | MalformedURLException e) {
-            LOGGER.info("{}: 401 Unauthorized, The token cannot be trusted : {}", exchange.getRequest().getPath(), e.getMessage());
+            LOGGER.info(UNAUTHORIZED_THE_TOKEN_CANNOT_BE_TRUSTED, exchange.getRequest().getPath(), e.getMessage());
             return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
         }
         return chain.filter(exchange);
