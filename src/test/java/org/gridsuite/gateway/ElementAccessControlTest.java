@@ -15,6 +15,7 @@ import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
+import org.gridsuite.gateway.config.ServiceURIsConfig;
 import org.gridsuite.gateway.dto.AccessControlInfos;
 import org.gridsuite.gateway.endpoints.ExploreServer;
 import org.junit.Before;

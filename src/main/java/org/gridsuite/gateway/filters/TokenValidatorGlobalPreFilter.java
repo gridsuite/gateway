@@ -15,7 +15,8 @@ import com.nimbusds.jwt.JWTParser;
 import com.nimbusds.oauth2.sdk.id.ClientID;
 import com.nimbusds.oauth2.sdk.id.Issuer;
 import com.nimbusds.openid.connect.sdk.validators.IDTokenValidator;
-import org.gridsuite.gateway.GatewayService;
+import org.gridsuite.gateway.services.CacheService;
+import org.gridsuite.gateway.services.GatewayService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -33,7 +34,7 @@ import java.text.ParseException;
 import java.util.Arrays;
 import java.util.List;
 
-import static org.gridsuite.gateway.GatewayConfig.HEADER_USER_ID;
+import static org.gridsuite.gateway.config.GatewayConfig.HEADER_USER_ID;
 
 /**
  * @author Chamseddine Benhamed <chamseddine.benhamed at rte-france.com>
@@ -45,11 +46,14 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
 
     private final GatewayService gatewayService;
 
+    private final CacheService cacheService;
+
     @Value("${allowed-issuers}")
     private List<String> allowedIssuers;
 
-    public TokenValidatorGlobalPreFilter(GatewayService gatewayService) {
+    public TokenValidatorGlobalPreFilter(GatewayService gatewayService, CacheService cacheService) {
         this.gatewayService = gatewayService;
+        this.cacheService = cacheService;
     }
 
     @Override
@@ -125,7 +129,16 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
             exchange.getRequest()
                 .mutate()
                 .headers(h -> h.set(HEADER_USER_ID, jwtClaimsSet.getSubject()));
-        } catch (JOSEException | BadJOSEException | ParseException | MalformedURLException e) {
+        } catch (JOSEException | BadJOSEException err) {
+            try {
+                cacheService.evictSingleCacheValue("JwksUrl", jwt.getJWTClaimsSet().getIssuer());
+                gatewayService.getJwksUrl(jwt.getJWTClaimsSet().getIssuer());
+            } catch (ParseException e) {
+                throw new RuntimeException(e);
+            }
+            LOGGER.info("{}: 401 Unauthorized, The token cannot be trusted : {}", exchange.getRequest().getPath(), err.getMessage());
+            return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
+        } catch (ParseException | MalformedURLException e) {
             LOGGER.info("{}: 401 Unauthorized, The token cannot be trusted : {}", exchange.getRequest().getPath(), e.getMessage());
             return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
         }

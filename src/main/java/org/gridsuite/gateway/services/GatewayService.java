@@ -5,10 +5,11 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-package org.gridsuite.gateway;
+package org.gridsuite.gateway.services;
 
 import org.gridsuite.gateway.dto.OpenIdConfiguration;
 import org.springframework.boot.web.client.RestTemplateBuilder;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
@@ -28,7 +29,9 @@ public class GatewayService {
         issRest = restTemplateBuilder.build();
     }
 
+    @Cacheable(cacheNames = {"JwksUrl"}, key = "#issBaseUri")
     public String getJwksUrl(String issBaseUri) {
+        System.out.println("calling gaia");
         issRest.setUriTemplateHandler(new DefaultUriBuilderFactory(issBaseUri));
 
         String path = UriComponentsBuilder.fromPath("/.well-known/openid-configuration")

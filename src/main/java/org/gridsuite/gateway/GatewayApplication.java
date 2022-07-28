@@ -9,11 +9,15 @@ package org.gridsuite.gateway;
 import com.powsybl.ws.commons.Utils;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cache.annotation.EnableCaching;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * @author Chamseddine Benhamed <chamseddine.benhamed at rte-france.com>
  */
 @SuppressWarnings("checkstyle:HideUtilityClassConstructor")
+@EnableCaching
+@EnableScheduling
 @SpringBootApplication
 public class GatewayApplication {
     public static void main(String[] args) {
