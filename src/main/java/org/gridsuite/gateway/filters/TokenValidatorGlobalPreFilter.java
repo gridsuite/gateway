@@ -29,7 +29,6 @@ import reactor.core.publisher.Mono;
 
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.text.ParseException;
 import java.util.Arrays;
 import java.util.List;
 
@@ -106,30 +105,33 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
             return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
         }
 
-        try {
-            JWT idToken = JWTParser.parse(token);
-            Issuer iss = new Issuer(jwt.getJWTClaimsSet().getIssuer());
-            ClientID clientID = new ClientID(jwt.getJWTClaimsSet().getAudience().get(0));
+        Issuer iss = new Issuer(jwtClaimsSet.getIssuer());
+        ClientID clientID = new ClientID(jwtClaimsSet.getAudience().get(0));
 
-            JWSAlgorithm jwsAlg = JWSAlgorithm.parse(jwt.getHeader().getAlgorithm().getName());
-            URL jwkSetURL = new URL(gatewayService.getJwksUrl(jwt.getJWTClaimsSet().getIssuer()));
+        JWSAlgorithm jwsAlg = JWSAlgorithm.parse(jwt.getHeader().getAlgorithm().getName());
+        return gatewayService.getJwksUrl(jwtClaimsSet.getIssuer())
+                .flatMap(jwkSet -> {
+                    try {
+                        URL jwkSetURL = new URL(jwkSet);
 
-            // Create validator for signed ID tokens
-            IDTokenValidator validator = new IDTokenValidator(iss, clientID, jwsAlg, jwkSetURL);
+                        // Create validator for signed ID tokens
+                        IDTokenValidator validator = new IDTokenValidator(iss, clientID, jwsAlg, jwkSetURL);
 
-            validator.validate(idToken, null);
-            // we can safely trust the JWT
-            LOGGER.debug("Token verified, it can be trusted");
+                        validator.validate(jwt, null);
+                        // we can safely trust the JWT
+                        LOGGER.debug("Token verified, it can be trusted");
 
-            //we add the subject header
-            exchange.getRequest()
-                .mutate()
-                .headers(h -> h.set(HEADER_USER_ID, jwtClaimsSet.getSubject()));
-        } catch (JOSEException | BadJOSEException | ParseException | MalformedURLException e) {
-            LOGGER.info("{}: 401 Unauthorized, The token cannot be trusted : {}", exchange.getRequest().getPath(), e.getMessage());
-            return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
-        }
-        return chain.filter(exchange);
+                        //we add the subject header
+                        exchange.getRequest()
+                                .mutate()
+                                .headers(h -> h.set(HEADER_USER_ID, jwtClaimsSet.getSubject()));
+
+                        return chain.filter(exchange);
+                    } catch (JOSEException | BadJOSEException | MalformedURLException e) {
+                        LOGGER.info("{}: 401 Unauthorized, The token cannot be trusted : {}", exchange.getRequest().getPath(), e.getMessage());
+                        return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
+                    }
+                });
     }
 }
 
