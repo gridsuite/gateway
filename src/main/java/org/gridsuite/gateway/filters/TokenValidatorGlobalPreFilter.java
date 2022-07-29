@@ -35,7 +35,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import static org.gridsuite.gateway.config.GatewayConfig.HEADER_USER_ID;
-
+import static org.gridsuite.gateway.services.GatewayService.CACHE_NAME;
 /**
  * @author Chamseddine Benhamed <chamseddine.benhamed at rte-france.com>
  */
@@ -132,7 +132,7 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
                 .headers(h -> h.set(HEADER_USER_ID, jwtClaimsSet.getSubject()));
         } catch (JOSEException | BadJOSEException err) {
             try {
-                cacheService.evictSingleCacheValue("JwksUrl", jwt.getJWTClaimsSet().getIssuer());
+                cacheService.evictSingleCacheValue(CACHE_NAME, jwt.getJWTClaimsSet().getIssuer());
                 gatewayService.getJwksUrl(jwt.getJWTClaimsSet().getIssuer());
             } catch (ParseException e) {
                 LOGGER.info(UNAUTHORIZED_THE_TOKEN_CANNOT_BE_TRUSTED, exchange.getRequest().getPath(), e.getMessage());
