@@ -1,39 +1,31 @@
+/**
+ * Copyright (c) 2020, RTE (http://www.rte-france.com)
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
+
 package org.gridsuite.gateway.services;
 
 import lombok.AllArgsConstructor;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+
+/**
+ * @author bendaamerahm <ahmed.bendaamer@rte-france.com>
+ */
 @Service
 @AllArgsConstructor
 public class CacheService {
 
-    CacheManager cacheManager;
+    private CacheManager cacheManager;
 
-    public void evictSingleCacheValue(String cacheName, String cacheKey) {
+    public void evictSingleCacheValueByKey(String cacheName, String cacheKey) {
         Cache cache = cacheManager.getCache(cacheName);
         if (cache != null) {
             cache.evict(cacheKey);
         }
-    }
-
-    public void evictAllCacheValuesByName(String cacheName) {
-        Cache cache = cacheManager.getCache(cacheName);
-        if (cache != null) {
-            cache.clear();
-        }
-    }
-
-    public void evictAllCaches() {
-        cacheManager.getCacheNames().stream()
-                .forEach(cacheName -> cacheManager.getCache(cacheName).clear());
-    }
-
-    //clear all cache every 5 min
-    @Scheduled(fixedRate = 300000)
-    public void evictAllcachesAtIntervals() {
-        evictAllCaches();
     }
 }

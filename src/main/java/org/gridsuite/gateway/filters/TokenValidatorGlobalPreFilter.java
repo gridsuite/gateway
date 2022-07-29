@@ -132,7 +132,7 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
                 .headers(h -> h.set(HEADER_USER_ID, jwtClaimsSet.getSubject()));
         } catch (JOSEException | BadJOSEException err) {
             try {
-                cacheService.evictSingleCacheValue(CACHE_NAME, jwt.getJWTClaimsSet().getIssuer());
+                cacheService.evictSingleCacheValueByKey(CACHE_NAME, jwt.getJWTClaimsSet().getIssuer());
                 gatewayService.getJwksUrl(jwt.getJWTClaimsSet().getIssuer());
             } catch (ParseException e) {
                 LOGGER.info(UNAUTHORIZED_THE_TOKEN_CANNOT_BE_TRUSTED, exchange.getRequest().getPath(), e.getMessage());
