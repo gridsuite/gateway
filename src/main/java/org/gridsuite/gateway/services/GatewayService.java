@@ -22,6 +22,8 @@ import java.util.Objects;
 
 @Service
 public class GatewayService {
+    public static final String CACHE_NAME = "JwksUrl";
+    public static final String CACHE_KEY = "#issBaseUri";
     private RestTemplate issRest;
 
     public GatewayService() {
@@ -29,7 +31,7 @@ public class GatewayService {
         issRest = restTemplateBuilder.build();
     }
 
-    @Cacheable(cacheNames = {"JwksUrl"}, key = "#issBaseUri")
+    @Cacheable(cacheNames = {CACHE_NAME}, key = CACHE_KEY)
     public String getJwksUrl(String issBaseUri) {
         issRest.setUriTemplateHandler(new DefaultUriBuilderFactory(issBaseUri));
 
