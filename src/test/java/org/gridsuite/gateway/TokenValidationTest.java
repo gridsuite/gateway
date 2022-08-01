@@ -55,23 +55,23 @@ import static com.github.tomakehurst.wiremock.client.WireMock.*;
  */
 @RunWith(SpringRunner.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-    properties = {"backing-services.case.base-uri=http://localhost:${wiremock.server.port}",
-        "backing-services.study-server.base-uri=http://localhost:${wiremock.server.port}",
-        "backing-services.merge-orchestrator-server.base-uri=http://localhost:${wiremock.server.port}",
-        "backing-services.merge-notification-server.base-uri=http://localhost:${wiremock.server.port}",
-        "backing-services.directory-notification-server.base-uri=http://localhost:${wiremock.server.port}",
-        "backing-services.actions-server.base-uri=http://localhost:${wiremock.server.port}",
-        "backing-services.notification-server.base-uri=http://localhost:${wiremock.server.port}",
-        "backing-services.config-server.base-uri=http://localhost:${wiremock.server.port}",
-        "backing-services.config-notification-server.base-uri=http://localhost:${wiremock.server.port}",
-        "backing-services.directory-server.base-uri=http://localhost:${wiremock.server.port}",
-        "backing-services.explore-server.base-uri=http://localhost:${wiremock.server.port}",
-        "backing-services.cgmes-boundary-server.base-uri=http://localhost:${wiremock.server.port}",
-        "backing-services.dynamic-mapping-server.base-uri=http://localhost:${wiremock.server.port}",
-        "backing-services.filter-server.base-uri=http://localhost:${wiremock.server.port}",
-        "backing-services.report-server.base-uri=http://localhost:${wiremock.server.port}",
-        "backing-services.network-modification-server.base-uri=http://localhost:${wiremock.server.port}"
-    })
+        properties = {"backing-services.case.base-uri=http://localhost:${wiremock.server.port}",
+                "backing-services.study-server.base-uri=http://localhost:${wiremock.server.port}",
+                "backing-services.merge-orchestrator-server.base-uri=http://localhost:${wiremock.server.port}",
+                "backing-services.merge-notification-server.base-uri=http://localhost:${wiremock.server.port}",
+                "backing-services.directory-notification-server.base-uri=http://localhost:${wiremock.server.port}",
+                "backing-services.actions-server.base-uri=http://localhost:${wiremock.server.port}",
+                "backing-services.notification-server.base-uri=http://localhost:${wiremock.server.port}",
+                "backing-services.config-server.base-uri=http://localhost:${wiremock.server.port}",
+                "backing-services.config-notification-server.base-uri=http://localhost:${wiremock.server.port}",
+                "backing-services.directory-server.base-uri=http://localhost:${wiremock.server.port}",
+                "backing-services.explore-server.base-uri=http://localhost:${wiremock.server.port}",
+                "backing-services.cgmes-boundary-server.base-uri=http://localhost:${wiremock.server.port}",
+                "backing-services.dynamic-mapping-server.base-uri=http://localhost:${wiremock.server.port}",
+                "backing-services.filter-server.base-uri=http://localhost:${wiremock.server.port}",
+                "backing-services.report-server.base-uri=http://localhost:${wiremock.server.port}",
+                "backing-services.network-modification-server.base-uri=http://localhost:${wiremock.server.port}"
+        })
 
 @AutoConfigureWireMock(port = 0)
 public class TokenValidationTest {
@@ -152,8 +152,8 @@ public class TokenValidationTest {
         WebSocketClient client = new StandardWebSocketClient();
         HttpHeaders headers = new HttpHeaders();
         Mono<Void> wsconnection = client.execute(
-            URI.create("ws://localhost:" + this.localServerPort + "/" + name + "/notify?access_token=" + token), headers,
-            ws -> ws.receive().then());
+                URI.create("ws://localhost:" + this.localServerPort + "/" + name + "/notify?access_token=" + token), headers,
+                ws -> ws.receive().then());
         wsconnection.subscribe();
 
         // Busy loop waiting to check that spring-gateway contacted our wiremock server
@@ -191,7 +191,7 @@ public class TokenValidationTest {
         UUID elementUuid = UUID.randomUUID();
 
         stubFor(head(urlEqualTo(String.format("/v1/elements?ids=%s", elementUuid))).withPort(port).withHeader("userId", equalTo("chmits"))
-            .willReturn(aResponse()));
+                .willReturn(aResponse()));
 
         stubFor(get(urlEqualTo(String.format("/v1/explore/elements/metadata?ids=%s", elementUuid))).withHeader("userId", equalTo("chmits"))
                 .willReturn(aResponse()
@@ -357,11 +357,11 @@ public class TokenValidationTest {
 
         stubFor(get(urlPathEqualTo("/notify")).withHeader("userId", equalTo("chmits"))
                 .willReturn(aResponse()
-                    .withHeader("Sec-WebSocket-Accept", "{{{sec-websocket-accept request.headers.Sec-WebSocket-Key}}}")
-                    .withHeader("Upgrade", "websocket")
-                    .withHeader("Connection", "Upgrade")
-                    .withStatus(101)
-                    .withStatusMessage("Switching Protocols")));
+                        .withHeader("Sec-WebSocket-Accept", "{{{sec-websocket-accept request.headers.Sec-WebSocket-Key}}}")
+                        .withHeader("Upgrade", "websocket")
+                        .withHeader("Connection", "Upgrade")
+                        .withStatus(101)
+                        .withStatusMessage("Switching Protocols")));
 
         testWebsocket("notification");
         testWebsocket("config-notification");
@@ -372,13 +372,13 @@ public class TokenValidationTest {
     private void initStubForJwk() {
         stubFor(get(urlEqualTo("/.well-known/openid-configuration"))
                 .willReturn(aResponse()
-                    .withHeader("Content-Type", "application/json")
-                    .withBody("{\"jwks_uri\": \"http://localhost:" + port + "/jwks\"}")));
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("{\"jwks_uri\": \"http://localhost:" + port + "/jwks\"}")));
 
         stubFor(get(urlEqualTo("/jwks"))
                 .willReturn(aResponse()
-                    .withHeader("Content-Type", "application/json")
-                    .withBody("{\"keys\" : [ " + rsaKey.toJSONString() + " ] }")));
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("{\"keys\" : [ " + rsaKey.toJSONString() + " ] }")));
     }
 
     @Test
@@ -386,18 +386,18 @@ public class TokenValidationTest {
 
         stubFor(get(urlEqualTo("/v1/cases"))
                 .willReturn(aResponse()
-                    .withHeader("Content-Type", "application/json")
-                    .withBody("[{\"name\": \"testCase\", \"format\" :\"XIIDM\"}, {\"name\": \"testCase2\", \"format\" :\"CGMES\"}]")));
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("[{\"name\": \"testCase\", \"format\" :\"XIIDM\"}, {\"name\": \"testCase2\", \"format\" :\"CGMES\"}]")));
 
         stubFor(get(urlEqualTo("/.well-known/openid-configuration"))
                 .willReturn(aResponse()
-                    .withHeader("Content-Type", "application/json")
-                    .withBody("{\"jwks_uri\": \"http://localhost:" + port + "/jwks\"}")));
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("{\"jwks_uri\": \"http://localhost:" + port + "/jwks\"}")));
 
         stubFor(get(urlEqualTo("/jwks"))
                 .willReturn(aResponse()
-                    .withHeader("Content-Type", "application/json")
-                    .withBody("{\"keys\" : [ " + rsaKey.toJSONString() + " ] }")));
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("{\"keys\" : [ " + rsaKey.toJSONString() + " ] }")));
 
         // test with no token
         webClient
@@ -453,8 +453,8 @@ public class TokenValidationTest {
         // test without a token
         WebSocketClient client = new StandardWebSocketClient();
         client.execute(URI.create("ws://localhost:" +
-                this.localServerPort + "/notification/notify"),
-            ws -> ws.receive().then()).doOnSuccess(s -> Assert.fail("Should have thrown"));
+                        this.localServerPort + "/notification/notify"),
+                ws -> ws.receive().then()).doOnSuccess(s -> Assert.fail("Should have thrown"));
     }
 
     @TestConfiguration
