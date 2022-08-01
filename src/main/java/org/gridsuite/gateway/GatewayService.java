@@ -8,37 +8,31 @@
 package org.gridsuite.gateway;
 
 import org.gridsuite.gateway.dto.OpenIdConfiguration;
-import org.springframework.boot.web.client.RestTemplateBuilder;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.util.DefaultUriBuilderFactory;
 import org.springframework.web.util.UriComponentsBuilder;
-
-import java.util.Objects;
+import reactor.core.publisher.Mono;
 
 @Service
 public class GatewayService {
-    private RestTemplate issRest;
+    private WebClient.Builder webClientBuilder;
 
     public GatewayService() {
-        RestTemplateBuilder restTemplateBuilder = new RestTemplateBuilder();
-        issRest = restTemplateBuilder.build();
+        webClientBuilder = WebClient.builder();
     }
 
-    public String getJwksUrl(String issBaseUri) {
-        issRest.setUriTemplateHandler(new DefaultUriBuilderFactory(issBaseUri));
+    public Mono<String> getJwksUrl(String issBaseUri) {
+        WebClient webClient = webClientBuilder.uriBuilderFactory(new DefaultUriBuilderFactory(issBaseUri)).build();
 
         String path = UriComponentsBuilder.fromPath("/.well-known/openid-configuration")
             .toUriString();
 
-        ResponseEntity<OpenIdConfiguration> responseEntity = issRest.exchange(path,
-            HttpMethod.GET,
-            HttpEntity.EMPTY,
-            OpenIdConfiguration.class);
-
-        return Objects.requireNonNull(responseEntity.getBody()).getJwksUri();
+        return webClient.get()
+                 .uri(path)
+                 .retrieve()
+                 .bodyToMono(OpenIdConfiguration.class)
+                 .single()
+                 .map(OpenIdConfiguration::getJwksUri);
     }
 }
