@@ -5,7 +5,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-package org.gridsuite.gateway.services;
+package org.gridsuite.gateway;
 
 import lombok.AllArgsConstructor;
 import org.springframework.cache.Cache;

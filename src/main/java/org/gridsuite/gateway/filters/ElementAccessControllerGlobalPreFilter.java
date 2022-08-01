@@ -8,7 +8,7 @@
 package org.gridsuite.gateway.filters;
 
 import lombok.NonNull;
-import org.gridsuite.gateway.config.ServiceURIsConfig;
+import org.gridsuite.gateway.ServiceURIsConfig;
 import org.gridsuite.gateway.dto.AccessControlInfos;
 import org.gridsuite.gateway.endpoints.EndPointElementServer;
 import org.gridsuite.gateway.endpoints.EndPointServer;
@@ -34,8 +34,8 @@ import java.util.Optional;
 import java.util.logging.Level;
 import java.util.regex.Pattern;
 
-import static org.gridsuite.gateway.config.GatewayConfig.END_POINT_SERVICE_NAME;
-import static org.gridsuite.gateway.config.GatewayConfig.HEADER_USER_ID;
+import static org.gridsuite.gateway.GatewayConfig.END_POINT_SERVICE_NAME;
+import static org.gridsuite.gateway.GatewayConfig.HEADER_USER_ID;
 import static org.gridsuite.gateway.endpoints.EndPointElementServer.QUERY_PARAM_IDS;
 
 /**

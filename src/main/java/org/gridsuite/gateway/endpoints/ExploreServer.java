@@ -7,7 +7,7 @@
 package org.gridsuite.gateway.endpoints;
 
 import lombok.NonNull;
-import org.gridsuite.gateway.config.ServiceURIsConfig;
+import org.gridsuite.gateway.ServiceURIsConfig;
 import org.gridsuite.gateway.dto.AccessControlInfos;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.server.RequestPath;

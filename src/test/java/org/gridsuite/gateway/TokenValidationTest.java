@@ -194,9 +194,9 @@ public class TokenValidationTest {
             .willReturn(aResponse()));
 
         stubFor(get(urlEqualTo(String.format("/v1/explore/elements/metadata?ids=%s", elementUuid))).withHeader("userId", equalTo("chmits"))
-            .willReturn(aResponse()
-                .withHeader("Content-Type", "application/json")
-                .withBody(String.format("[{\"elementUuid\" : \"%s\", \"type\" : \"STUDY\", \"subdirectoriesCount\" : \"0\", \"specificMetadata\" : {\"id\" : \"%s\", \"caseFormat\" : \"IIDM\"}}]", elementUuid, elementUuid))));
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(String.format("[{\"elementUuid\" : \"%s\", \"type\" : \"STUDY\", \"subdirectoriesCount\" : \"0\", \"specificMetadata\" : {\"id\" : \"%s\", \"caseFormat\" : \"IIDM\"}}]", elementUuid, elementUuid))));
 
         stubFor(get(urlEqualTo(String.format("/v1/studies/metadata?ids=%s", elementUuid))).withHeader("userId", equalTo("chmits"))
                 .willReturn(aResponse()
@@ -204,14 +204,14 @@ public class TokenValidationTest {
                         .withBody(String.format("[{\"id\" : \"%s\", \"caseFormat\" : \"IIDM\"}]", elementUuid))));
 
         stubFor(get(urlEqualTo(String.format("/v1/contingency-lists/metadata?ids=%s", elementUuid))).withHeader("userId", equalTo("chmits"))
-            .willReturn(aResponse()
+                .willReturn(aResponse()
                         .withHeader("Content-Type", "application/json")
                         .withBody(String.format("[{\"id\" : \"%s\", \"type\" : \"SCRIPT\"}]", elementUuid))));
 
         stubFor(get(urlEqualTo(String.format("/v1/filters/metadata?ids=%s", elementUuid))).withHeader("userId", equalTo("chmits"))
-            .willReturn(aResponse()
-                .withHeader("Content-Type", "application/json")
-                .withBody(String.format("[{\"id\": \"%s\", \"type\" :\"LINE\"}]", elementUuid))));
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(String.format("[{\"id\": \"%s\", \"type\" :\"LINE\"}]", elementUuid))));
 
         stubFor(get(urlEqualTo("/v1/root_directories")).withHeader("userId", equalTo("chmits"))
                 .willReturn(aResponse()
@@ -234,9 +234,9 @@ public class TokenValidationTest {
                         .withBody("[{\"process\": \"TEST\", \"tsos\" : [\"BE\", \"NL\"]}]")));
 
         stubFor(get(urlEqualTo("/v1/boundaries")).withHeader("userId", equalTo("chmits"))
-            .willReturn(aResponse()
-                .withHeader("Content-Type", "application/json")
-                .withBody("[{\"name\": \"boundary1\", \"id\" :\"da47a173-22d2-47e8-8a84-aa66e2d0fafb\"}]")));
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("[{\"name\": \"boundary1\", \"id\" :\"da47a173-22d2-47e8-8a84-aa66e2d0fafb\"}]")));
 
         stubFor(get(urlEqualTo("/mappings")).withHeader("userId", equalTo("chmits"))
                 .willReturn(aResponse()
@@ -244,9 +244,9 @@ public class TokenValidationTest {
                         .withBody("[{\"name\": \"mapping1\", \"rules\":[]}]")));
 
         stubFor(get(urlEqualTo("/v1/reports")).withHeader("userId", equalTo("chmits"))
-            .willReturn(aResponse()
-                .withHeader("Content-Type", "application/json")
-                .withBody("{\"id\": \"report1\", \"reports\" :[{\"date\":\"2001:01:01T11:11\", \"report\": \"Lets Rock\" }]}")));
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("{\"id\": \"report1\", \"reports\" :[{\"date\":\"2001:01:01T11:11\", \"report\": \"Lets Rock\" }]}")));
 
         webClient
                 .get().uri("case/v1/cases")
@@ -304,13 +304,13 @@ public class TokenValidationTest {
                 .jsonPath("$[0].name").isEqualTo("test");
 
         webClient
-            .get().uri("boundary/v1/boundaries")
-            .header("Authorization", "Bearer " + token)
-            .exchange()
-            .expectStatus().isOk()
-            .expectBody()
-            .jsonPath("$[0].name").isEqualTo("boundary1")
-            .jsonPath("$[0].id").isEqualTo("da47a173-22d2-47e8-8a84-aa66e2d0fafb");
+                .get().uri("boundary/v1/boundaries")
+                .header("Authorization", "Bearer " + token)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$[0].name").isEqualTo("boundary1")
+                .jsonPath("$[0].id").isEqualTo("da47a173-22d2-47e8-8a84-aa66e2d0fafb");
 
         webClient
                 .get().uri("dynamic-mapping/mappings")
@@ -321,33 +321,33 @@ public class TokenValidationTest {
                 .jsonPath("$[0].name").isEqualTo("mapping1");
 
         webClient
-            .get().uri("filter/v1/filters/metadata?ids=" + elementUuid)
-            .header("Authorization", "Bearer " + token)
-            .exchange()
-            .expectStatus().isOk()
-            .expectBody()
-            .jsonPath("$[0].id").isEqualTo(elementUuid.toString())
-            .jsonPath("$[0].type").isEqualTo("LINE");
+                .get().uri("filter/v1/filters/metadata?ids=" + elementUuid)
+                .header("Authorization", "Bearer " + token)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$[0].id").isEqualTo(elementUuid.toString())
+                .jsonPath("$[0].type").isEqualTo("LINE");
 
         webClient
-            .get().uri("report/v1/reports")
-            .header("Authorization", "Bearer " + token)
-            .exchange()
-            .expectStatus().isOk()
-            .expectBody()
-            .jsonPath("$.id").isEqualTo("report1")
-            .jsonPath("$.reports[0].report").isEqualTo("Lets Rock")
-            .jsonPath("$.reports[0].date").isEqualTo("2001:01:01T11:11");
+                .get().uri("report/v1/reports")
+                .header("Authorization", "Bearer " + token)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.id").isEqualTo("report1")
+                .jsonPath("$.reports[0].report").isEqualTo("Lets Rock")
+                .jsonPath("$.reports[0].date").isEqualTo("2001:01:01T11:11");
 
         webClient
-            .get().uri("explore/v1/explore/elements/metadata?ids=" + elementUuid)
-            .header("Authorization", "Bearer " + token)
-            .exchange()
-            .expectStatus().isOk()
-            .expectBody()
-            .jsonPath("$[0].elementUuid").isEqualTo(elementUuid.toString())
-            .jsonPath("$[0].type").isEqualTo("STUDY")
-            .jsonPath("$[0].subdirectoriesCount").isEqualTo(0);
+                .get().uri("explore/v1/explore/elements/metadata?ids=" + elementUuid)
+                .header("Authorization", "Bearer " + token)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$[0].elementUuid").isEqualTo(elementUuid.toString())
+                .jsonPath("$[0].type").isEqualTo("STUDY")
+                .jsonPath("$[0].subdirectoriesCount").isEqualTo(0);
     }
 
     @Test
@@ -356,12 +356,12 @@ public class TokenValidationTest {
         initStubForJwk();
 
         stubFor(get(urlPathEqualTo("/notify")).withHeader("userId", equalTo("chmits"))
-            .willReturn(aResponse()
-                .withHeader("Sec-WebSocket-Accept", "{{{sec-websocket-accept request.headers.Sec-WebSocket-Key}}}")
-                .withHeader("Upgrade", "websocket")
-                .withHeader("Connection", "Upgrade")
-                .withStatus(101)
-                .withStatusMessage("Switching Protocols")));
+                .willReturn(aResponse()
+                    .withHeader("Sec-WebSocket-Accept", "{{{sec-websocket-accept request.headers.Sec-WebSocket-Key}}}")
+                    .withHeader("Upgrade", "websocket")
+                    .withHeader("Connection", "Upgrade")
+                    .withStatus(101)
+                    .withStatusMessage("Switching Protocols")));
 
         testWebsocket("notification");
         testWebsocket("config-notification");
@@ -371,14 +371,14 @@ public class TokenValidationTest {
 
     private void initStubForJwk() {
         stubFor(get(urlEqualTo("/.well-known/openid-configuration"))
-            .willReturn(aResponse()
-                .withHeader("Content-Type", "application/json")
-                .withBody("{\"jwks_uri\": \"http://localhost:" + port + "/jwks\"}")));
+                .willReturn(aResponse()
+                    .withHeader("Content-Type", "application/json")
+                    .withBody("{\"jwks_uri\": \"http://localhost:" + port + "/jwks\"}")));
 
         stubFor(get(urlEqualTo("/jwks"))
-            .willReturn(aResponse()
-                .withHeader("Content-Type", "application/json")
-                .withBody("{\"keys\" : [ " + rsaKey.toJSONString() + " ] }")));
+                .willReturn(aResponse()
+                    .withHeader("Content-Type", "application/json")
+                    .withBody("{\"keys\" : [ " + rsaKey.toJSONString() + " ] }")));
     }
 
     @Test
@@ -386,18 +386,18 @@ public class TokenValidationTest {
 
         stubFor(get(urlEqualTo("/v1/cases"))
                 .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
-                        .withBody("[{\"name\": \"testCase\", \"format\" :\"XIIDM\"}, {\"name\": \"testCase2\", \"format\" :\"CGMES\"}]")));
+                    .withHeader("Content-Type", "application/json")
+                    .withBody("[{\"name\": \"testCase\", \"format\" :\"XIIDM\"}, {\"name\": \"testCase2\", \"format\" :\"CGMES\"}]")));
 
         stubFor(get(urlEqualTo("/.well-known/openid-configuration"))
                 .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
-                        .withBody("{\"jwks_uri\": \"http://localhost:" + port + "/jwks\"}")));
+                    .withHeader("Content-Type", "application/json")
+                    .withBody("{\"jwks_uri\": \"http://localhost:" + port + "/jwks\"}")));
 
         stubFor(get(urlEqualTo("/jwks"))
                 .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
-                        .withBody("{\"keys\" : [ " + rsaKey.toJSONString() + " ] }")));
+                    .withHeader("Content-Type", "application/json")
+                    .withBody("{\"keys\" : [ " + rsaKey.toJSONString() + " ] }")));
 
         // test with no token
         webClient
