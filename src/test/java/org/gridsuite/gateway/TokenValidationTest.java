@@ -152,8 +152,8 @@ public class TokenValidationTest {
         WebSocketClient client = new StandardWebSocketClient();
         HttpHeaders headers = new HttpHeaders();
         Mono<Void> wsconnection = client.execute(
-                URI.create("ws://localhost:" + this.localServerPort + "/" + name + "/notify?access_token=" + token), headers,
-                ws -> ws.receive().then());
+            URI.create("ws://localhost:" + this.localServerPort + "/" + name + "/notify?access_token=" + token), headers,
+            ws -> ws.receive().then());
         wsconnection.subscribe();
 
         // Busy loop waiting to check that spring-gateway contacted our wiremock server
@@ -453,8 +453,8 @@ public class TokenValidationTest {
         // test without a token
         WebSocketClient client = new StandardWebSocketClient();
         client.execute(URI.create("ws://localhost:" +
-                        this.localServerPort + "/notification/notify"),
-                ws -> ws.receive().then()).doOnSuccess(s -> Assert.fail("Should have thrown"));
+            this.localServerPort + "/notification/notify"),
+            ws -> ws.receive().then()).doOnSuccess(s -> Assert.fail("Should have thrown"));
     }
 
     @TestConfiguration
