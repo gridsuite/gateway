@@ -4,3 +4,6 @@ spring:
 server:
   # unset forward-headers-strategy from the common conf, otherwise we get 404 on all apis
   forward-headers-strategy: ~
+  netty:
+    max-initial-line-length: 64000
+    max-chunk-size: 64000
