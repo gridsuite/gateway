@@ -121,10 +121,10 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
         ClientID clientID = new ClientID(jwtClaimsSet.getAudience().get(0));
 
         JWSAlgorithm jwsAlg = JWSAlgorithm.parse(jwt.getHeader().getAlgorithm().getName());
-        return jwkUriMap.get(iss.getValue()) != null ? proceedChain(exchange, chain, jwt, jwtClaimsSet, iss, clientID, jwsAlg, jwkUriMap.get(iss.getValue())) : gatewayService.getJwksUrl(jwtClaimsSet.getIssuer())
+        return jwkUriMap.get(iss.getValue()) != null ? proceedFilter(exchange, chain, jwt, jwtClaimsSet, iss, clientID, jwsAlg, jwkUriMap.get(iss.getValue())) : gatewayService.getJwksUrl(jwtClaimsSet.getIssuer())
                 .flatMap(jwkSetUri -> {
                     jwkUriMap.put(iss.getValue(), jwkSetUri);
-                    return proceedChain(exchange, chain, jwt, jwtClaimsSet, iss, clientID, jwsAlg, jwkSetUri);
+                    return proceedFilter(exchange, chain, jwt, jwtClaimsSet, iss, clientID, jwsAlg, jwkSetUri);
                 });
     }
 
@@ -145,10 +145,10 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
         return chain.filter(exchange);
     }
 
-    Mono<Void> proceedChain(ServerWebExchange exchange, GatewayFilterChain chain, JWT jwt, JWTClaimsSet jwtClaimsSet, Issuer iss, ClientID clientID, JWSAlgorithm jwsAlg, String jwkSet) {
+    Mono<Void> proceedFilter(ServerWebExchange exchange, GatewayFilterChain chain, JWT jwt, JWTClaimsSet jwtClaimsSet, Issuer iss, ClientID clientID, JWSAlgorithm jwsAlg, String jwkSetUri) {
 
         try {
-            URL jwkSetURL = new URL(jwkSet);
+            URL jwkSetURL = new URL(jwkSetUri);
             // if jwkset source not found in cache
             if (jwkSetMap.get(iss.getValue()) == null) {
                 // download source and cache it
@@ -164,7 +164,7 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
                     validate(exchange, chain, jwt, jwtClaimsSet, iss, clientID, jwsAlg);
                 } catch (BadJOSEException | JOSEException e) {
                     jwkSetMap.remove(iss.getValue());
-                    this.filter(exchange, chain);
+                    this.proceedFilter(exchange, chain, jwt, jwtClaimsSet, iss, clientID, jwsAlg, jwkSetUri);
                 }
             }
         } catch (IOException | ParseException e) {

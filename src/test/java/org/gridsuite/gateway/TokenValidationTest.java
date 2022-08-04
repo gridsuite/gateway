@@ -405,12 +405,12 @@ public class TokenValidationTest {
                 .exchange()
                 .expectStatus().isEqualTo(401);
 
-        //test with an expired token
+        //test with an expired token from cache with retry after validation error
         webClient
                 .get().uri("case/v1/cases")
                 .header("Authorization", "Bearer " + expiredToken)
                 .exchange()
-                .expectStatus().isEqualTo(401);
+                .expectStatus().isEqualTo(200);
 
         //test with with not allowed issuer
         webClient
@@ -422,19 +422,19 @@ public class TokenValidationTest {
         String tokenWithFakeAlgorithm = token.replaceFirst("U", "Q");
         String tokenWithFakeAudience = token.replaceFirst("X", "L");
 
-        //test with token with a fake algorithm
+        //test with fake algorithm from cache with retry after validation error
         webClient
                 .get().uri("case/v1/cases")
                 .header("Authorization", "Bearer " + tokenWithFakeAlgorithm)
                 .exchange()
-                .expectStatus().isEqualTo(401);
+                .expectStatus().isEqualTo(200);
 
-        //test with token with fake audience
+        //test with fake audience from cache with retry after validation error
         webClient
                 .get().uri("case/v1/cases")
                 .header("Authorization", "Bearer " + tokenWithFakeAudience)
                 .exchange()
-                .expectStatus().isEqualTo(401);
+                .expectStatus().isEqualTo(200);
 
         //test with non JSON token
         webClient
