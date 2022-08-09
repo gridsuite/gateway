@@ -19,8 +19,6 @@ import com.nimbusds.jwt.JWTParser;
 import com.nimbusds.oauth2.sdk.id.ClientID;
 import com.nimbusds.oauth2.sdk.id.Issuer;
 import com.nimbusds.openid.connect.sdk.validators.IDTokenValidator;
-import lombok.AllArgsConstructor;
-import lombok.Data;
 import org.gridsuite.gateway.GatewayService;
 import org.gridsuite.gateway.dto.FilterInfos;
 import org.slf4j.Logger;
