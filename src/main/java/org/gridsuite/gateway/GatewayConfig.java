@@ -46,6 +46,7 @@ public class GatewayConfig {
             .route(p -> context.getBean(FilterServer.class).getRoute(p))
             .route(p -> context.getBean(ReportServer.class).getRoute(p))
             .route(p -> context.getBean(NetworkModificationServer.class).getRoute(p))
+            .route(p -> context.getBean(NetworkConversionServer.class).getRoute(p))
             .build();
     }
 }
