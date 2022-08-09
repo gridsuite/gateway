@@ -34,6 +34,6 @@ backing-services:
     base-uri: http://localhost:5029
   network-modification-server:
     base-uri: http://localhost:5007
-  network-modification-server:
+  network-conversion-server:
     base-uri: http://localhost:5003
 
