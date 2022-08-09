@@ -19,6 +19,8 @@ import com.nimbusds.jwt.JWTParser;
 import com.nimbusds.oauth2.sdk.id.ClientID;
 import com.nimbusds.oauth2.sdk.id.Issuer;
 import com.nimbusds.openid.connect.sdk.validators.IDTokenValidator;
+import lombok.AllArgsConstructor;
+import lombok.Data;
 import org.gridsuite.gateway.GatewayService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,6 +50,7 @@ import static org.gridsuite.gateway.GatewayConfig.HEADER_USER_ID;
 @Component
 public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
 
+    public static final String UNAUTHORIZED_INVALID_PLAIN_JOSE_OBJECT_ENCODING = "{}: 401 Unauthorized, Invalid plain JOSE object encoding";
     private static final Logger LOGGER = LoggerFactory.getLogger(TokenValidatorGlobalPreFilter.class);
     public static final String UNAUTHORIZED_THE_TOKEN_CANNOT_BE_TRUSTED = "{}: 401 Unauthorized, The token cannot be trusted : {}";
 
@@ -56,8 +59,8 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
     @Value("${allowed-issuers}")
     private List<String> allowedIssuers;
 
-    private Map<String, JWKSet> jwkSetMap = new HashMap<>();
-    private Map<String, String> jwkUriMap = new HashMap<>();
+    private Map<String, JWKSet> jwkSetCache = new HashMap<>();
+    private Map<String, String> jwkUriCache = new HashMap<>();
 
     public TokenValidatorGlobalPreFilter(GatewayService gatewayService) {
         this.gatewayService = gatewayService;
@@ -107,11 +110,12 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
             jwtClaimsSet = jwt.getJWTClaimsSet();
         } catch (java.text.ParseException e) {
             // Invalid plain JOSE object encoding
-            LOGGER.info("{}: 401 Unauthorized, Invalid plain JOSE object encoding", exchange.getRequest().getPath());
+            LOGGER.info(UNAUTHORIZED_INVALID_PLAIN_JOSE_OBJECT_ENCODING, exchange.getRequest().getPath());
             return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
         }
 
         LOGGER.debug("checking issuer");
+
         if (allowedIssuers.stream().noneMatch(iss -> jwtClaimsSet.getIssuer().startsWith(iss))) {
             LOGGER.info("{}: 401 Unauthorized, {} Issuer is not in the issuers white list", exchange.getRequest().getPath(), jwtClaimsSet.getIssuer());
             return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
@@ -121,17 +125,17 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
         ClientID clientID = new ClientID(jwtClaimsSet.getAudience().get(0));
 
         JWSAlgorithm jwsAlg = JWSAlgorithm.parse(jwt.getHeader().getAlgorithm().getName());
-        return jwkUriMap.get(iss.getValue()) != null ? proceedFilter(exchange, chain, jwt, jwtClaimsSet, iss, clientID, jwsAlg, jwkUriMap.get(iss.getValue())) : gatewayService.getJwksUrl(jwtClaimsSet.getIssuer())
+        return jwkUriCache.get(iss.getValue()) != null ? proceedFilter(new FilterInfos(exchange, chain, jwt, jwtClaimsSet, iss, clientID, jwsAlg, jwkUriCache.get(iss.getValue()))) : gatewayService.getJwksUrl(jwtClaimsSet.getIssuer())
                 .flatMap(jwkSetUri -> {
-                    jwkUriMap.put(iss.getValue(), jwkSetUri);
-                    return proceedFilter(exchange, chain, jwt, jwtClaimsSet, iss, clientID, jwsAlg, jwkSetUri);
+                    jwkUriCache.put(iss.getValue(), jwkSetUri);
+                    return proceedFilter(new FilterInfos(exchange, chain, jwt, jwtClaimsSet, iss, clientID, jwsAlg, jwkSetUri));
                 });
     }
 
-    private Mono<Void> validate(ServerWebExchange exchange, GatewayFilterChain chain, JWT jwt, JWTClaimsSet jwtClaimsSet, Issuer iss, ClientID clientID, JWSAlgorithm jwsAlg) throws BadJOSEException, JOSEException, MalformedURLException {
+    private Mono<Void> validate(ServerWebExchange exchange, GatewayFilterChain chain, JWT jwt, JWTClaimsSet jwtClaimsSet, Issuer iss, ClientID clientID, JWSAlgorithm jwsAlg) throws BadJOSEException, JOSEException {
 
         // Create validator for signed ID tokens
-        IDTokenValidator validator = new IDTokenValidator(iss, clientID, jwsAlg, jwkSetMap.get(iss.getValue()));
+        IDTokenValidator validator = new IDTokenValidator(iss, clientID, jwsAlg, jwkSetCache.get(iss.getValue()));
 
         validator.validate(jwt, null);
         // we can safely trust the JWT
@@ -145,44 +149,51 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
         return chain.filter(exchange);
     }
 
-    Mono<Void> proceedFilter(ServerWebExchange exchange, GatewayFilterChain chain, JWT jwt, JWTClaimsSet jwtClaimsSet, Issuer iss, ClientID clientID, JWSAlgorithm jwsAlg, String jwkSetUri) {
-
-        try {
-            URL jwkSetURL = new URL(jwkSetUri);
-            // if jwkset source not found in cache
-            if (jwkSetMap.get(iss.getValue()) == null) {
-                // download source and cache it
-                getJwksSourceAndFillMap(iss, jwkSetURL);
-                try {
-                    validate(exchange, chain, jwt, jwtClaimsSet, iss, clientID, jwsAlg);
-                } catch (BadJOSEException | JOSEException e) {
-                    LOGGER.info("{}: 401 Unauthorized, Invalid plain JOSE object encoding", exchange.getRequest().getPath());
-                    return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
-                }
-            } else {
-                try {
-                    validate(exchange, chain, jwt, jwtClaimsSet, iss, clientID, jwsAlg);
-                } catch (BadJOSEException | JOSEException e) {
-                    jwkSetMap.remove(iss.getValue());
-                    this.proceedFilter(exchange, chain, jwt, jwtClaimsSet, iss, clientID, jwsAlg, jwkSetUri);
-                }
+    Mono<Void> proceedFilter(FilterInfos filterInfos) {
+        // if jwkset source not found in cache
+        if (jwkSetCache.get(filterInfos.getIss().getValue()) == null) {
+            try {
+                // download public keys and cache it
+                fillMapWithJwkSet(filterInfos.getIss(), new URL(filterInfos.getJwkSetUri()));
+                validate(filterInfos.getExchange(), filterInfos.getChain(), filterInfos.getJwt(), filterInfos.getJwtClaimsSet(), filterInfos.getIss(), filterInfos.getClientID(), filterInfos.getJwsAlg());
+            } catch (BadJOSEException | JOSEException | IOException e) {
+                jwkUriCache.remove(filterInfos.getIss().getValue());
+                LOGGER.info(UNAUTHORIZED_THE_TOKEN_CANNOT_BE_TRUSTED, filterInfos.getExchange().getRequest().getPath());
+                return completeWithCode(filterInfos.getExchange(), HttpStatus.UNAUTHORIZED);
+            } catch (ParseException e) {
+                jwkUriCache.remove(filterInfos.getIss().getValue());
+                LOGGER.info(UNAUTHORIZED_INVALID_PLAIN_JOSE_OBJECT_ENCODING, filterInfos.getExchange().getRequest().getPath());
+                return completeWithCode(filterInfos.getExchange(), HttpStatus.UNAUTHORIZED);
             }
-        } catch (IOException | ParseException e) {
-            // remove uri from cache
-            jwkUriMap.remove(iss.getValue());
-            LOGGER.info("{}: 401 Unauthorized, Invalid plain JOSE object encoding", exchange.getRequest().getPath());
-            return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
+        } else {
+            try {
+                validate(filterInfos.getExchange(), filterInfos.getChain(), filterInfos.getJwt(), filterInfos.getJwtClaimsSet(), filterInfos.getIss(), filterInfos.getClientID(), filterInfos.getJwsAlg());
+            } catch (BadJOSEException | JOSEException e) {
+                jwkSetCache.remove(filterInfos.getIss().getValue());
+                this.proceedFilter(new FilterInfos(filterInfos.getExchange(), filterInfos.getChain(), filterInfos.getJwt(), filterInfos.getJwtClaimsSet(), filterInfos.getIss(), filterInfos.getClientID(), filterInfos.getJwsAlg(), filterInfos.getJwkSetUri()));
+            }
         }
 
-        return chain.filter(exchange);
+        return filterInfos.getChain().filter(filterInfos.getExchange());
     }
 
-    private void getJwksSourceAndFillMap(Issuer iss, URL jwkSetURL) throws ParseException, IOException {
-        jwkSetMap.remove(iss.getValue());
+    private void fillMapWithJwkSet(Issuer iss, URL jwkSetURL) throws ParseException, IOException {
         RemoteJWKSet<SecurityContext> jwkSource = new RemoteJWKSet<>(jwkSetURL, new DefaultResourceRetriever());
         JWKSet jwksSet = JWKSet.parse(jwkSource.getResourceRetriever().retrieveResource(jwkSetURL).getContent());
-        jwkSetMap.put(iss.getValue(), jwksSet);
+        jwkSetCache.put(iss.getValue(), jwksSet);
     }
 
+    @AllArgsConstructor
+    @Data
+    private static class FilterInfos {
+        private final ServerWebExchange exchange;
+        private final GatewayFilterChain chain;
+        private final JWT jwt;
+        private final JWTClaimsSet jwtClaimsSet;
+        private final Issuer iss;
+        private final ClientID clientID;
+        private final JWSAlgorithm jwsAlg;
+        private final String jwkSetUri;
+    }
 }
 
