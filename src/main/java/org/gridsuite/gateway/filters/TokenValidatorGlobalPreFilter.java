@@ -19,8 +19,9 @@ import com.nimbusds.jwt.JWTParser;
 import com.nimbusds.oauth2.sdk.id.ClientID;
 import com.nimbusds.oauth2.sdk.id.Issuer;
 import com.nimbusds.openid.connect.sdk.validators.IDTokenValidator;
+import lombok.AllArgsConstructor;
+import lombok.Data;
 import org.gridsuite.gateway.GatewayService;
-import org.gridsuite.gateway.dto.FilterInfos;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -175,6 +176,19 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
         }
 
         return filterInfos.getChain().filter(filterInfos.getExchange());
+    }
+
+    @AllArgsConstructor
+    @Data
+    private static class FilterInfos {
+        private final ServerWebExchange exchange;
+        private final GatewayFilterChain chain;
+        private final JWT jwt;
+        private final JWTClaimsSet jwtClaimsSet;
+        private final Issuer iss;
+        private final ClientID clientID;
+        private final JWSAlgorithm jwsAlg;
+        private final String jwkSetUri;
     }
 }
 
