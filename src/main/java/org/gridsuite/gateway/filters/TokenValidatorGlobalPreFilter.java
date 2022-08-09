@@ -20,7 +20,8 @@ import com.nimbusds.oauth2.sdk.id.ClientID;
 import com.nimbusds.oauth2.sdk.id.Issuer;
 import com.nimbusds.openid.connect.sdk.validators.IDTokenValidator;
 import lombok.AllArgsConstructor;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import org.gridsuite.gateway.GatewayService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -179,7 +180,8 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
     }
 
     @AllArgsConstructor
-    @Data
+    @Getter
+    @Setter
     private static class FilterInfos {
         private final ServerWebExchange exchange;
         private final GatewayFilterChain chain;
