@@ -405,7 +405,7 @@ public class TokenValidationTest {
                 .exchange()
                 .expectStatus().isEqualTo(401);
 
-        //test with an expired token from cache with retry after validation error
+        //test with an expired token
         webClient
                 .get().uri("case/v1/cases")
                 .header("Authorization", "Bearer " + expiredToken)
@@ -422,14 +422,14 @@ public class TokenValidationTest {
         String tokenWithFakeAlgorithm = token.replaceFirst("U", "Q");
         String tokenWithFakeAudience = token.replaceFirst("X", "L");
 
-        //test with fake algorithm from cache with retry after validation error
+        //test with token with a fake algorithm
         webClient
                 .get().uri("case/v1/cases")
                 .header("Authorization", "Bearer " + tokenWithFakeAlgorithm)
                 .exchange()
                 .expectStatus().isEqualTo(200);
 
-        //test with fake audience from cache with retry after validation error
+        //test with token with fake audience
         webClient
                 .get().uri("case/v1/cases")
                 .header("Authorization", "Bearer " + tokenWithFakeAudience)
@@ -453,7 +453,7 @@ public class TokenValidationTest {
         // test without a token
         WebSocketClient client = new StandardWebSocketClient();
         client.execute(URI.create("ws://localhost:" +
-            this.localServerPort + "/notification/notify"),
+                        this.localServerPort + "/notification/notify"),
             ws -> ws.receive().then()).doOnSuccess(s -> Assert.fail("Should have thrown"));
     }
 
