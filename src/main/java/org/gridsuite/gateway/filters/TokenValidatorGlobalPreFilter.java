@@ -130,21 +130,21 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
                 });
     }
 
-    private Mono<Void> validate(ServerWebExchange exchange, GatewayFilterChain chain, JWT jwt, JWTClaimsSet jwtClaimsSet, Issuer iss, ClientID clientID, JWSAlgorithm jwsAlg) throws BadJOSEException, JOSEException {
+    private Mono<Void> validate(FilterInfos filterInfos) throws BadJOSEException, JOSEException {
 
         // Create validator for signed ID tokens
-        IDTokenValidator validator = new IDTokenValidator(iss, clientID, jwsAlg, jwkSetCache.get(iss.getValue()));
+        IDTokenValidator validator = new IDTokenValidator(filterInfos.getIss(), filterInfos.getClientID(), filterInfos.getJwsAlg(), jwkSetCache.get(filterInfos.getIss().getValue()));
 
-        validator.validate(jwt, null);
+        validator.validate(filterInfos.getJwt(), null);
         // we can safely trust the JWT
         LOGGER.debug("Token verified, it can be trusted");
 
         //we add the subject header
-        exchange.getRequest()
+        filterInfos.getExchange().getRequest()
                 .mutate()
-                .headers(h -> h.set(HEADER_USER_ID, jwtClaimsSet.getSubject()));
+                .headers(h -> h.set(HEADER_USER_ID, filterInfos.getJwtClaimsSet().getSubject()));
 
-        return chain.filter(exchange);
+        return filterInfos.getChain().filter(filterInfos.getExchange());
     }
 
     Mono<Void> proceedFilter(FilterInfos filterInfos) {
@@ -155,7 +155,7 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
                 RemoteJWKSet<SecurityContext> jwkSource = new RemoteJWKSet<>(new URL(filterInfos.getJwkSetUri()), new DefaultResourceRetriever());
                 JWKSet jwksSet = JWKSet.parse(jwkSource.getResourceRetriever().retrieveResource(new URL(filterInfos.getJwkSetUri())).getContent());
                 jwkSetCache.put(filterInfos.getIss().getValue(), jwksSet);
-                validate(filterInfos.getExchange(), filterInfos.getChain(), filterInfos.getJwt(), filterInfos.getJwtClaimsSet(), filterInfos.getIss(), filterInfos.getClientID(), filterInfos.getJwsAlg());
+                validate(filterInfos);
             } catch (BadJOSEException | JOSEException | IOException e) {
                 jwkUriCache.remove(filterInfos.getIss().getValue());
                 LOGGER.info(UNAUTHORIZED_THE_TOKEN_CANNOT_BE_TRUSTED, filterInfos.getExchange().getRequest().getPath());
@@ -167,7 +167,7 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
             }
         } else {
             try {
-                validate(filterInfos.getExchange(), filterInfos.getChain(), filterInfos.getJwt(), filterInfos.getJwtClaimsSet(), filterInfos.getIss(), filterInfos.getClientID(), filterInfos.getJwsAlg());
+                validate(filterInfos);
             } catch (BadJOSEException | JOSEException e) {
                 jwkSetCache.remove(filterInfos.getIss().getValue());
                 this.proceedFilter(new FilterInfos(filterInfos.getExchange(), filterInfos.getChain(), filterInfos.getJwt(), filterInfos.getJwtClaimsSet(), filterInfos.getIss(), filterInfos.getClientID(), filterInfos.getJwsAlg(), filterInfos.getJwkSetUri()));
