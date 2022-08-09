@@ -152,7 +152,9 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
         if (jwkSetCache.get(filterInfos.getIss().getValue()) == null) {
             try {
                 // download public keys and cache it
-                fillMapWithJwkSet(filterInfos.getIss(), new URL(filterInfos.getJwkSetUri()));
+                RemoteJWKSet<SecurityContext> jwkSource = new RemoteJWKSet<>(new URL(filterInfos.getJwkSetUri()), new DefaultResourceRetriever());
+                JWKSet jwksSet = JWKSet.parse(jwkSource.getResourceRetriever().retrieveResource(new URL(filterInfos.getJwkSetUri())).getContent());
+                jwkSetCache.put(filterInfos.getIss().getValue(), jwksSet);
                 validate(filterInfos.getExchange(), filterInfos.getChain(), filterInfos.getJwt(), filterInfos.getJwtClaimsSet(), filterInfos.getIss(), filterInfos.getClientID(), filterInfos.getJwsAlg());
             } catch (BadJOSEException | JOSEException | IOException e) {
                 jwkUriCache.remove(filterInfos.getIss().getValue());
@@ -173,12 +175,6 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
         }
 
         return filterInfos.getChain().filter(filterInfos.getExchange());
-    }
-
-    private void fillMapWithJwkSet(Issuer iss, URL jwkSetURL) throws ParseException, IOException {
-        RemoteJWKSet<SecurityContext> jwkSource = new RemoteJWKSet<>(jwkSetURL, new DefaultResourceRetriever());
-        JWKSet jwksSet = JWKSet.parse(jwkSource.getResourceRetriever().retrieveResource(jwkSetURL).getContent());
-        jwkSetCache.put(iss.getValue(), jwksSet);
     }
 }
 
