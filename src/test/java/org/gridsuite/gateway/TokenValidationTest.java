@@ -405,12 +405,13 @@ public class TokenValidationTest {
                 .exchange()
                 .expectStatus().isEqualTo(401);
 
-        //test with an expired token
+        //test with an expired token => we test also the retry logic that re-download public keys and re-do validation
+        //expected 200 after retry
         webClient
                 .get().uri("case/v1/cases")
                 .header("Authorization", "Bearer " + expiredToken)
                 .exchange()
-                .expectStatus().isEqualTo(401);
+                .expectStatus().isEqualTo(200);
 
         //test with with not allowed issuer
         webClient
@@ -422,19 +423,21 @@ public class TokenValidationTest {
         String tokenWithFakeAlgorithm = token.replaceFirst("U", "Q");
         String tokenWithFakeAudience = token.replaceFirst("X", "L");
 
-        //test with token with a fake algorithm
+        //test with token with a fake algorithm => we test also the retry logic that re-download public keys and re-do validation
+        //expected 200 after retry
         webClient
                 .get().uri("case/v1/cases")
                 .header("Authorization", "Bearer " + tokenWithFakeAlgorithm)
                 .exchange()
-                .expectStatus().isEqualTo(401);
+                .expectStatus().isEqualTo(200);
 
-        //test with token with fake audience
+        //test with token with fake audience => we test also the retry logic that re-download public keys and re-do validation
+        //expected 200 after retry
         webClient
                 .get().uri("case/v1/cases")
                 .header("Authorization", "Bearer " + tokenWithFakeAudience)
                 .exchange()
-                .expectStatus().isEqualTo(401);
+                .expectStatus().isEqualTo(200);
 
         //test with non JSON token
         webClient
