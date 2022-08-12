@@ -68,4 +68,7 @@ public class ServiceURIsConfig {
 
     @Value("${backing-services.network-modification-server.base-uri:http://network-modification-server/}")
     String networkModificationServerBaseUri;
+
+    @Value("${backing-services.network-conversion-server.base-uri:http://network-conversion-server/}")
+    String networkConversionServerBaseUri;
 }
