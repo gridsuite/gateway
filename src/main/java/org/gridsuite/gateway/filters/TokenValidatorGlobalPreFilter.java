@@ -41,6 +41,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static org.gridsuite.gateway.GatewayConfig.HEADER_USER_ID;
 
@@ -59,8 +60,8 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
     @Value("${allowed-issuers}")
     private List<String> allowedIssuers;
 
-    private Map<String, JWKSet> jwkSetCache = new HashMap<>();
-    private Map<String, String> jwkUriCache = new HashMap<>();
+    private Map<String, JWKSet> jwkSetCache = new ConcurrentHashMap<>();
+    private Map<String, String> jwkUriCache = new ConcurrentHashMap<>();
 
     public TokenValidatorGlobalPreFilter(GatewayService gatewayService) {
         this.gatewayService = gatewayService;
