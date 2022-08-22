@@ -9,10 +9,7 @@ package org.gridsuite.gateway.filters;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.jwk.JWKSet;
-import com.nimbusds.jose.jwk.source.RemoteJWKSet;
 import com.nimbusds.jose.proc.BadJOSEException;
-import com.nimbusds.jose.proc.SecurityContext;
-import com.nimbusds.jose.util.DefaultResourceRetriever;
 import com.nimbusds.jwt.JWT;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.JWTParser;
@@ -33,12 +30,8 @@ import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
-
-import java.io.IOException;
-import java.net.URL;
 import java.text.ParseException;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -153,21 +146,23 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
     Mono<Void> proceedFilter(FilterInfos filterInfos) {
         // if jwkset source not found in cache
         if (jwkSetCache.get(filterInfos.getIss().getValue()) == null) {
-            try {
-                // download public keys and cache it into hashmap
-                RemoteJWKSet<SecurityContext> jwkSource = new RemoteJWKSet<>(new URL(filterInfos.getJwkSetUri()), new DefaultResourceRetriever());
-                JWKSet jwksSet = JWKSet.parse(jwkSource.getResourceRetriever().retrieveResource(new URL(filterInfos.getJwkSetUri())).getContent());
-                jwkSetCache.put(filterInfos.getIss().getValue(), jwksSet);
-                validate(filterInfos);
-            } catch (BadJOSEException | JOSEException | IOException e) {
-                jwkUriCache.remove(filterInfos.getIss().getValue());
-                LOGGER.info(UNAUTHORIZED_THE_TOKEN_CANNOT_BE_TRUSTED, filterInfos.getExchange().getRequest().getPath());
-                return completeWithCode(filterInfos.getExchange(), HttpStatus.UNAUTHORIZED);
-            } catch (ParseException e) {
-                jwkUriCache.remove(filterInfos.getIss().getValue());
-                LOGGER.info(UNAUTHORIZED_INVALID_PLAIN_JOSE_OBJECT_ENCODING, filterInfos.getExchange().getRequest().getPath());
-                return completeWithCode(filterInfos.getExchange(), HttpStatus.UNAUTHORIZED);
-            }
+            // download public keys and cache it
+            gatewayService.getJwkSet(filterInfos.getJwkSetUri()).flatMap(jwkSet -> {
+                try {
+                    LOGGER.info("jwkset", jwkSet);
+                    JWKSet jwksSet = JWKSet.parse(jwkSet);
+                    jwkSetCache.put(filterInfos.getIss().getValue(), jwksSet);
+                    return validate(filterInfos);
+                } catch (ParseException e) {
+                    jwkUriCache.remove(filterInfos.getIss().getValue());
+                    LOGGER.info(UNAUTHORIZED_INVALID_PLAIN_JOSE_OBJECT_ENCODING, filterInfos.getExchange().getRequest().getPath());
+                    return completeWithCode(filterInfos.getExchange(), HttpStatus.UNAUTHORIZED);
+                } catch (BadJOSEException | JOSEException  e) {
+                    jwkUriCache.remove(filterInfos.getIss().getValue());
+                    LOGGER.info(UNAUTHORIZED_THE_TOKEN_CANNOT_BE_TRUSTED, filterInfos.getExchange().getRequest().getPath());
+                    return completeWithCode(filterInfos.getExchange(), HttpStatus.UNAUTHORIZED);
+                }
+            });
         } else {
             try {
                 validate(filterInfos);

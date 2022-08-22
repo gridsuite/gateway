@@ -7,6 +7,7 @@
 
 package org.gridsuite.gateway;
 
+import lombok.extern.slf4j.Slf4j;
 import org.gridsuite.gateway.dto.OpenIdConfiguration;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -15,6 +16,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 import reactor.core.publisher.Mono;
 
 @Service
+@Slf4j
 public class GatewayService {
     private WebClient.Builder webClientBuilder;
 
@@ -34,5 +36,16 @@ public class GatewayService {
                  .bodyToMono(OpenIdConfiguration.class)
                  .single()
                  .map(OpenIdConfiguration::getJwksUri);
+    }
+
+    public Mono<String> getJwkSet(String jwkSetUri) {
+        WebClient webClient = webClientBuilder.uriBuilderFactory(new DefaultUriBuilderFactory(jwkSetUri)).build();
+
+        return webClient.get()
+                .retrieve()
+                .bodyToMono(String.class).map(x -> {
+                    log.info("x", x);
+                    return x;
+                });
     }
 }
