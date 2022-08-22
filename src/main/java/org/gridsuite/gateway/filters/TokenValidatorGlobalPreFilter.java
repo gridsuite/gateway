@@ -172,7 +172,7 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
                 validate(filterInfos);
             } catch (BadJOSEException | JOSEException e) {
                 jwkSetCache.remove(filterInfos.getIss().getValue());
-                this.proceedFilter(new FilterInfos(filterInfos.getExchange(), filterInfos.getChain(), filterInfos.getJwt(), filterInfos.getJwtClaimsSet(), filterInfos.getIss(), filterInfos.getClientID(), filterInfos.getJwsAlg(), filterInfos.getJwkSetUri()));
+                return this.proceedFilter(new FilterInfos(filterInfos.getExchange(), filterInfos.getChain(), filterInfos.getJwt(), filterInfos.getJwtClaimsSet(), filterInfos.getIss(), filterInfos.getClientID(), filterInfos.getJwsAlg(), filterInfos.getJwkSetUri()));
             }
         }
 
