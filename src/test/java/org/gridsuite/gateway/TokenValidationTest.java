@@ -410,7 +410,7 @@ public class TokenValidationTest {
                 .get().uri("case/v1/cases")
                 .header("Authorization", "Bearer " + expiredToken)
                 .exchange()
-                .expectStatus().isEqualTo(200);
+                .expectStatus().isEqualTo(401);
 
         //test with with not allowed issuer
         webClient
@@ -427,14 +427,14 @@ public class TokenValidationTest {
                 .get().uri("case/v1/cases")
                 .header("Authorization", "Bearer " + tokenWithFakeAlgorithm)
                 .exchange()
-                .expectStatus().isEqualTo(200);
+                .expectStatus().isEqualTo(401);
 
         //test with token with fake audience
         webClient
                 .get().uri("case/v1/cases")
                 .header("Authorization", "Bearer " + tokenWithFakeAudience)
                 .exchange()
-                .expectStatus().isEqualTo(200);
+                .expectStatus().isEqualTo(401);
 
         //test with non JSON token
         webClient
