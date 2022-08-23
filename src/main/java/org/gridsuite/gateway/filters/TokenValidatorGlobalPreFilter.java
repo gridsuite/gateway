@@ -165,12 +165,13 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
         } else {
             try {
                 validate(filterInfos);
+                return filterInfos.getChain().filter(filterInfos.getExchange());
             } catch (BadJOSEException | JOSEException e) {
                 jwkSetCache.remove(filterInfos.getIss().getValue());
                 return this.proceedFilter(new FilterInfos(filterInfos.getExchange(), filterInfos.getChain(), filterInfos.getJwt(), filterInfos.getJwtClaimsSet(), filterInfos.getIss(), filterInfos.getClientID(), filterInfos.getJwsAlg(), filterInfos.getJwkSetUri()));
             }
         }
-        return filterInfos.getChain().filter(filterInfos.getExchange());
+
     }
 
     @AllArgsConstructor
