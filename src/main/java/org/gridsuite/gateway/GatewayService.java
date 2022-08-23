@@ -43,9 +43,6 @@ public class GatewayService {
 
         return webClient.get()
                 .retrieve()
-                .bodyToMono(String.class).map(x -> {
-                    log.info("x", x);
-                    return x;
-                });
+                .bodyToMono(String.class);
     }
 }
