@@ -382,7 +382,7 @@ public class TokenValidationTest {
     }
 
     @Test
-    public void invalidToken() {
+    public void invalidToken() throws InterruptedException {
 
         stubFor(get(urlEqualTo("/v1/cases"))
                 .willReturn(aResponse()
@@ -405,8 +405,7 @@ public class TokenValidationTest {
                 .exchange()
                 .expectStatus().isEqualTo(401);
 
-        //test with an expired token => we test also the retry logic that re-download public keys and re-do validation
-        //expected 200 after retry
+        //test with an expired token
         webClient
                 .get().uri("case/v1/cases")
                 .header("Authorization", "Bearer " + expiredToken)
@@ -423,16 +422,14 @@ public class TokenValidationTest {
         String tokenWithFakeAlgorithm = token.replaceFirst("U", "Q");
         String tokenWithFakeAudience = token.replaceFirst("X", "L");
 
-        //test with token with a fake algorithm => we test also the retry logic that re-download public keys and re-do validation
-        //expected 200 after retry
+        //test with token with a fake algorithm
         webClient
                 .get().uri("case/v1/cases")
                 .header("Authorization", "Bearer " + tokenWithFakeAlgorithm)
                 .exchange()
                 .expectStatus().isEqualTo(401);
 
-        //test with token with fake audience => we test also the retry logic that re-download public keys and re-do validation
-        //expected 200 after retry
+        //test with token with fake audience
         webClient
                 .get().uri("case/v1/cases")
                 .header("Authorization", "Bearer " + tokenWithFakeAudience)

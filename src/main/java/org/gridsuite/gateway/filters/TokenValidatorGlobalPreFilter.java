@@ -35,7 +35,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-
 import static org.gridsuite.gateway.GatewayConfig.HEADER_USER_ID;
 
 /**
@@ -146,22 +145,22 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
     Mono<Void> proceedFilter(FilterInfos filterInfos) {
         // if jwkset source not found in cache
         if (jwkSetCache.get(filterInfos.getIss().getValue()) == null) {
-            // download public keys and cache it
-            gatewayService.getJwkSet(filterInfos.getJwkSetUri()).flatMap(jwkSet -> {
+            // download public keys and cache it into hashmap
+            return gatewayService.getJwkSet(filterInfos.getJwkSetUri()).flatMap(jwksString -> {
                 try {
-                    LOGGER.info("jwkset", jwkSet);
-                    JWKSet jwksSet = JWKSet.parse(jwkSet);
+                    JWKSet jwksSet = JWKSet.parse(jwksString);
                     jwkSetCache.put(filterInfos.getIss().getValue(), jwksSet);
-                    return validate(filterInfos);
+                    validate(filterInfos);
                 } catch (ParseException e) {
                     jwkUriCache.remove(filterInfos.getIss().getValue());
                     LOGGER.info(UNAUTHORIZED_INVALID_PLAIN_JOSE_OBJECT_ENCODING, filterInfos.getExchange().getRequest().getPath());
                     return completeWithCode(filterInfos.getExchange(), HttpStatus.UNAUTHORIZED);
-                } catch (BadJOSEException | JOSEException  e) {
+                } catch (BadJOSEException | JOSEException e) {
                     jwkUriCache.remove(filterInfos.getIss().getValue());
                     LOGGER.info(UNAUTHORIZED_THE_TOKEN_CANNOT_BE_TRUSTED, filterInfos.getExchange().getRequest().getPath());
                     return completeWithCode(filterInfos.getExchange(), HttpStatus.UNAUTHORIZED);
                 }
+                return filterInfos.getChain().filter(filterInfos.getExchange());
             });
         } else {
             try {
@@ -171,7 +170,6 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
                 return this.proceedFilter(new FilterInfos(filterInfos.getExchange(), filterInfos.getChain(), filterInfos.getJwt(), filterInfos.getJwtClaimsSet(), filterInfos.getIss(), filterInfos.getClientID(), filterInfos.getJwsAlg(), filterInfos.getJwkSetUri()));
             }
         }
-
         return filterInfos.getChain().filter(filterInfos.getExchange());
     }
 
