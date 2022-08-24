@@ -157,7 +157,9 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
 
         JWKSet jwksCache = jwkSetCache.get(filterInfos.getIss().getValue());
         // check if jwkset exists in cache
-        if (jwksCache == null) {
+        if (jwksCache != null) {
+            return tryValidate(filterInfos, jwksCache, true);
+        } else {
             // download public keys and cache it into ConcurrentHashMap
             return gatewayService.getJwkSet(filterInfos.getJwkSetUri()).flatMap(jwksString -> {
                 JWKSet jwkSet = null;
@@ -169,21 +171,20 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
                     LOGGER.info(UNAUTHORIZED_INVALID_PLAIN_JOSE_OBJECT_ENCODING, filterInfos.getExchange().getRequest().getPath());
                     return completeWithCode(filterInfos.getExchange(), HttpStatus.UNAUTHORIZED);
                 }
-                try {
-                    return validate(filterInfos, jwkSet);
-                } catch (BadJOSEException | JOSEException e) {
-                    LOGGER.info(UNAUTHORIZED_THE_TOKEN_CANNOT_BE_TRUSTED, filterInfos.getExchange().getRequest().getPath());
-                    return completeWithCode(filterInfos.getExchange(), HttpStatus.UNAUTHORIZED);
-                }
+                return tryValidate(filterInfos, jwkSet, false);
             });
-        } else {
-            try {
-                return validate(filterInfos, jwksCache);
-            } catch (BadJOSEException e) {
+        }
+    }
+
+    private Mono<Void> tryValidate(FilterInfos filterInfos, JWKSet jwksCache, boolean evict) {
+        try {
+            return validate(filterInfos, jwksCache);
+        } catch (JOSEException | BadJOSEException e) {
+            if (evict && e instanceof BadJOSEException) {
                 LOGGER.info(CACHE_OUTDATED, filterInfos.getExchange().getRequest().getPath());
                 jwkSetCache.remove(filterInfos.getIss().getValue());
-                return this.proceedFilter(new FilterInfos(filterInfos.getExchange(), filterInfos.getChain(), filterInfos.getJwt(), filterInfos.getJwtClaimsSet(), filterInfos.getIss(), filterInfos.getClientID(), filterInfos.getJwsAlg(), filterInfos.getJwkSetUri()));
-            } catch (JOSEException e) {
+                return this.proceedFilter(filterInfos);
+            } else {
                 LOGGER.info(UNAUTHORIZED_THE_TOKEN_CANNOT_BE_TRUSTED, filterInfos.getExchange().getRequest().getPath());
                 return completeWithCode(filterInfos.getExchange(), HttpStatus.UNAUTHORIZED);
             }
