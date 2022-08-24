@@ -382,7 +382,7 @@ public class TokenValidationTest {
     }
 
     @Test
-    public void invalidToken() throws InterruptedException {
+    public void invalidToken() {
 
         stubFor(get(urlEqualTo("/v1/cases"))
                 .willReturn(aResponse()
