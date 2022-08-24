@@ -119,9 +119,7 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
 
         JWSAlgorithm jwsAlg = JWSAlgorithm.parse(jwt.getHeader().getAlgorithm().getName());
         String cacheURi = jwkUriCache.get(iss.getValue());
-        Mono<String> fetchedUri = gatewayService.getJwksUrl(jwtClaimsSet.getIssuer()).doOnNext(uri -> {
-            jwkUriCache.put(iss.getValue(), uri);
-        });
+        Mono<String> fetchedUri = gatewayService.getJwksUrl(jwtClaimsSet.getIssuer()).doOnNext(uri -> jwkUriCache.put(iss.getValue(), uri));
         Mono<String> jwkSetUri = cacheURi != null ? Mono.just(cacheURi) : fetchedUri;
         return jwkSetUri.flatMap(uri -> proceedFilter(new FilterInfos(exchange, chain, jwt, jwtClaimsSet, iss, clientID, jwsAlg, uri)));
 
