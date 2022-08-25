@@ -9,10 +9,7 @@ package org.gridsuite.gateway;
 import com.github.tomakehurst.wiremock.client.VerificationException;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import com.github.tomakehurst.wiremock.extension.responsetemplating.ResponseTemplateTransformer;
-import com.nimbusds.jose.JOSEException;
-import com.nimbusds.jose.JWSAlgorithm;
-import com.nimbusds.jose.JWSHeader;
-import com.nimbusds.jose.JWSSigner;
+import com.nimbusds.jose.*;
 import com.nimbusds.jose.crypto.RSASSASigner;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator;
@@ -84,11 +81,15 @@ public class TokenValidationTest {
 
     private String token;
 
+    private String token2;
+
     private String expiredToken;
 
     private String tokenWithNotAllowedissuer;
 
     private RSAKey rsaKey;
+
+    private RSAKey rsaKey2;
 
     @Autowired
     WebTestClient webClient;
@@ -101,10 +102,16 @@ public class TokenValidationTest {
                 .keyID("123")
                 .generate();
 
+        RSAKey rsaJWK2 = new RSAKeyGenerator(2048)
+                .keyID("111")
+                .generate();
+
         rsaKey = rsaJWK.toPublicJWK();
+        rsaKey2 = rsaJWK2.toPublicJWK();
 
         // Create RSA-signer with the private key
         JWSSigner signer = new RSASSASigner(rsaJWK);
+        JWSSigner signer2 = new RSASSASigner(rsaJWK2);
 
         // Prepare JWT with claims set
         JWTClaimsSet claimsSet = new JWTClaimsSet.Builder()
@@ -134,15 +141,18 @@ public class TokenValidationTest {
                 .build();
 
         SignedJWT signedJWT = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(rsaJWK.getKeyID()).build(), claimsSet);
+        SignedJWT signedJWT2 = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(rsaJWK2.getKeyID()).build(), claimsSet);
         SignedJWT signedJWTExpired = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(rsaJWK.getKeyID()).build(), claimsSetForExpiredToken);
         SignedJWT signedJWTWithIssuerNotAllowed = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(rsaJWK.getKeyID()).build(), claimsSetForTokenWithIssuerNotAllowed);
 
         // Compute the RSA signature
         signedJWT.sign(signer);
+        signedJWT2.sign(signer2);
         signedJWTExpired.sign(signer);
         signedJWTWithIssuerNotAllowed.sign(signer);
 
         token = signedJWT.serialize();
+        token2 = signedJWT2.serialize();
         expiredToken = signedJWTExpired.serialize();
         tokenWithNotAllowedissuer = signedJWTWithIssuerNotAllowed.serialize();
     }
@@ -379,6 +389,68 @@ public class TokenValidationTest {
             .willReturn(aResponse()
                 .withHeader("Content-Type", "application/json")
                 .withBody("{\"keys\" : [ " + rsaKey.toJSONString() + " ] }")));
+    }
+
+    @Test
+    public void testJwksUpdate() {
+        stubFor(get(urlEqualTo("/v1/cases"))
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("[{\"name\": \"testCase\", \"format\" :\"XIIDM\"}, {\"name\": \"testCase2\", \"format\" :\"CGMES\"}]")));
+
+        stubFor(get(urlEqualTo("/.well-known/openid-configuration"))
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("{\"jwks_uri\": \"http://localhost:" + port + "/jwks\"}")));
+
+        UUID stubId = UUID.randomUUID();
+
+        stubFor(get(urlEqualTo("/jwks"))
+                .withId(stubId)
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("{\"keys\" : [] }")));
+
+        webClient
+                .get().uri("case/v1/cases")
+                .header("Authorization", "Bearer " + token)
+                .exchange()
+                .expectStatus().isEqualTo(401);
+
+        editStub(get(urlEqualTo("/jwks"))
+                .withId(stubId)
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("{\"keys\" : [ " + rsaKey.toJSONString() + " ] }")));
+        webClient
+                .get().uri("case/v1/cases")
+                .header("Authorization", "Bearer " + token)
+                .exchange()
+                .expectStatus().isEqualTo(200);
+
+        webClient
+                .get().uri("case/v1/cases")
+                .header("Authorization", "Bearer " + token2)
+                .exchange()
+                .expectStatus().isEqualTo(401);
+
+        stubFor(get(urlEqualTo("/jwks"))
+                .withId(stubId)
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("{\"keys\" : [ " + rsaKey.toJSONString() + ", " + rsaKey2.toJSONString() + "] }")));
+
+        webClient
+                .get().uri("case/v1/cases")
+                .header("Authorization", "Bearer " + token2)
+                .exchange()
+                .expectStatus().isEqualTo(200);
+
+        webClient
+                .get().uri("case/v1/cases")
+                .header("Authorization", "Bearer " + token)
+                .exchange()
+                .expectStatus().isEqualTo(200);
     }
 
     @Test

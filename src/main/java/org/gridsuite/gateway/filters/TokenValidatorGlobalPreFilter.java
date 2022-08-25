@@ -46,15 +46,14 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
 
     public static final String UNAUTHORIZED_INVALID_PLAIN_JOSE_OBJECT_ENCODING = "{}: 401 Unauthorized, Invalid plain JOSE object encoding";
     private static final Logger LOGGER = LoggerFactory.getLogger(TokenValidatorGlobalPreFilter.class);
-    public static final String UNAUTHORIZED_THE_TOKEN_CANNOT_BE_TRUSTED = "{}: 401 Unauthorized, The token cannot be trusted : {}";
-    public static final String CACHE_OUTDATED = "{}: Bad JSON Object Signing and Encryption, cache outdated : {}";
+    public static final String UNAUTHORIZED_THE_TOKEN_CANNOT_BE_TRUSTED = "{}: 401 Unauthorized, The token cannot be trusted";
+    public static final String CACHE_OUTDATED = "{}: Bad JSON Object Signing and Encryption, cache outdated";
     private final GatewayService gatewayService;
 
     @Value("${allowed-issuers}")
     private List<String> allowedIssuers;
 
     private Map<String, JWKSet> jwkSetCache = new ConcurrentHashMap<>();
-    private Map<String, String> jwkUriCache = new ConcurrentHashMap<>();
 
     public TokenValidatorGlobalPreFilter(GatewayService gatewayService) {
         this.gatewayService = gatewayService;
@@ -118,10 +117,7 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
         ClientID clientID = new ClientID(jwtClaimsSet.getAudience().get(0));
 
         JWSAlgorithm jwsAlg = JWSAlgorithm.parse(jwt.getHeader().getAlgorithm().getName());
-        String cacheURi = jwkUriCache.get(iss.getValue());
-        Mono<String> fetchedUri = gatewayService.getJwksUrl(jwtClaimsSet.getIssuer()).doOnNext(uri -> jwkUriCache.put(iss.getValue(), uri));
-        Mono<String> jwkSetUri = cacheURi != null ? Mono.just(cacheURi) : fetchedUri;
-        return jwkSetUri.flatMap(uri -> proceedFilter(new FilterInfos(exchange, chain, jwt, jwtClaimsSet, iss, clientID, jwsAlg, uri)));
+        return gatewayService.getJwksUrl(jwtClaimsSet.getIssuer()).flatMap(uri -> proceedFilter(new FilterInfos(exchange, chain, jwt, jwtClaimsSet, iss, clientID, jwsAlg, uri)));
 
     }
 
@@ -143,11 +139,11 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
     }
 
     /**
-     * <pre>check jwkset if exist in cache then call validate otherwise download new jwkset and refill map then call validate</pre>
+     * <pre>check jwkset if exist in cache then call validate otherwise download new JWKSet and refill map then call validate</pre>
      * => case of BadJOSEException: remove outdated cache and retry same process
      * <ul>
      *  <li>BadJOSEException: Bad JSON Object Signing and Encryption (JOSE) exception.</li>
-     *  <li>BadJWSException: Bad JSON Web Signature (JWS) exception. Used to indicate an invalid signature or hash-based message authentication code (HMAC).</li>
+     *  <li>BadJWSException (Subclass of BadJOSEException) : Bad JSON Web Signature (JWS) exception. Used to indicate an invalid signature or hash-based message authentication code (HMAC).</li>
      *  <li>JOSEException: Javascript Object Signing and Encryption (JOSE) exception. Used to indicate an invalid jwt type.</li>
      * </ul>
      * @param  filterInfos
@@ -167,7 +163,6 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
                     jwkSet = JWKSet.parse(jwksString);
                     jwkSetCache.put(filterInfos.getIss().getValue(), jwkSet);
                 } catch (ParseException e) {
-                    jwkUriCache.remove(filterInfos.getIss().getValue());
                     LOGGER.info(UNAUTHORIZED_INVALID_PLAIN_JOSE_OBJECT_ENCODING, filterInfos.getExchange().getRequest().getPath());
                     return completeWithCode(filterInfos.getExchange(), HttpStatus.UNAUTHORIZED);
                 }
