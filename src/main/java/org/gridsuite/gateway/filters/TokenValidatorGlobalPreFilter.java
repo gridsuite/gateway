@@ -45,6 +45,8 @@ import static org.gridsuite.gateway.GatewayConfig.HEADER_USER_ID;
 public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
 
     public static final String UNAUTHORIZED_INVALID_PLAIN_JOSE_OBJECT_ENCODING = "{}: 401 Unauthorized, Invalid plain JOSE object encoding";
+    public static final String PARSING_ERROR = "{}: 500 Internal Server Error, error has been reached unexpectedly while parsing";
+
     private static final Logger LOGGER = LoggerFactory.getLogger(TokenValidatorGlobalPreFilter.class);
     public static final String UNAUTHORIZED_THE_TOKEN_CANNOT_BE_TRUSTED = "{}: 401 Unauthorized, The token cannot be trusted";
     public static final String CACHE_OUTDATED = "{}: Bad JSON Object Signing and Encryption, cache outdated";
@@ -164,8 +166,8 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
                         jwkSet = JWKSet.parse(jwksString);
                         jwkSetCache.put(filterInfos.getIss().getValue(), jwkSet);
                     } catch (ParseException e) {
-                        LOGGER.info(UNAUTHORIZED_INVALID_PLAIN_JOSE_OBJECT_ENCODING, filterInfos.getExchange().getRequest().getPath());
-                        return completeWithCode(filterInfos.getExchange(), HttpStatus.UNAUTHORIZED);
+                        LOGGER.info(PARSING_ERROR, filterInfos.getExchange().getRequest().getPath());
+                        return completeWithCode(filterInfos.getExchange(), HttpStatus.INTERNAL_SERVER_ERROR);
                     }
                     return tryValidate(filterInfos, jwkSet, false);
                 })
