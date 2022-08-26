@@ -35,4 +35,13 @@ public class GatewayService {
                  .single()
                  .map(OpenIdConfiguration::getJwksUri);
     }
+
+    public Mono<String> getJwkSet(String jwkSetUri) {
+        WebClient webClient = webClientBuilder.uriBuilderFactory(new DefaultUriBuilderFactory(jwkSetUri)).build();
+
+        return webClient.get()
+                .retrieve()
+                .bodyToMono(String.class)
+                .single();
+    }
 }
