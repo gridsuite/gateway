@@ -156,9 +156,9 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
             return tryValidate(filterInfos, jwksCache, true);
         } else {
             // get Jwks Url
-            return gatewayService.getJwksUrl(filterInfos.getIss().getValue()).flatMap(uri -> {
+            return gatewayService.getJwksUrl(filterInfos.getIss().getValue()).flatMap(uri ->
                 // download public keys and cache it into ConcurrentHashMap
-                return gatewayService.getJwkSet(uri).flatMap(jwksString -> {
+                gatewayService.getJwkSet(uri).flatMap(jwksString -> {
                     JWKSet jwkSet = null;
                     try {
                         jwkSet = JWKSet.parse(jwksString);
@@ -168,8 +168,8 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
                         return completeWithCode(filterInfos.getExchange(), HttpStatus.UNAUTHORIZED);
                     }
                     return tryValidate(filterInfos, jwkSet, false);
-                });
-            });
+                })
+            );
         }
     }
 
