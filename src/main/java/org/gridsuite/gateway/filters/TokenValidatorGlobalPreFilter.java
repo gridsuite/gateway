@@ -117,8 +117,7 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
         ClientID clientID = new ClientID(jwtClaimsSet.getAudience().get(0));
 
         JWSAlgorithm jwsAlg = JWSAlgorithm.parse(jwt.getHeader().getAlgorithm().getName());
-        return gatewayService.getJwksUrl(jwtClaimsSet.getIssuer()).flatMap(uri -> proceedFilter(new FilterInfos(exchange, chain, jwt, jwtClaimsSet, iss, clientID, jwsAlg, uri)));
-
+        return proceedFilter(new FilterInfos(exchange, chain, jwt, jwtClaimsSet, iss, clientID, jwsAlg));
     }
 
     private Mono<Void> validate(FilterInfos filterInfos, JWKSet jwkset) throws BadJOSEException, JOSEException {
@@ -156,17 +155,20 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
         if (jwksCache != null) {
             return tryValidate(filterInfos, jwksCache, true);
         } else {
-            // download public keys and cache it into ConcurrentHashMap
-            return gatewayService.getJwkSet(filterInfos.getJwkSetUri()).flatMap(jwksString -> {
-                JWKSet jwkSet = null;
-                try {
-                    jwkSet = JWKSet.parse(jwksString);
-                    jwkSetCache.put(filterInfos.getIss().getValue(), jwkSet);
-                } catch (ParseException e) {
-                    LOGGER.info(UNAUTHORIZED_INVALID_PLAIN_JOSE_OBJECT_ENCODING, filterInfos.getExchange().getRequest().getPath());
-                    return completeWithCode(filterInfos.getExchange(), HttpStatus.UNAUTHORIZED);
-                }
-                return tryValidate(filterInfos, jwkSet, false);
+            // get Jwks Url
+            return gatewayService.getJwksUrl(filterInfos.getIss().getValue()).flatMap(uri -> {
+                // download public keys and cache it into ConcurrentHashMap
+                return gatewayService.getJwkSet(uri).flatMap(jwksString -> {
+                    JWKSet jwkSet = null;
+                    try {
+                        jwkSet = JWKSet.parse(jwksString);
+                        jwkSetCache.put(filterInfos.getIss().getValue(), jwkSet);
+                    } catch (ParseException e) {
+                        LOGGER.info(UNAUTHORIZED_INVALID_PLAIN_JOSE_OBJECT_ENCODING, filterInfos.getExchange().getRequest().getPath());
+                        return completeWithCode(filterInfos.getExchange(), HttpStatus.UNAUTHORIZED);
+                    }
+                    return tryValidate(filterInfos, jwkSet, false);
+                });
             });
         }
     }
@@ -196,6 +198,5 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
         private final Issuer iss;
         private final ClientID clientID;
         private final JWSAlgorithm jwsAlg;
-        private final String jwkSetUri;
     }
 }
