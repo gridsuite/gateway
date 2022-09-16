@@ -36,4 +36,8 @@ backing-services:
     base-uri: http://localhost:5007
   network-conversion-server:
     base-uri: http://localhost:5003
+  odre-server:
+    base-uri: http://localhost:8090
+  geo-data-server:
+    base-uri: http://localhost:8087
 

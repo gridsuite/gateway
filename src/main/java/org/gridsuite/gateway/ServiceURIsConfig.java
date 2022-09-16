@@ -71,4 +71,10 @@ public class ServiceURIsConfig {
 
     @Value("${backing-services.network-conversion-server.base-uri:http://network-conversion-server/}")
     String networkConversionServerBaseUri;
+
+    @Value("${backing-services.odre-server.base-uri:http://odre-server/}")
+    String odreServerBaseUri;
+
+    @Value("${backing-services.geo-data-server.base-uri:http://geo-data-server/}")
+    String geoDataServerBaseUri;
 }
