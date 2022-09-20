@@ -49,6 +49,7 @@ public class GatewayConfig {
             .route(p -> context.getBean(NetworkConversionServer.class).getRoute(p))
             .route(p -> context.getBean(OdreServer.class).getRoute(p))
             .route(p -> context.getBean(GeoDataServer.class).getRoute(p))
+            .route(p -> context.getBean(UserAdminServer.class).getRoute(p))
             .build();
     }
 }

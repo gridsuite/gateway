@@ -77,4 +77,7 @@ public class ServiceURIsConfig {
 
     @Value("${backing-services.geo-data-server.base-uri:http://geo-data-server/}")
     String geoDataServerBaseUri;
+
+    @Value("${backing-services.user-admin-server.base-uri:http://user-admin-server/}")
+    String userAdminServerBaseUri;
 }
