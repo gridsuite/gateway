@@ -41,5 +41,5 @@ backing-services:
   geo-data-server:
     base-uri: http://localhost:8087
   user-admin-server:
-    base-uri: http://localhost:5032
+    base-uri: http://localhost:5033
 

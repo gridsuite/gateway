@@ -46,8 +46,6 @@ public class UserAdminService {
                     .path(USER_ADMIN_SERVER_ROOT_PATH + "/" + sub)
                     .build()
             )
-            .exchangeToMono(response ->
-                 Mono.just(response.statusCode().value() == 200)
-            );
+            .exchangeToMono(response -> Mono.just(response.statusCode().value() == 200));
     }
 }
