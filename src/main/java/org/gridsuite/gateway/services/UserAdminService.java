@@ -35,7 +35,7 @@ public class UserAdminService {
         return webClient
             .head()
             .uri(uriBuilder -> uriBuilder
-                    .path(USER_ADMIN_SERVER_ROOT_PATH + "/" + sub)
+                    .path(USER_ADMIN_SERVER_ROOT_PATH + DELIMITER + sub)
                     .build()
             )
             .exchangeToMono(response -> Mono.just(response.statusCode().value() == 200));
