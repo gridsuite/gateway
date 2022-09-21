@@ -8,7 +8,6 @@ package org.gridsuite.gateway.services;
 
 import org.gridsuite.gateway.ServiceURIsConfig;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
@@ -27,16 +26,9 @@ public class UserAdminService {
 
     private final WebClient webClient;
 
-    private String userAdminServerBaseUri;
-
     @Autowired
-    public UserAdminService(@Value("${backing-services.user-admin-server.base-uri:http://user-admin-server/}") String userAdminServerBaseUri, ServiceURIsConfig servicesURIsConfig, WebClient.Builder webClientBuilder) {
-        this.userAdminServerBaseUri = userAdminServerBaseUri;
-        this.webClient = webClientBuilder.baseUrl(servicesURIsConfig.getDirectoryServerBaseUri()).build();
-    }
-
-    public void setUserAdminServerBaseUri(String userAdminServerBaseUri) {
-        this.userAdminServerBaseUri = userAdminServerBaseUri;
+    public UserAdminService(ServiceURIsConfig servicesURIsConfig, WebClient.Builder webClientBuilder) {
+        this.webClient = webClientBuilder.baseUrl(servicesURIsConfig.getUserAdminServerBaseUri()).build();
     }
 
     public Mono<Boolean> userExists(String sub) {
