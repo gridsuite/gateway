@@ -42,7 +42,7 @@ public class UserAdminControlGlobalPreFilter extends AbstractGlobalPreFilter {
         HttpHeaders httpHeaders = exchange.getRequest().getHeaders();
         String sub = Objects.requireNonNull(httpHeaders.get(HEADER_USER_ID)).get(0);
 
-        return userAdminService.userExists(sub).flatMap(userExist ->  userExist ? chain.filter(exchange) : completeWithCode(exchange, HttpStatus.FORBIDDEN));
+        return userAdminService.userExists(sub).flatMap(userExist ->  Boolean.TRUE.equals(userExist) ? chain.filter(exchange) : completeWithCode(exchange, HttpStatus.FORBIDDEN));
     }
 
     @Override
