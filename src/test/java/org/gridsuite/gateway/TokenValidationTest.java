@@ -67,7 +67,8 @@ import static com.github.tomakehurst.wiremock.client.WireMock.*;
         "backing-services.dynamic-mapping-server.base-uri=http://localhost:${wiremock.server.port}",
         "backing-services.filter-server.base-uri=http://localhost:${wiremock.server.port}",
         "backing-services.report-server.base-uri=http://localhost:${wiremock.server.port}",
-        "backing-services.network-modification-server.base-uri=http://localhost:${wiremock.server.port}"
+        "backing-services.network-modification-server.base-uri=http://localhost:${wiremock.server.port}",
+        "backing-services.user-admin-server.base-uri=http://localhost:${wiremock.server.port}",
     })
 
 @AutoConfigureWireMock(port = 0)
@@ -161,6 +162,7 @@ public class TokenValidationTest {
         //Test a websocket with token in query parameters
         WebSocketClient client = new StandardWebSocketClient();
         HttpHeaders headers = new HttpHeaders();
+        headers.set("userId", "chmits");
         Mono<Void> wsconnection = client.execute(
             URI.create("ws://localhost:" + this.localServerPort + "/" + name + "/notify?access_token=" + token), headers,
             ws -> ws.receive().then());
@@ -257,13 +259,14 @@ public class TokenValidationTest {
             .willReturn(aResponse()
                 .withHeader("Content-Type", "application/json")
                 .withBody("{\"id\": \"report1\", \"reports\" :[{\"date\":\"2001:01:01T11:11\", \"report\": \"Lets Rock\" }]}")));
-
-        webClient
+        WebTestClient.BodyContentSpec body = webClient
                 .get().uri("case/v1/cases")
                 .header("Authorization", "Bearer " + token)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody()
+                .expectBody();
+
+        body
                 .jsonPath("$[0].name").isEqualTo("testCase")
                 .jsonPath("$[1].name").isEqualTo("testCase2")
                 .jsonPath("$[0].format").isEqualTo("XIIDM")
@@ -380,6 +383,9 @@ public class TokenValidationTest {
     }
 
     private void initStubForJwk() {
+        stubFor(head(urlEqualTo(String.format("/v1/users/%s", "chmits"))).withPort(port)
+                .willReturn(aResponse().withStatus(200)));
+
         stubFor(get(urlEqualTo("/.well-known/openid-configuration"))
             .willReturn(aResponse()
                 .withHeader("Content-Type", "application/json")
@@ -393,6 +399,9 @@ public class TokenValidationTest {
 
     @Test
     public void testJwksUpdate() {
+        stubFor(head(urlEqualTo(String.format("/v1/users/%s", "chmits"))).withPort(port)
+                .willReturn(aResponse().withStatus(200)));
+
         stubFor(get(urlEqualTo("/v1/cases"))
                 .willReturn(aResponse()
                         .withHeader("Content-Type", "application/json")
@@ -455,6 +464,8 @@ public class TokenValidationTest {
 
     @Test
     public void invalidToken() {
+        stubFor(head(urlEqualTo(String.format("/v1/users/%s", "chmits"))).withPort(port)
+                .willReturn(aResponse().withStatus(200)));
 
         stubFor(get(urlEqualTo("/v1/cases"))
                 .willReturn(aResponse()

@@ -47,6 +47,7 @@ import static org.junit.Assert.assertThrows;
         "backing-services.study-server.base-uri=http://localhost:${wiremock.server.port}",
         "backing-services.actions-server.base-uri=http://localhost:${wiremock.server.port}",
         "backing-services.filter-server.base-uri=http://localhost:${wiremock.server.port}",
+        "backing-services.user-admin-server.base-uri=http://localhost:${wiremock.server.port}",
     }
 )
 @AutoConfigureWireMock(port = 0)
@@ -509,6 +510,12 @@ public class ElementAccessControlTest {
     }
 
     private void initStubForJwk() {
+        stubFor(head(urlEqualTo(String.format("/v1/users/%s", "user1"))).withPort(port)
+                .willReturn(aResponse().withStatus(200)));
+
+        stubFor(head(urlEqualTo(String.format("/v1/users/%s", "user2"))).withPort(port)
+                .willReturn(aResponse().withStatus(200)));
+
         stubFor(get(urlEqualTo("/.well-known/openid-configuration"))
             .willReturn(aResponse()
                 .withHeader("Content-Type", "application/json")
