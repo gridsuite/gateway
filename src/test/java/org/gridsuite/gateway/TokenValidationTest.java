@@ -459,8 +459,6 @@ public class TokenValidationTest {
                 .header("Authorization", "Bearer " + token)
                 .exchange()
                 .expectStatus().isEqualTo(200);
-
-
     }
 
     @Test
