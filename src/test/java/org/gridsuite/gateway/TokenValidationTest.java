@@ -258,6 +258,7 @@ public class TokenValidationTest {
             .willReturn(aResponse()
                 .withHeader("Content-Type", "application/json")
                 .withBody("{\"id\": \"report1\", \"reports\" :[{\"date\":\"2001:01:01T11:11\", \"report\": \"Lets Rock\" }]}")));
+
         webClient
                 .get().uri("case/v1/cases")
                 .header("Authorization", "Bearer " + token)
