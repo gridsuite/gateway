@@ -162,7 +162,6 @@ public class TokenValidationTest {
         //Test a websocket with token in query parameters
         WebSocketClient client = new StandardWebSocketClient();
         HttpHeaders headers = new HttpHeaders();
-        headers.set("userId", "chmits");
         Mono<Void> wsconnection = client.execute(
             URI.create("ws://localhost:" + this.localServerPort + "/" + name + "/notify?access_token=" + token), headers,
             ws -> ws.receive().then());
@@ -460,6 +459,8 @@ public class TokenValidationTest {
                 .header("Authorization", "Bearer " + token)
                 .exchange()
                 .expectStatus().isEqualTo(200);
+
+
     }
 
     @Test
@@ -538,6 +539,15 @@ public class TokenValidationTest {
         client.execute(URI.create("ws://localhost:" +
                 this.localServerPort + "/notification/notify"),
             ws -> ws.receive().then()).doOnSuccess(s -> Assert.fail("Should have thrown"));
+    }
+
+    @Test
+    public void unauthorizedUserTest() {
+        webClient
+                .get().uri("case/v1/cases")
+                .header("Authorization", "Bearer " + "unknown")
+                .exchange()
+                .expectStatus().isEqualTo(401);
     }
 
     @TestConfiguration

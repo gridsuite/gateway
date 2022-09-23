@@ -47,6 +47,6 @@ public class UserAdminControlGlobalPreFilter extends AbstractGlobalPreFilter {
 
     @Override
     public int getOrder() {
-        return Ordered.LOWEST_PRECEDENCE - 2;
+        return Ordered.LOWEST_PRECEDENCE - 3;
     }
 }

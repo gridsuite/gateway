@@ -38,6 +38,9 @@ public class UserAdminService {
                     .path(USER_ADMIN_SERVER_ROOT_PATH + DELIMITER + sub)
                     .build()
             )
-            .exchangeToMono(response -> Mono.just(response.statusCode().value() == 200));
+            .retrieve()
+            .toBodilessEntity()
+            .single()
+            .map(entity -> entity.getStatusCode().value() == 200);
     }
 }
