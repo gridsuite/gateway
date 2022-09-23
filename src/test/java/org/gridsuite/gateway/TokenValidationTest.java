@@ -258,14 +258,12 @@ public class TokenValidationTest {
             .willReturn(aResponse()
                 .withHeader("Content-Type", "application/json")
                 .withBody("{\"id\": \"report1\", \"reports\" :[{\"date\":\"2001:01:01T11:11\", \"report\": \"Lets Rock\" }]}")));
-        WebTestClient.BodyContentSpec body = webClient
+        webClient
                 .get().uri("case/v1/cases")
                 .header("Authorization", "Bearer " + token)
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody();
-
-        body
+                .expectBody()
                 .jsonPath("$[0].name").isEqualTo("testCase")
                 .jsonPath("$[1].name").isEqualTo("testCase2")
                 .jsonPath("$[0].format").isEqualTo("XIIDM")
