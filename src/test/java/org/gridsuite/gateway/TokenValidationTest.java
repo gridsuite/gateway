@@ -67,7 +67,8 @@ import static com.github.tomakehurst.wiremock.client.WireMock.*;
         "backing-services.dynamic-mapping-server.base-uri=http://localhost:${wiremock.server.port}",
         "backing-services.filter-server.base-uri=http://localhost:${wiremock.server.port}",
         "backing-services.report-server.base-uri=http://localhost:${wiremock.server.port}",
-        "backing-services.network-modification-server.base-uri=http://localhost:${wiremock.server.port}"
+        "backing-services.network-modification-server.base-uri=http://localhost:${wiremock.server.port}",
+        "backing-services.user-admin-server.base-uri=http://localhost:${wiremock.server.port}",
     })
 
 @AutoConfigureWireMock(port = 0)
@@ -380,6 +381,9 @@ public class TokenValidationTest {
     }
 
     private void initStubForJwk() {
+        stubFor(head(urlEqualTo(String.format("/v1/users/%s", "chmits"))).withPort(port)
+                .willReturn(aResponse().withStatus(200)));
+
         stubFor(get(urlEqualTo("/.well-known/openid-configuration"))
             .willReturn(aResponse()
                 .withHeader("Content-Type", "application/json")
@@ -393,6 +397,9 @@ public class TokenValidationTest {
 
     @Test
     public void testJwksUpdate() {
+        stubFor(head(urlEqualTo(String.format("/v1/users/%s", "chmits"))).withPort(port)
+                .willReturn(aResponse().withStatus(200)));
+
         stubFor(get(urlEqualTo("/v1/cases"))
                 .willReturn(aResponse()
                         .withHeader("Content-Type", "application/json")
@@ -455,6 +462,8 @@ public class TokenValidationTest {
 
     @Test
     public void invalidToken() {
+        stubFor(head(urlEqualTo(String.format("/v1/users/%s", "chmits"))).withPort(port)
+                .willReturn(aResponse().withStatus(200)));
 
         stubFor(get(urlEqualTo("/v1/cases"))
                 .willReturn(aResponse()
@@ -527,6 +536,19 @@ public class TokenValidationTest {
         client.execute(URI.create("ws://localhost:" +
                 this.localServerPort + "/notification/notify"),
             ws -> ws.receive().then()).doOnSuccess(s -> Assert.fail("Should have thrown"));
+    }
+
+    @Test
+    public void forbiddenUserTest() {
+        initStubForJwk();
+        stubFor(head(urlEqualTo(String.format("/v1/users/%s", "chmits"))).withPort(port)
+                .willReturn(aResponse().withStatus(204)));
+
+        webClient
+                .get().uri("case/v1/cases")
+                .header("Authorization", "Bearer " + token)
+                .exchange()
+                .expectStatus().isEqualTo(403);
     }
 
     @TestConfiguration
