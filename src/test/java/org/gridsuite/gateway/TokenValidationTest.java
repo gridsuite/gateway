@@ -539,12 +539,16 @@ public class TokenValidationTest {
     }
 
     @Test
-    public void unauthorizedUserTest() {
+    public void forbiddenUserTest() {
+        initStubForJwk();
+        stubFor(head(urlEqualTo(String.format("/v1/users/%s", "chmits"))).withPort(port)
+                .willReturn(aResponse().withStatus(204)));
+
         webClient
                 .get().uri("case/v1/cases")
-                .header("Authorization", "Bearer " + "unknown")
+                .header("Authorization", "Bearer " + token)
                 .exchange()
-                .expectStatus().isEqualTo(401);
+                .expectStatus().isEqualTo(403);
     }
 
     @TestConfiguration
