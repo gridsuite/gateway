@@ -80,4 +80,7 @@ public class ServiceURIsConfig {
 
     @Value("${backing-services.user-admin-server.base-uri:http://user-admin-server/}")
     String userAdminServerBaseUri;
+
+    @Value("${backing-services.cgmes-gl-server.base-uri:http://cgmes-gl-server/}")
+    String cgmesGlServerBaseUri;
 }
