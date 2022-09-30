@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
  * @author Etienne Homer <etienne.homer at rte-france.com>
  */
 @Component(value = UserAdminServer.ENDPOINT_NAME)
-public class UserAdminServer implements EndPointElementServer {
+public class UserAdminServer implements EndPointServer {
 
     public static final String ENDPOINT_NAME = "user-admin";
 
