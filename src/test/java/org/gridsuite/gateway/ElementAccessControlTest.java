@@ -150,14 +150,6 @@ public class ElementAccessControlTest {
             .header("Authorization", "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isOk();
-
-        // No control for some sensitivity analysis server
-        stubFor(get(urlEqualTo("/v1/results-threshold-default-value")).withHeader("userId", equalTo("user1")).willReturn(aResponse()));
-        webClient
-            .get().uri("sensitivity-analysis/v1/results-threshold-default-value")
-            .header("Authorization", "Bearer " + tokenUser1)
-            .exchange()
-            .expectStatus().isOk();
     }
 
     @Test
