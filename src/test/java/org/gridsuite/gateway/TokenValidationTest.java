@@ -69,6 +69,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.*;
         "backing-services.report-server.base-uri=http://localhost:${wiremock.server.port}",
         "backing-services.network-modification-server.base-uri=http://localhost:${wiremock.server.port}",
         "backing-services.user-admin-server.base-uri=http://localhost:${wiremock.server.port}",
+        "backing-services.sensitivity-analysis-server.base-uri=http://localhost:${wiremock.server.port}",
     })
 
 @AutoConfigureWireMock(port = 0)

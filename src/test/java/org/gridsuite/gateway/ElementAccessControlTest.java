@@ -48,6 +48,7 @@ import static org.junit.Assert.assertThrows;
         "backing-services.actions-server.base-uri=http://localhost:${wiremock.server.port}",
         "backing-services.filter-server.base-uri=http://localhost:${wiremock.server.port}",
         "backing-services.user-admin-server.base-uri=http://localhost:${wiremock.server.port}",
+        "backing-services.sensitivity-analysis-server.base-uri=http://localhost:${wiremock.server.port}",
     }
 )
 @AutoConfigureWireMock(port = 0)
@@ -146,6 +147,14 @@ public class ElementAccessControlTest {
             .expectStatus().isOk();
         webClient
             .get().uri("study/v1/loadflow-default-provider")
+            .header("Authorization", "Bearer " + tokenUser1)
+            .exchange()
+            .expectStatus().isOk();
+
+        // No control for some sensitivity analysis server root paths
+        stubFor(get(urlEqualTo("/v1/results-threshold-default-value")).withHeader("userId", equalTo("user1")).willReturn(aResponse()));
+        webClient
+            .get().uri("sensitivity-analysis/v1/results-threshold-default-value")
             .header("Authorization", "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isOk();

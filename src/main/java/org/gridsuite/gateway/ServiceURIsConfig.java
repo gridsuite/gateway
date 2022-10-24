@@ -83,4 +83,8 @@ public class ServiceURIsConfig {
 
     @Value("${backing-services.cgmes-gl-server.base-uri:http://cgmes-gl-server/}")
     String cgmesGlServerBaseUri;
+
+    @Value("${backing-services.sensitivity-analysis-server.base-uri:http://sensitivity-analysis-server/}")
+    String sensitivityAnalysisServerBaseUri;
+
 }
