@@ -15,7 +15,7 @@ import java.util.Set;
  * @author Franck Lecuyer <franck.lecuyer at rte-france.com>
  */
 @Component(value = SensitivityAnalysisServer.ENDPOINT_NAME)
-public class SensitivityAnalysisServer implements EndPointElementServer {
+public class SensitivityAnalysisServer implements EndPointServer {
 
     public static final String ENDPOINT_NAME = "sensitivity-analysis";
 
