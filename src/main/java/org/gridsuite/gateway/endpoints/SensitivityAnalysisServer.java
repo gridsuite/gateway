@@ -9,8 +9,6 @@ package org.gridsuite.gateway.endpoints;
 import org.gridsuite.gateway.ServiceURIsConfig;
 import org.springframework.stereotype.Component;
 
-import java.util.Set;
-
 /**
  * @author Franck Lecuyer <franck.lecuyer at rte-france.com>
  */
@@ -33,10 +31,5 @@ public class SensitivityAnalysisServer implements EndPointServer {
     @Override
     public String getEndpointName() {
         return ENDPOINT_NAME;
-    }
-
-    @Override
-    public Set<String> getUncontrolledRootPaths() {
-        return Set.of("results-threshold-default-value");
     }
 }

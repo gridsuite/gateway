@@ -42,6 +42,10 @@ public interface EndPointElementServer extends EndPointServer {
         return ALLOWED_HTTP_METHODS.contains(httpMethod);
     }
 
+    default Set<String> getUncontrolledRootPaths() {
+        return Set.of();
+    }
+
     default boolean isNotControlledRootPath(String rootPath) {
         return getUncontrolledRootPaths().contains(rootPath);
     }

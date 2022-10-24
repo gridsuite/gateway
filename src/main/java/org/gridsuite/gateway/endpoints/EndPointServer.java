@@ -11,8 +11,6 @@ import org.springframework.cloud.gateway.route.Route;
 import org.springframework.cloud.gateway.route.builder.Buildable;
 import org.springframework.cloud.gateway.route.builder.PredicateSpec;
 
-import java.util.Set;
-
 import static org.gridsuite.gateway.GatewayConfig.END_POINT_SERVICE_NAME;
 
 /**
@@ -28,10 +26,6 @@ public interface EndPointServer {
             .filters(f -> f.rewritePath(String.format("/%s/(.*)", getEndpointName()), "/$1"))
             .metadata(END_POINT_SERVICE_NAME, getEndpointName())
             .uri(getEndpointBaseUri());
-    }
-
-    default Set<String> getUncontrolledRootPaths() {
-        return Set.of();
     }
 
     default boolean hasElementsAccessControl() {
