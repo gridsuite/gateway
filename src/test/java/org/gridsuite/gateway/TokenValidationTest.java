@@ -58,7 +58,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.*;
         "backing-services.merge-notification-server.base-uri=http://localhost:${wiremock.server.port}",
         "backing-services.directory-notification-server.base-uri=http://localhost:${wiremock.server.port}",
         "backing-services.actions-server.base-uri=http://localhost:${wiremock.server.port}",
-        "backing-services.notification-server.base-uri=http://localhost:${wiremock.server.port}",
+        "backing-services.study-notification-server.base-uri=http://localhost:${wiremock.server.port}",
         "backing-services.config-server.base-uri=http://localhost:${wiremock.server.port}",
         "backing-services.config-notification-server.base-uri=http://localhost:${wiremock.server.port}",
         "backing-services.directory-server.base-uri=http://localhost:${wiremock.server.port}",

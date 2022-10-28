@@ -30,7 +30,7 @@ public class ServiceURIsConfig {
     @Value("${backing-services.merge-orchestrator-server.base-uri:http://merge-orchestrator-server/}")
     String mergeOrchestratorServerBaseUri;
 
-    @Value("${backing-services.notification-server.base-uri:http://notification-server/}")
+    @Value("${backing-services.study-notification-server.base-uri:http://study-notification-server/}")
     String notificationServerBaseUri;
 
     @Value("${backing-services.merge-notification-server.base-uri:http://merge-notification-server/}")
