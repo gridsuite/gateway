@@ -58,7 +58,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.*;
         "backing-services.merge-notification-server.base-uri=http://localhost:${wiremock.server.port}",
         "backing-services.directory-notification-server.base-uri=http://localhost:${wiremock.server.port}",
         "backing-services.actions-server.base-uri=http://localhost:${wiremock.server.port}",
-        "backing-services.notification-server.base-uri=http://localhost:${wiremock.server.port}",
+        "backing-services.study-notification-server.base-uri=http://localhost:${wiremock.server.port}",
         "backing-services.config-server.base-uri=http://localhost:${wiremock.server.port}",
         "backing-services.config-notification-server.base-uri=http://localhost:${wiremock.server.port}",
         "backing-services.directory-server.base-uri=http://localhost:${wiremock.server.port}",
@@ -374,7 +374,7 @@ public class TokenValidationTest {
                 .withStatus(101)
                 .withStatusMessage("Switching Protocols")));
 
-        testWebsocket("notification");
+        testWebsocket("study-notification");
         testWebsocket("config-notification");
         testWebsocket("merge-notification");
         testWebsocket("directory-notification");
@@ -534,7 +534,7 @@ public class TokenValidationTest {
         // test without a token
         WebSocketClient client = new StandardWebSocketClient();
         client.execute(URI.create("ws://localhost:" +
-                this.localServerPort + "/notification/notify"),
+                this.localServerPort + "/study-notification/notify"),
             ws -> ws.receive().then()).doOnSuccess(s -> Assert.fail("Should have thrown"));
     }
 
