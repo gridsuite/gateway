@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component;
 @Component(value = StudyNotificationServer.ENDPOINT_NAME)
 public class StudyNotificationServer implements EndPointServer {
 
-    public static final String ENDPOINT_NAME = "notification";
+    public static final String ENDPOINT_NAME = "study-notification";
 
     private final ServiceURIsConfig servicesURIsConfig;
 
@@ -25,7 +25,7 @@ public class StudyNotificationServer implements EndPointServer {
 
     @Override
     public String getEndpointBaseUri() {
-        return servicesURIsConfig.getNotificationServerBaseUri();
+        return servicesURIsConfig.getStudyNotificationServerBaseUri();
     }
 
     @Override
