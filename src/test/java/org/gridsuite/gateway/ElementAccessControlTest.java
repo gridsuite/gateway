@@ -48,6 +48,7 @@ import static org.junit.Assert.assertThrows;
         "backing-services.actions-server.base-uri=http://localhost:${wiremock.server.port}",
         "backing-services.filter-server.base-uri=http://localhost:${wiremock.server.port}",
         "backing-services.user-admin-server.base-uri=http://localhost:${wiremock.server.port}",
+        "backing-services.sensitivity-analysis-server.base-uri=http://localhost:${wiremock.server.port}",
     }
 )
 @AutoConfigureWireMock(port = 0)
