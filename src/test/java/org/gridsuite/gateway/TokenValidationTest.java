@@ -52,7 +52,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.*;
  */
 @RunWith(SpringRunner.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-    properties = {"backing-services.case.base-uri=http://localhost:${wiremock.server.port}",
+    properties = {"backing-services.case-server.base-uri=http://localhost:${wiremock.server.port}",
         "backing-services.study-server.base-uri=http://localhost:${wiremock.server.port}",
         "backing-services.merge-orchestrator-server.base-uri=http://localhost:${wiremock.server.port}",
         "backing-services.merge-notification-server.base-uri=http://localhost:${wiremock.server.port}",

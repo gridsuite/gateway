@@ -21,7 +21,7 @@ import org.springframework.context.annotation.Configuration;
 @Setter
 @ConfigurationProperties(prefix = "gateway")
 public class ServiceURIsConfig {
-    @Value("${backing-services.case.base-uri:http://case-server/}")
+    @Value("${backing-services.case-server.base-uri:http://case-server/}")
     String caseServerBaseUri;
 
     @Value("${backing-services.study-server.base-uri:http://study-server/}")
