@@ -1,49 +1,53 @@
 server:
   port: 9000
 
-backing-services:
-  case-server:
-    base-uri: http://localhost:5000
-  study-server:
-    base-uri: http://localhost:5001
-  merge-orchestrator-server:
-    base-uri: http://localhost:5020
-  study-notification-server:
-    base-uri: http://localhost:5009
-  merge-notification-server:
-    base-uri: http://localhost:5002
-  directory-notification-server:
-    base-uri: http://localhost:5004
-  actions-server:
-    base-uri: http://localhost:5022
-  config-server:
-    base-uri: http://localhost:5025
-  config-notification-server:
-    base-uri: http://localhost:5024
-  directory-server:
-    base-uri: http://localhost:5026
-  cgmes-boundary-server:
-    base-uri: http://localhost:5021
-  dynamic-mapping-server:
-    base-uri: http://localhost:5036
-  filter-server:
-    base-uri: http://localhost:5027
-  report-server:
-    base-uri: http://localhost:5028
-  explore-server:
-    base-uri: http://localhost:5029
-  network-modification-server:
-    base-uri: http://localhost:5007
-  network-conversion-server:
-    base-uri: http://localhost:5003
-  odre-server:
-    base-uri: http://localhost:8090
-  geo-data-server:
-    base-uri: http://localhost:8087
-  user-admin-server:
-    base-uri: http://localhost:5033
-  cgmes-gl-server:
-    base-uri: http://localhost:8095
-  sensitivity-analysis-server:
-    base-uri: http://localhost:5030
+powsybl:
+  services:
+    case-server:
+      base-uri: http://localhost:5000
+    network-conversion-server:
+      base-uri: http://localhost:5003
+
+gridsuite:
+  services:
+    study-server:
+      base-uri: http://localhost:5001
+    merge-orchestrator-server:
+      base-uri: http://localhost:5020
+    study-notification-server:
+      base-uri: http://localhost:5009
+    merge-notification-server:
+      base-uri: http://localhost:5002
+    directory-notification-server:
+      base-uri: http://localhost:5004
+    actions-server:
+      base-uri: http://localhost:5022
+    config-server:
+      base-uri: http://localhost:5025
+    config-notification-server:
+      base-uri: http://localhost:5024
+    directory-server:
+      base-uri: http://localhost:5026
+    cgmes-boundary-server:
+      base-uri: http://localhost:5021
+    dynamic-mapping-server:
+      base-uri: http://localhost:5036
+    filter-server:
+      base-uri: http://localhost:5027
+    report-server:
+      base-uri: http://localhost:5028
+    explore-server:
+      base-uri: http://localhost:5029
+    network-modification-server:
+      base-uri: http://localhost:5007
+    odre-server:
+      base-uri: http://localhost:8090
+    geo-data-server:
+      base-uri: http://localhost:8087
+    user-admin-server:
+      base-uri: http://localhost:5033
+    cgmes-gl-server:
+      base-uri: http://localhost:8095
+    sensitivity-analysis-server:
+      base-uri: http://localhost:5030
 

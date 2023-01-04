@@ -21,70 +21,70 @@ import org.springframework.context.annotation.Configuration;
 @Setter
 @ConfigurationProperties(prefix = "gateway")
 public class ServiceURIsConfig {
-    @Value("${backing-services.case-server.base-uri:http://case-server/}")
+    @Value("${powsybl.services.case-server.base-uri:http://case-server/}")
     String caseServerBaseUri;
 
-    @Value("${backing-services.study-server.base-uri:http://study-server/}")
+    @Value("${gridsuite.services.study-server.base-uri:http://study-server/}")
     String studyServerBaseUri;
 
-    @Value("${backing-services.merge-orchestrator-server.base-uri:http://merge-orchestrator-server/}")
+    @Value("${gridsuite.services.merge-orchestrator-server.base-uri:http://merge-orchestrator-server/}")
     String mergeOrchestratorServerBaseUri;
 
-    @Value("${backing-services.study-notification-server.base-uri:http://study-notification-server/}")
+    @Value("${gridsuite.services.study-notification-server.base-uri:http://study-notification-server/}")
     String studyNotificationServerBaseUri;
 
-    @Value("${backing-services.merge-notification-server.base-uri:http://merge-notification-server/}")
+    @Value("${gridsuite.services.merge-notification-server.base-uri:http://merge-notification-server/}")
     String mergeNotificationServerBaseUri;
 
-    @Value("${backing-services.actions-server.base-uri:http://actions-server/}")
+    @Value("${gridsuite.services.actions-server.base-uri:http://actions-server/}")
     String actionsServerBaseUri;
 
-    @Value("${backing-services.config-server.base-uri:http://config-server/}")
+    @Value("${gridsuite.services.config-server.base-uri:http://config-server/}")
     String configServerBaseUri;
 
-    @Value("${backing-services.config-notification-server.base-uri:http://config-notification-server/}")
+    @Value("${gridsuite.services.config-notification-server.base-uri:http://config-notification-server/}")
     String configNotificationServerBaseUri;
 
-    @Value("${backing-services.directory-server.base-uri:http://directory-server/}")
+    @Value("${gridsuite.services.directory-server.base-uri:http://directory-server/}")
     String directoryServerBaseUri;
 
-    @Value("${backing-services.explore-server.base-uri:http://explore-server/}")
+    @Value("${gridsuite.services.explore-server.base-uri:http://explore-server/}")
     String exploreServerBaseUri;
 
-    @Value("${backing-services.cgmes-boundary-server.base-uri:http://cgmes-boundary-server/}")
+    @Value("${gridsuite.services.cgmes-boundary-server.base-uri:http://cgmes-boundary-server/}")
     String boundaryServerBaseUri;
 
-    @Value("${backing-services.dynamic-mapping-server.base-uri:http://dynamic-mapping-server/}")
+    @Value("${gridsuite.services.dynamic-mapping-server.base-uri:http://dynamic-mapping-server/}")
     String dynamicMappingServerBaseUri;
 
-    @Value("${backing-services.filter-server.base-uri:http://filter-server/}")
+    @Value("${gridsuite.services.filter-server.base-uri:http://filter-server/}")
     String filterServerBaseUri;
 
-    @Value("${backing-services.report-server.base-uri:http://report-server/}")
+    @Value("${gridsuite.services.report-server.base-uri:http://report-server/}")
     String reportServerBaseUri;
 
-    @Value("${backing-services.directory-notification-server.base-uri:http://directory-notification-server/}")
+    @Value("${gridsuite.services.directory-notification-server.base-uri:http://directory-notification-server/}")
     String directoryNotificationServerBaseUri;
 
-    @Value("${backing-services.network-modification-server.base-uri:http://network-modification-server/}")
+    @Value("${gridsuite.services.network-modification-server.base-uri:http://network-modification-server/}")
     String networkModificationServerBaseUri;
 
-    @Value("${backing-services.network-conversion-server.base-uri:http://network-conversion-server/}")
+    @Value("${powsybl.services.network-conversion-server.base-uri:http://network-conversion-server/}")
     String networkConversionServerBaseUri;
 
-    @Value("${backing-services.odre-server.base-uri:http://odre-server/}")
+    @Value("${gridsuite.services.odre-server.base-uri:http://odre-server/}")
     String odreServerBaseUri;
 
-    @Value("${backing-services.geo-data-server.base-uri:http://geo-data-server/}")
+    @Value("${gridsuite.services.geo-data-server.base-uri:http://geo-data-server/}")
     String geoDataServerBaseUri;
 
-    @Value("${backing-services.user-admin-server.base-uri:http://user-admin-server/}")
+    @Value("${gridsuite.services.user-admin-server.base-uri:http://user-admin-server/}")
     String userAdminServerBaseUri;
 
-    @Value("${backing-services.cgmes-gl-server.base-uri:http://cgmes-gl-server/}")
+    @Value("${gridsuite.services.cgmes-gl-server.base-uri:http://cgmes-gl-server/}")
     String cgmesGlServerBaseUri;
 
-    @Value("${backing-services.sensitivity-analysis-server.base-uri:http://sensitivity-analysis-server/}")
+    @Value("${gridsuite.services.sensitivity-analysis-server.base-uri:http://sensitivity-analysis-server/}")
     String sensitivityAnalysisServerBaseUri;
 
 }
