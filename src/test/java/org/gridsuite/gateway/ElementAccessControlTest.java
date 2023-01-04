@@ -40,7 +40,8 @@ import static org.junit.Assert.assertThrows;
  * @author Slimane Amar <slimane.amar at rte-france.com>
  */
 @RunWith(SpringRunner.class)
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+    properties = {
         "gridsuite.services.directory-server.base-uri=http://localhost:${wiremock.server.port}",
         "gridsuite.services.explore-server.base-uri=http://localhost:${wiremock.server.port}",
         "gridsuite.services.study-server.base-uri=http://localhost:${wiremock.server.port}",
@@ -48,7 +49,8 @@ import static org.junit.Assert.assertThrows;
         "gridsuite.services.filter-server.base-uri=http://localhost:${wiremock.server.port}",
         "gridsuite.services.user-admin-server.base-uri=http://localhost:${wiremock.server.port}",
         "gridsuite.services.sensitivity-analysis-server.base-uri=http://localhost:${wiremock.server.port}",
-})
+    }
+)
 @AutoConfigureWireMock(port = 0)
 public class ElementAccessControlTest {
 
@@ -546,7 +548,7 @@ public class ElementAccessControlTest {
         List<UUID> emptyList = List.of();
 
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-                () -> AccessControlInfos.create(emptyList));
+            () -> AccessControlInfos.create(emptyList));
         assertEquals("List of elements is empty", exception.getMessage());
     }
 
