@@ -87,4 +87,6 @@ public class ServiceURIsConfig {
     @Value("${backing-services.sensitivity-analysis-server.base-uri:http://sensitivity-analysis-server/}")
     String sensitivityAnalysisServerBaseUri;
 
+    @Value("${backing-services.loadflow-server.base-uri:http://loadflow-server/}")
+    String loadFlowServerBaseUri;
 }

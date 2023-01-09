@@ -53,6 +53,7 @@ public class GatewayConfig {
             .route(p -> context.getBean(UserAdminServer.class).getRoute(p))
             .route(p -> context.getBean(CgmesGlServer.class).getRoute(p))
             .route(p -> context.getBean(SensitivityAnalysisServer.class).getRoute(p))
+            .route(p -> context.getBean(LoadFlowServer.class).getRoute(p))
             .build();
     }
 }
