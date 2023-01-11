@@ -19,6 +19,7 @@ import com.nimbusds.openid.connect.sdk.validators.IDTokenValidator;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.gridsuite.gateway.GatewayService;
+import org.gridsuite.gateway.dto.TokenIntrospection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -37,6 +38,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static org.gridsuite.gateway.GatewayConfig.HEADER_USER_ID;
+//TODO add client_id
+//import static org.gridsuite.gateway.GatewayConfig.HEADER_CLIENT_ID;
 
 /**
  * @author Chamseddine Benhamed <chamseddine.benhamed at rte-france.com>
@@ -44,7 +47,7 @@ import static org.gridsuite.gateway.GatewayConfig.HEADER_USER_ID;
 @Component
 public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
 
-    public static final String UNAUTHORIZED_INVALID_PLAIN_JOSE_OBJECT_ENCODING = "{}: 401 Unauthorized, Invalid plain JOSE object encoding";
+    public static final String UNAUTHORIZED_INVALID_PLAIN_JOSE_OBJECT_ENCODING = "{}: 401 Unauthorized, Invalid plain JOSE object encoding or inactive opaque token";
     public static final String PARSING_ERROR = "{}: 500 Internal Server Error, error has been reached unexpectedly while parsing";
 
     private static final Logger LOGGER = LoggerFactory.getLogger(TokenValidatorGlobalPreFilter.class);
@@ -103,33 +106,56 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
         try {
             jwt = JWTParser.parse(token);
             jwtClaimsSet = jwt.getJWTClaimsSet();
+
+            LOGGER.debug("checking issuer");
+            if (allowedIssuers.stream().noneMatch(iss -> jwtClaimsSet.getIssuer().startsWith(iss))) {
+                LOGGER.info("{}: 401 Unauthorized, {} Issuer is not in the issuers white list", exchange.getRequest().getPath(), jwtClaimsSet.getIssuer());
+                return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
+            }
+
+            Issuer iss = new Issuer(jwtClaimsSet.getIssuer());
+            ClientID clientID = new ClientID(jwtClaimsSet.getAudience().get(0));
+
+            JWSAlgorithm jwsAlg = JWSAlgorithm.parse(jwt.getHeader().getAlgorithm().getName());
+            return proceedFilter(new FilterInfos(exchange, chain, jwt, jwtClaimsSet, iss, clientID, jwsAlg));
         } catch (java.text.ParseException e) {
             // Invalid plain JOSE object encoding
-            LOGGER.info(UNAUTHORIZED_INVALID_PLAIN_JOSE_OBJECT_ENCODING, exchange.getRequest().getPath());
-            return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
+            // Don't print the full stacktrace here for less verbose logs,
+            // we have enough context with just the message
+            LOGGER.debug("JWTParser.parse ParseException, will attempt to use as opaque token: ({})", e.getMessage());
+            // TODO try more than just the first issuer here ? get the issuer from the client ?
+            return validateOpaqueReferenceToken(allowedIssuers.get(0), token, exchange, chain);
         }
+    }
 
-        LOGGER.debug("checking issuer");
-        if (allowedIssuers.stream().noneMatch(iss -> jwtClaimsSet.getIssuer().startsWith(iss))) {
-            LOGGER.info("{}: 401 Unauthorized, {} Issuer is not in the issuers white list", exchange.getRequest().getPath(), jwtClaimsSet.getIssuer());
-            return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
-        }
-
-        Issuer iss = new Issuer(jwtClaimsSet.getIssuer());
-        ClientID clientID = new ClientID(jwtClaimsSet.getAudience().get(0));
-
-        JWSAlgorithm jwsAlg = JWSAlgorithm.parse(jwt.getHeader().getAlgorithm().getName());
-        return proceedFilter(new FilterInfos(exchange, chain, jwt, jwtClaimsSet, iss, clientID, jwsAlg));
+    private Mono<Void> validateOpaqueReferenceToken(String issBaseUri, String token, ServerWebExchange exchange,
+            GatewayFilterChain chain) {
+        // TODO CACHE the two requests
+        return gatewayService.getOpaqueTokenIntrospectionUri(issBaseUri)
+                .flatMap(uri -> gatewayService.getOpaqueTokenIntrospection(uri, token))
+                .flatMap((TokenIntrospection tokenIntrospection) -> {
+                    // TODO really add the client_id header instead of userid
+                    exchange.getRequest().mutate()
+                            .headers(h -> h.set(HEADER_USER_ID, tokenIntrospection.getClientId()));
+                    if (tokenIntrospection.getActive()) {
+                        LOGGER.debug("Opaque Token verified, it can be trusted");
+                        return chain.filter(exchange);
+                    } else {
+                        LOGGER.info(UNAUTHORIZED_INVALID_PLAIN_JOSE_OBJECT_ENCODING, exchange.getRequest().getPath());
+                        return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
+                    }
+                });
     }
 
     private Mono<Void> validate(FilterInfos filterInfos, JWKSet jwkset) throws BadJOSEException, JOSEException {
 
         // Create validator for signed ID tokens
+        // this works with jwt access tokens too (by chance ?) Do we need to modify this ?
         IDTokenValidator validator = new IDTokenValidator(filterInfos.getIss(), filterInfos.getClientID(), filterInfos.getJwsAlg(), jwkset);
 
         validator.validate(filterInfos.getJwt(), null);
         // we can safely trust the JWT
-        LOGGER.debug("Token verified, it can be trusted");
+        LOGGER.debug("JWT Token verified, it can be trusted");
 
         //we add the subject header
         filterInfos.getExchange().getRequest()
