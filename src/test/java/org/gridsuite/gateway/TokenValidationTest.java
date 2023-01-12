@@ -70,6 +70,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.*;
         "gridsuite.services.network-modification-server.base-uri=http://localhost:${wiremock.server.port}",
         "gridsuite.services.user-admin-server.base-uri=http://localhost:${wiremock.server.port}",
         "gridsuite.services.sensitivity-analysis-server.base-uri=http://localhost:${wiremock.server.port}",
+        "allowed-issuers=http://localhost:${wiremock.server.port}"
     })
 
 @AutoConfigureWireMock(port = 0)
@@ -260,6 +261,12 @@ public class TokenValidationTest {
                 .withHeader("Content-Type", "application/json")
                 .withBody("{\"id\": \"report1\", \"reports\" :[{\"date\":\"2001:01:01T11:11\", \"report\": \"Lets Rock\" }]}")));
 
+        testToken(elementUuid, token);
+        //TODO are all requests supposed to work with reference tokens from clients ?
+        testToken(elementUuid, "clientopaquetoken");
+    }
+
+    private void testToken(UUID elementUuid, String token) {
         webClient
                 .get().uri("case/v1/cases")
                 .header("Authorization", "Bearer " + token)
@@ -388,12 +395,21 @@ public class TokenValidationTest {
         stubFor(get(urlEqualTo("/.well-known/openid-configuration"))
             .willReturn(aResponse()
                 .withHeader("Content-Type", "application/json")
-                .withBody("{\"jwks_uri\": \"http://localhost:" + port + "/jwks\"}")));
+                .withBody("{"
+                        + "\"jwks_uri\": \"http://localhost:" + port + "/jwks\","
+                                + "\"introspection_endpoint\": \"http://localhost:" + port + "/introspection\""
+                        + "}")));
 
         stubFor(get(urlEqualTo("/jwks"))
             .willReturn(aResponse()
                 .withHeader("Content-Type", "application/json")
                 .withBody("{\"keys\" : [ " + rsaKey.toJSONString() + " ] }")));
+
+        stubFor(post(urlEqualTo("/introspection"))
+                .withRequestBody(equalTo("client_id=gridsuite&client_secret=secret&token=clientopaquetoken"))
+                .willReturn(aResponse()
+                    .withHeader("Content-Type", "application/json")
+                    .withBody("{\"active\":true,\"token_type\":\"Bearer\",\"exp\":2673442276,\"client_id\":\"chmits\"}")));
     }
 
     @Test
@@ -409,7 +425,10 @@ public class TokenValidationTest {
         stubFor(get(urlEqualTo("/.well-known/openid-configuration"))
                 .willReturn(aResponse()
                         .withHeader("Content-Type", "application/json")
-                        .withBody("{\"jwks_uri\": \"http://localhost:" + port + "/jwks\"}")));
+                        .withBody("{"
+                                + "\"jwks_uri\": \"http://localhost:" + port + "/jwks\","
+                                + "\"introspection_endpoint\": \"http://localhost:" + port + "/introspection\""
+                                + "}")));
 
         UUID stubId = UUID.randomUUID();
 
@@ -474,7 +493,15 @@ public class TokenValidationTest {
         stubFor(get(urlEqualTo("/.well-known/openid-configuration"))
                 .willReturn(aResponse()
                         .withHeader("Content-Type", "application/json")
-                        .withBody("{\"jwks_uri\": \"http://localhost:" + port + "/jwks\"}")));
+                        .withBody("{"
+                                + "\"jwks_uri\": \"http://localhost:" + port + "/jwks\","
+                                + "\"introspection_endpoint\": \"http://localhost:" + port + "/introspection\""
+                                + "}")));
+
+        stubFor(post(urlEqualTo("/introspection"))
+                .willReturn(aResponse()
+                    .withHeader("Content-Type", "application/json")
+                    .withBody("{\"active\":false}")));
 
         stubFor(get(urlEqualTo("/jwks"))
                 .willReturn(aResponse()
@@ -518,7 +545,7 @@ public class TokenValidationTest {
                 .exchange()
                 .expectStatus().isEqualTo(401);
 
-        //test with non JSON token
+        // test with non JSON token, non valid reference token
         webClient
                 .get().uri("case/v1/cases")
                 .header("Authorization", "Bearer " + "NonValidToken")

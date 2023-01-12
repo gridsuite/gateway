@@ -18,9 +18,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
-import java.util.Objects;
+import java.util.List;
 
 import static org.gridsuite.gateway.GatewayConfig.HEADER_USER_ID;
+import static org.gridsuite.gateway.GatewayConfig.HEADER_CLIENT_ID;
 
 /**
  * @author Etienne Homer <etienne.homer at rte-france.com>
@@ -40,9 +41,22 @@ public class UserAdminControlGlobalPreFilter extends AbstractGlobalPreFilter {
         LOGGER.debug("Filter : {}", getClass().getSimpleName());
 
         HttpHeaders httpHeaders = exchange.getRequest().getHeaders();
-        String sub = Objects.requireNonNull(httpHeaders.get(HEADER_USER_ID)).get(0);
+        List<String> maybeSubList = httpHeaders.get(HEADER_USER_ID);
+        List<String> maybeClientIdList = httpHeaders.get(HEADER_CLIENT_ID);
 
-        return userAdminService.userExists(sub).flatMap(userExist ->  Boolean.TRUE.equals(userExist) ? chain.filter(exchange) : completeWithCode(exchange, HttpStatus.FORBIDDEN));
+        if (maybeSubList != null) {
+            String sub = maybeSubList.get(0);
+            return userAdminService.userExists(sub).flatMap(userExist ->  Boolean.TRUE.equals(userExist) ? chain.filter(exchange) : completeWithCode(exchange, HttpStatus.FORBIDDEN));
+        }
+
+        if (maybeClientIdList != null) {
+            // String clientId = maybeClientId.get(0);
+            // TODO do something with clientId
+            return chain.filter(exchange);
+        }
+
+        // no sub or no clientid, can't control access
+        return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
     }
 
     @Override

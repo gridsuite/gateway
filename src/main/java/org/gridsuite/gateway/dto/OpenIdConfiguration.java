@@ -24,4 +24,17 @@ public class OpenIdConfiguration {
     public void setJwksUri(String jwksUri) {
         this.jwksUri = jwksUri;
     }
+
+    @JsonAlias("introspection_endpoint")
+    String introspectionEndpoint;
+
+    @JsonGetter("introspectionEndpoint")
+    public String getIntrospectionEndpoint() {
+        return introspectionEndpoint;
+    }
+
+    @JsonSetter("introspectionEndpoint")
+    public void setIntrospectionEndpoint(String introspectionEndpoint) {
+        this.introspectionEndpoint = introspectionEndpoint;
+    }
 }
