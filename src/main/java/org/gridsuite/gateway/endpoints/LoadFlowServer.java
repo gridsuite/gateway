@@ -25,7 +25,7 @@ public class LoadFlowServer implements EndPointServer {
 
     @Override
     public String getEndpointBaseUri() {
-        return servicesURIsConfig.getSensitivityAnalysisServerBaseUri();
+        return servicesURIsConfig.getLoadFlowServerBaseUri();
     }
 
     @Override
