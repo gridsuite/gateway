@@ -89,4 +89,7 @@ public class ServiceURIsConfig {
 
     @Value("${backing-services.loadflow-server.base-uri:http://loadflow-server/}")
     String loadFlowServerBaseUri;
+
+    @Value("${backing-services.security-analysis-server.base-uri:http://security-analysis-server/}")
+    String securityAnalysisServerBaseUri;
 }

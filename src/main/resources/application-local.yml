@@ -48,3 +48,5 @@ backing-services:
     base-uri: http://localhost:5030
   loadflow-server:
     base-uri: http://localhost:5008
+  security-analysis-server:
+    base-uri: http://localhost:5023
