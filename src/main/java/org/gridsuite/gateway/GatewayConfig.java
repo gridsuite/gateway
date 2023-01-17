@@ -27,6 +27,7 @@ public class GatewayConfig {
     public static final String END_POINT_SERVICE_NAME = "end_point_service_name";
 
     public static final String HEADER_USER_ID = "userId";
+    public static final String HEADER_CLIENT_ID = "clientId";
 
     @Bean
     public RouteLocator myRoutes(RouteLocatorBuilder builder, ApplicationContext context) {

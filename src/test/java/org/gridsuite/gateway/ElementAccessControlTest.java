@@ -42,13 +42,13 @@ import static org.junit.Assert.assertThrows;
 @RunWith(SpringRunner.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
     properties = {
-        "backing-services.directory-server.base-uri=http://localhost:${wiremock.server.port}",
-        "backing-services.explore-server.base-uri=http://localhost:${wiremock.server.port}",
-        "backing-services.study-server.base-uri=http://localhost:${wiremock.server.port}",
-        "backing-services.actions-server.base-uri=http://localhost:${wiremock.server.port}",
-        "backing-services.filter-server.base-uri=http://localhost:${wiremock.server.port}",
-        "backing-services.user-admin-server.base-uri=http://localhost:${wiremock.server.port}",
-        "backing-services.sensitivity-analysis-server.base-uri=http://localhost:${wiremock.server.port}",
+        "gridsuite.services.directory-server.base-uri=http://localhost:${wiremock.server.port}",
+        "gridsuite.services.explore-server.base-uri=http://localhost:${wiremock.server.port}",
+        "gridsuite.services.study-server.base-uri=http://localhost:${wiremock.server.port}",
+        "gridsuite.services.actions-server.base-uri=http://localhost:${wiremock.server.port}",
+        "gridsuite.services.filter-server.base-uri=http://localhost:${wiremock.server.port}",
+        "gridsuite.services.user-admin-server.base-uri=http://localhost:${wiremock.server.port}",
+        "gridsuite.services.sensitivity-analysis-server.base-uri=http://localhost:${wiremock.server.port}",
     }
 )
 @AutoConfigureWireMock(port = 0)
