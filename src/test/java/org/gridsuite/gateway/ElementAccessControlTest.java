@@ -145,6 +145,21 @@ public class ElementAccessControlTest {
             .header("Authorization", "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isOk();
+        webClient
+            .get().uri("study/v1/loadflow-default-provider")
+            .header("Authorization", "Bearer " + tokenUser1)
+            .exchange()
+            .expectStatus().isOk();
+        webClient
+                .get().uri("study/v1/security-analysis-default-provider")
+                .header("Authorization", "Bearer " + tokenUser1)
+                .exchange()
+                .expectStatus().isOk();
+        webClient
+                .get().uri("study/v1/sensitivity-analysis-default-provider")
+                .header("Authorization", "Bearer " + tokenUser1)
+                .exchange()
+                .expectStatus().isOk();
     }
 
     @Test
