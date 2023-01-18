@@ -130,6 +130,9 @@ public class ElementAccessControlTest {
         stubFor(get(urlEqualTo("/v1/svg-component-libraries")).withHeader("userId", equalTo("user1")).willReturn(aResponse()));
         stubFor(get(urlEqualTo("/v1/export-network-formats")).withHeader("userId", equalTo("user1")).willReturn(aResponse()));
         stubFor(get(urlEqualTo("/v1/loadflow-default-provider")).withHeader("userId", equalTo("user1")).willReturn(aResponse()));
+        stubFor(get(urlEqualTo("/v1/loadflow-default-provider")).withHeader("userId", equalTo("user1")).willReturn(aResponse()));
+        stubFor(get(urlEqualTo("/v1/security-analysis-default-provider")).withHeader("userId", equalTo("user1")).willReturn(aResponse()));
+        stubFor(get(urlEqualTo("/v1/sensitivity-analysis-default-provider")).withHeader("userId", equalTo("user1")).willReturn(aResponse()));
         webClient
             .get().uri("study/v1/search")
             .header("Authorization", "Bearer " + tokenUser1)
