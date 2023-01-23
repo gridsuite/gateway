@@ -87,4 +87,9 @@ public class ServiceURIsConfig {
     @Value("${gridsuite.services.sensitivity-analysis-server.base-uri:http://sensitivity-analysis-server/}")
     String sensitivityAnalysisServerBaseUri;
 
+    @Value("${gridsuite.services.loadflow-server.base-uri:http://loadflow-server/}")
+    String loadFlowServerBaseUri;
+
+    @Value("${gridsuite.services.security-analysis-server.base-uri:http://security-analysis-server/}")
+    String securityAnalysisServerBaseUri;
 }
