@@ -92,4 +92,7 @@ public class ServiceURIsConfig {
 
     @Value("${gridsuite.services.security-analysis-server.base-uri:http://security-analysis-server/}")
     String securityAnalysisServerBaseUri;
+
+    @Value("${gridsuite.services.dynamic-simulation-server.base-uri:http://dynamic-simulation-server/}")
+    String dynamicSimulationServerBaseUri;
 }
