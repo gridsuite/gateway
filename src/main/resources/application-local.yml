@@ -54,3 +54,5 @@ gridsuite:
       base-uri: http://localhost:5008
     security-analysis-server:
       base-uri: http://localhost:5023
+    dynamic-simulation-server:
+      base-uri: http://localhost:5032
