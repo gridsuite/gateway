@@ -46,7 +46,7 @@ public class UserAdminControlGlobalPreFilter extends AbstractGlobalPreFilter {
 
         if (maybeSubList != null) {
             String sub = maybeSubList.get(0);
-            return userAdminService.userExists(sub).flatMap(userExist ->  Boolean.TRUE.equals(userExist) ? chain.filter(exchange) : completeWithCode(exchange, HttpStatus.FORBIDDEN));
+            return userAdminService.userExists(sub).flatMap(userExist -> Boolean.TRUE.equals(userExist) ? chain.filter(exchange) : completeWithCode(exchange, HttpStatus.FORBIDDEN));
         }
 
         if (maybeClientIdList != null) {
