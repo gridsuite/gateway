@@ -39,6 +39,6 @@ public class StudyServer implements EndPointElementServer {
     public Set<String> getUncontrolledRootPaths() {
         return Set.of("search", "svg-component-libraries", "export-network-formats", "loadflow-default-provider",
                 "security-analysis-default-provider", "sensitivity-analysis-default-provider",
-                "dynamic-simulation-default-provider", "optional-up-services");
+                "dynamic-simulation-default-provider", "up-optional-services");
     }
 }
