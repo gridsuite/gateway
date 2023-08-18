@@ -15,6 +15,8 @@ import org.springframework.http.server.reactive.ServerHttpRequest;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static org.springframework.http.HttpMethod.*;
+
 /**
  * @author Slimane Amar <slimane.amar at rte-france.com>
  */
@@ -22,8 +24,8 @@ public interface EndPointElementServer extends EndPointServer {
 
     String QUERY_PARAM_IDS = "ids";
 
-    Set<HttpMethod> ALLOWED_HTTP_METHODS = Set.of(HttpMethod.GET, HttpMethod.HEAD,
-        HttpMethod.PUT, HttpMethod.POST, HttpMethod.DELETE
+    Set<HttpMethod> ALLOWED_HTTP_METHODS = Set.of(GET, HEAD,
+            PUT, POST, DELETE
     );
 
     static UUID getUuid(String uuid) {
@@ -60,27 +62,22 @@ public interface EndPointElementServer extends EndPointServer {
         UUID elementUuid = getElementUuidIfExist(path);
 
         // /<elements>/{elementUuid} or /<elements>/**?id=
-        switch (Objects.requireNonNull(request.getMethod())) {
-            case HEAD:
-            case GET: {
-                if (elementUuid != null) {
-                    return Optional.of(AccessControlInfos.create(List.of(elementUuid)));
+        HttpMethod httpMethod = Objects.requireNonNull(request.getMethod());
+        if (httpMethod.equals(HEAD) || httpMethod.equals(GET)) {
+            if (elementUuid != null) {
+                return Optional.of(AccessControlInfos.create(List.of(elementUuid)));
+            } else {
+                if (request.getQueryParams().get(QUERY_PARAM_IDS) == null) {
+                    return Optional.empty();
                 } else {
-                    if (request.getQueryParams().get(QUERY_PARAM_IDS) == null) {
-                        return Optional.empty();
-                    } else {
-                        List<String> ids = request.getQueryParams().get(QUERY_PARAM_IDS);
-                        List<UUID> elementUuids = ids.stream().map(EndPointElementServer::getUuid).filter(Objects::nonNull).collect(Collectors.toList());
-                        return elementUuids.size() == ids.size() ? Optional.of(AccessControlInfos.create(elementUuids)) : Optional.empty();
-                    }
+                    List<String> ids = request.getQueryParams().get(QUERY_PARAM_IDS);
+                    List<UUID> elementUuids = ids.stream().map(EndPointElementServer::getUuid).filter(Objects::nonNull).collect(Collectors.toList());
+                    return elementUuids.size() == ids.size() ? Optional.of(AccessControlInfos.create(elementUuids)) : Optional.empty();
                 }
             }
-            case POST: // Only sub elements (elements only via explore server)
-            case PUT:
-            case DELETE:
-                return elementUuid == null ? Optional.empty() : Optional.of(AccessControlInfos.create(List.of(elementUuid)));
-            default:
-                return Optional.empty();
+        } else if (httpMethod.equals(POST) || httpMethod.equals(PUT) || httpMethod.equals(DELETE)) {
+            return elementUuid == null ? Optional.empty() : Optional.of(AccessControlInfos.create(List.of(elementUuid)));
         }
+        return Optional.empty();
     }
 }
