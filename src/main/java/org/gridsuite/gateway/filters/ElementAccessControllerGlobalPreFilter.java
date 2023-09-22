@@ -20,7 +20,7 @@ import org.springframework.cloud.gateway.support.ServerWebExchangeUtils;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.Ordered;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.server.RequestPath;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
@@ -37,6 +37,7 @@ import java.util.regex.Pattern;
 import static org.gridsuite.gateway.GatewayConfig.END_POINT_SERVICE_NAME;
 import static org.gridsuite.gateway.GatewayConfig.HEADER_USER_ID;
 import static org.gridsuite.gateway.endpoints.EndPointElementServer.QUERY_PARAM_IDS;
+import static org.springframework.http.HttpStatus.*;
 
 /**
  * @author Slimane Amar <slimane.amar at rte-france.com>
@@ -91,11 +92,11 @@ public class ElementAccessControllerGlobalPreFilter extends AbstractGlobalPreFil
 
         // Is a method allowed ?
         if (!endPointElementServer.isAllowedMethod(exchange.getRequest().getMethod())) {
-            return completeWithCode(exchange, HttpStatus.FORBIDDEN);
+            return completeWithCode(exchange, FORBIDDEN);
         }
 
         Optional<AccessControlInfos> accessControlInfos = endPointElementServer.getAccessControlInfos(exchange.getRequest());
-        return accessControlInfos.isEmpty() ? completeWithCode(exchange, HttpStatus.FORBIDDEN) : isAccessAllowed(exchange, chain, accessControlInfos.get());
+        return accessControlInfos.isEmpty() ? completeWithCode(exchange, FORBIDDEN) : isAccessAllowed(exchange, chain, accessControlInfos.get());
     }
 
     private Mono<Void> isAccessAllowed(ServerWebExchange exchange, GatewayFilterChain chain, AccessControlInfos accessControlInfos) {
@@ -111,16 +112,15 @@ public class ElementAccessControllerGlobalPreFilter extends AbstractGlobalPreFil
             )
             .header(HEADER_USER_ID, Objects.requireNonNull(httpHeaders.get(HEADER_USER_ID)).get(0))
             .exchangeToMono(response -> {
-                switch (response.statusCode()) {
-                    case OK:
-                        return chain.filter(exchange);
-                    case NOT_FOUND:
-                        return completeWithCode(exchange, HttpStatus.NOT_FOUND);
-                    case FORBIDDEN:
-                        return completeWithCode(exchange, HttpStatus.FORBIDDEN);
-                    default:
-                        return response.createException().flatMap(Mono::error);
+                HttpStatusCode httpStatusCode = response.statusCode();
+                if (httpStatusCode.equals(OK)) {
+                    return chain.filter(exchange);
+                } else if (httpStatusCode.equals(NOT_FOUND)) {
+                    return completeWithCode(exchange, NOT_FOUND);
+                } else if (httpStatusCode.equals(FORBIDDEN)) {
+                    return completeWithCode(exchange, FORBIDDEN);
                 }
+                return response.createException().flatMap(Mono::error);
             })
             .publishOn(Schedulers.boundedElastic())
             .log(ROOT_CATEGORY_REACTOR, Level.FINE);
