@@ -58,3 +58,5 @@ gridsuite:
       base-uri: http://localhost:5032
     case-import-server:
       base-uri: http://localhost:5039
+    voltage-init-server:
+      base-uri: http://localhost:5038

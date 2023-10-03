@@ -98,4 +98,7 @@ public class ServiceURIsConfig {
 
     @Value("${gridsuite.services.case-import-server.base-uri:http://case-import-server/}")
     String caseImportServerBaseUri;
+
+    @Value("${gridsuite.services.voltage-init-server.base-uri:http://voltage-init-server/}")
+    String voltageInitServerBaseUri;
 }
