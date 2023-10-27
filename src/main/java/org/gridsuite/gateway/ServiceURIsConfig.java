@@ -101,4 +101,7 @@ public class ServiceURIsConfig {
 
     @Value("${gridsuite.services.voltage-init-server.base-uri:http://voltage-init-server/}")
     String voltageInitServerBaseUri;
+
+    @Value("${gridsuite.services.shortcircuit-server.base-uri:http://shortcircuit-server/}")
+    String shortCircuitServerBaseUri;
 }
