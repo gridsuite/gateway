@@ -60,3 +60,5 @@ gridsuite:
       base-uri: http://localhost:5039
     voltage-init-server:
       base-uri: http://localhost:5038
+    shortcircuit-server:
+      base-uri: http://localhost:5031
