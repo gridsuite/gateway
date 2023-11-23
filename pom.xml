@@ -42,7 +42,7 @@
     </developers>
 
     <properties>
-        <gridsuite-dependencies.version>26</gridsuite-dependencies.version>
+        <gridsuite-dependencies.version>28</gridsuite-dependencies.version>
 
         <nimbus-jose-jwt.version>8.14</nimbus-jose-jwt.version>
         <oauth2-oidc-sdk.version>7.3</oauth2-oidc-sdk.version>
