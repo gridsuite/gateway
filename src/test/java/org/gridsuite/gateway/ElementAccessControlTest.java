@@ -15,6 +15,7 @@ import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
+import org.assertj.core.api.WithAssertions;
 import org.gridsuite.gateway.dto.AccessControlInfos;
 import org.gridsuite.gateway.endpoints.ExploreServer;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,8 +33,6 @@ import java.util.List;
 import java.util.UUID;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * @author Slimane Amar <slimane.amar at rte-france.com>
@@ -48,7 +47,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
     "gridsuite.services.sensitivity-analysis-server.base-uri=http://localhost:${wiremock.server.port}",
 })
 @AutoConfigureWireMock(port = 0)
-class ElementAccessControlTest {
+class ElementAccessControlTest implements WithAssertions {
 
     @Value("${wiremock.server.port}")
     int port;
@@ -524,10 +523,7 @@ class ElementAccessControlTest {
 
     @Test
     void testAccessControlInfos() {
-        List<UUID> emptyList = List.of();
-
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> AccessControlInfos.create(emptyList));
-        assertEquals("List of elements is empty", exception.getMessage());
+        assertThatIllegalArgumentException().isThrownBy(() -> AccessControlInfos.create(List.of())).withMessage("List of elements is empty");
     }
 
     private void initStubForJwk() {

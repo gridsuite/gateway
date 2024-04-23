@@ -18,7 +18,7 @@ import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
-import org.junit.jupiter.api.Assertions;
+import org.assertj.core.api.WithAssertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -73,7 +73,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.*;
     "allowed-issuers=http://localhost:${wiremock.server.port}"
 })
 @AutoConfigureWireMock(port = 0)
-class TokenValidationTest {
+class TokenValidationTest implements WithAssertions {
 
     @Value("${wiremock.server.port}")
     int port;
@@ -186,11 +186,11 @@ class TokenValidationTest {
             }
         }
         if (!done) {
-            Assertions.fail("Wiremock didn't receive the websocket connection");
+            fail("Wiremock didn't receive the websocket connection");
         }
         try {
             wsconnection.timeout(Duration.ofMillis(100)).block();
-            Assertions.fail("websocket client was closed but should remain open");
+            fail("websocket client was closed but should remain open");
         } catch (Exception ignored) {
             //should timeout
         }
@@ -550,7 +550,7 @@ class TokenValidationTest {
                 .exchange()
                 .expectStatus().isEqualTo(401);
 
-        //test with a incorrect Authorization value
+        //test with an incorrect Authorization value
         webClient
                 .get().uri("case/v1/cases")
                 .header("Authorization", token)
@@ -559,9 +559,8 @@ class TokenValidationTest {
 
         // test without a token
         WebSocketClient client = new StandardWebSocketClient();
-        client.execute(URI.create("ws://localhost:" +
-                this.localServerPort + "/study-notification/notify"),
-            ws -> ws.receive().then()).doOnSuccess(s -> Assertions.fail("Should have thrown"));
+        client.execute(URI.create("ws://localhost:" + this.localServerPort + "/study-notification/notify"), ws -> ws.receive().then())
+              .doOnSuccess(s -> fail("Should have thrown"));
     }
 
     @Test
