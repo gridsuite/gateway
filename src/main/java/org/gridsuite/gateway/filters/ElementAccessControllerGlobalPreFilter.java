@@ -72,31 +72,34 @@ public class ElementAccessControllerGlobalPreFilter extends AbstractGlobalPreFil
 
         RequestPath path = exchange.getRequest().getPath();
 
-        // Filter only requests to the endpoint servers with this pattern : /v<number>/<appli_root_path>
+        // Filter only requests to the endpoint servers with this pattern: /v<number>/<appli_root_path>
         if (!Pattern.matches("/v(\\d)+/.*", path.value())) {
             return chain.filter(exchange);
         }
 
-        // Is an elements' endpoint with a controlled access ?
-        String endPointServiceName = Objects.requireNonNull((String) (Objects.requireNonNull((Route) exchange.getAttribute(ServerWebExchangeUtils.GATEWAY_ROUTE_ATTR)).getMetadata()).get(END_POINT_SERVICE_NAME));
-        EndPointServer endPointServer = applicationContext.containsBean(endPointServiceName) ? (EndPointServer) applicationContext.getBean(endPointServiceName) : null;
-        if (endPointServer == null || !endPointServer.hasElementsAccessControl()) {
+        // Is an elements' endpoint with controlled access?
+        final EndPointServer endPointServer = Optional.ofNullable((Route) exchange.getAttribute(ServerWebExchangeUtils.GATEWAY_ROUTE_ATTR))
+                .map(Route::getMetadata)
+                .map(metadata -> (String) metadata.get(END_POINT_SERVICE_NAME))
+                .map(endPointServiceName -> applicationContext.containsBean(endPointServiceName) ? (EndPointServer) applicationContext.getBean(endPointServiceName) : null)
+                .orElse(null);
+        if (!(endPointServer instanceof EndPointElementServer endPointElementServer)) {
             return chain.filter(exchange);
         }
 
-        // Is a root path with a controlled access ?
-        EndPointElementServer endPointElementServer = (EndPointElementServer) endPointServer;
+        // Is a root path with controlled access?
         if (endPointElementServer.isNotControlledRootPath(path.elements().get(3).value())) {
             return chain.filter(exchange);
         }
 
-        // Is a method allowed ?
+        // Is a method allowed?
         if (!endPointElementServer.isAllowedMethod(exchange.getRequest().getMethod())) {
             return completeWithCode(exchange, FORBIDDEN);
         }
 
-        Optional<AccessControlInfos> accessControlInfos = endPointElementServer.getAccessControlInfos(exchange.getRequest());
-        return accessControlInfos.isEmpty() ? completeWithCode(exchange, FORBIDDEN) : isAccessAllowed(exchange, chain, accessControlInfos.get());
+        return endPointElementServer.getAccessControlInfos(exchange.getRequest())
+                                    .map(controlInfos -> isAccessAllowed(exchange, chain, controlInfos))
+                                    .orElseGet(() -> completeWithCode(exchange, FORBIDDEN));
     }
 
     private Mono<Void> isAccessAllowed(ServerWebExchange exchange, GatewayFilterChain chain, AccessControlInfos accessControlInfos) {
