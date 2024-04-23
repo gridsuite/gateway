@@ -51,11 +51,6 @@ public class ExploreServer implements EndPointElementServer {
     }
 
     @Override
-    public boolean hasElementsAccessControl() {
-        return true;
-    }
-
-    @Override
     public Optional<AccessControlInfos> getAccessControlInfos(@NonNull ServerHttpRequest request) {
         RequestPath path = Objects.requireNonNull(request.getPath());
         UUID elementUuid = getElementUuidIfExist(path);

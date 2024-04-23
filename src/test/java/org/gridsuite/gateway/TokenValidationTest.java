@@ -88,7 +88,7 @@ public class TokenValidationTest {
 
     private String expiredToken;
 
-    private String tokenWithNotAllowedissuer;
+    private String tokenWithNotAllowedIssuer;
 
     private RSAKey rsaKey;
 
@@ -157,7 +157,7 @@ public class TokenValidationTest {
         token = signedJWT.serialize();
         token2 = signedJWT2.serialize();
         expiredToken = signedJWTExpired.serialize();
-        tokenWithNotAllowedissuer = signedJWTWithIssuerNotAllowed.serialize();
+        tokenWithNotAllowedIssuer = signedJWTWithIssuerNotAllowed.serialize();
     }
 
     private void testWebsocket(String name) throws InterruptedException {
@@ -524,7 +524,7 @@ public class TokenValidationTest {
         //test with with not allowed issuer
         webClient
                 .get().uri("case/v1/cases")
-                .header("Authorization", "Bearer " + tokenWithNotAllowedissuer)
+                .header("Authorization", "Bearer " + tokenWithNotAllowedIssuer)
                 .exchange()
                 .expectStatus().isEqualTo(401);
 
