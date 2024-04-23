@@ -48,11 +48,10 @@ public class ElementAccessControllerGlobalPreFilter extends AbstractGlobalPreFil
     private static final Logger LOGGER = LoggerFactory.getLogger(ElementAccessControllerGlobalPreFilter.class);
 
     private static final String ROOT_CATEGORY_REACTOR = "reactor.";
-
     private static final String ELEMENTS_ROOT_PATH = "elements";
+    private static final Pattern PATH_API_VERSION = Pattern.compile("^/v(\\d)+/.*");
 
     private final WebClient webClient;
-
     private final ApplicationContext applicationContext;
 
     public ElementAccessControllerGlobalPreFilter(ApplicationContext context, ServiceURIsConfig servicesURIsConfig, WebClient.Builder webClientBuilder) {
@@ -73,7 +72,7 @@ public class ElementAccessControllerGlobalPreFilter extends AbstractGlobalPreFil
         RequestPath path = exchange.getRequest().getPath();
 
         // Filter only requests to the endpoint servers with this pattern: /v<number>/<appli_root_path>
-        if (!Pattern.matches("/v(\\d)+/.*", path.value())) {
+        if (!PATH_API_VERSION.matcher(path.value()).matches()) {
             return chain.filter(exchange);
         }
 
