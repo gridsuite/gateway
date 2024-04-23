@@ -18,15 +18,15 @@ import java.util.stream.Collectors;
 import static org.springframework.http.HttpMethod.*;
 
 /**
+ * {@link EndPointServer Server} with access allowed under defined rules
+ *
  * @author Slimane Amar <slimane.amar at rte-france.com>
  */
-public interface EndPointElementServer extends EndPointServer {
+public interface EndPointAccessControlledServer extends EndPointServer {
 
     String QUERY_PARAM_IDS = "ids";
 
-    Set<HttpMethod> ALLOWED_HTTP_METHODS = Set.of(GET, HEAD,
-            PUT, POST, DELETE
-    );
+    Set<HttpMethod> ALLOWED_HTTP_METHODS = Set.of(GET, HEAD, PUT, POST, DELETE);
 
     static UUID getUuid(String uuid) {
         try {
@@ -52,11 +52,6 @@ public interface EndPointElementServer extends EndPointServer {
         return getUncontrolledRootPaths().contains(rootPath);
     }
 
-    @Override
-    default boolean hasElementsAccessControl() {
-        return true;
-    }
-
     default Optional<AccessControlInfos> getAccessControlInfos(@NonNull ServerHttpRequest request) {
         RequestPath path = Objects.requireNonNull(request.getPath());
         UUID elementUuid = getElementUuidIfExist(path);
@@ -71,7 +66,7 @@ public interface EndPointElementServer extends EndPointServer {
                     return Optional.empty();
                 } else {
                     List<String> ids = request.getQueryParams().get(QUERY_PARAM_IDS);
-                    List<UUID> elementUuids = ids.stream().map(EndPointElementServer::getUuid).filter(Objects::nonNull).collect(Collectors.toList());
+                    List<UUID> elementUuids = ids.stream().map(EndPointAccessControlledServer::getUuid).filter(Objects::nonNull).collect(Collectors.toList());
                     return elementUuids.size() == ids.size() ? Optional.of(AccessControlInfos.create(elementUuids)) : Optional.empty();
                 }
             }

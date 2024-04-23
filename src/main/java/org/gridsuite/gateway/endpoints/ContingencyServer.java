@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
  * @author Slimane Amar <slimane.amar at rte-france.com>
  */
 @Component(value = ContingencyServer.ENDPOINT_NAME)
-public class ContingencyServer implements EndPointElementServer {
+public class ContingencyServer implements EndPointAccessControlledServer {
 
     public static final String ENDPOINT_NAME = "actions";
 

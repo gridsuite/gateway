@@ -23,7 +23,7 @@ import java.util.UUID;
  * @author Slimane Amar <slimane.amar at rte-france.com>
  */
 @Component(value = ExploreServer.ENDPOINT_NAME)
-public class ExploreServer implements EndPointElementServer {
+public class ExploreServer implements EndPointAccessControlledServer {
 
     public static final String ENDPOINT_NAME = "explore";
 
@@ -37,7 +37,7 @@ public class ExploreServer implements EndPointElementServer {
 
     @Override
     public UUID getElementUuidIfExist(@NonNull RequestPath path) {
-        return (path.elements().size() > 7) ? EndPointElementServer.getUuid(path.elements().get(7).value()) : null;
+        return (path.elements().size() > 7) ? EndPointAccessControlledServer.getUuid(path.elements().get(7).value()) : null;
     }
 
     @Override
@@ -48,11 +48,6 @@ public class ExploreServer implements EndPointElementServer {
     @Override
     public String getEndpointName() {
         return ENDPOINT_NAME;
-    }
-
-    @Override
-    public boolean hasElementsAccessControl() {
-        return true;
     }
 
     @Override
@@ -69,12 +64,12 @@ public class ExploreServer implements EndPointElementServer {
                 if (ids == null || ids.size() != 1) {
                     return Optional.empty();
                 } else {
-                    UUID uuid = EndPointElementServer.getUuid(ids.get(0));
+                    UUID uuid = EndPointAccessControlledServer.getUuid(ids.get(0));
                     return uuid == null ? Optional.empty() : Optional.of(AccessControlInfos.create(List.of(uuid)));
                 }
             }
         } else {
-            return EndPointElementServer.super.getAccessControlInfos(request);
+            return EndPointAccessControlledServer.super.getAccessControlInfos(request);
         }
     }
 }

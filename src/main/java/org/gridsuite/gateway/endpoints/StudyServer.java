@@ -15,7 +15,7 @@ import java.util.Set;
  * @author Slimane Amar <slimane.amar at rte-france.com>
  */
 @Component(value = StudyServer.ENDPOINT_NAME)
-public class StudyServer implements EndPointElementServer {
+public class StudyServer implements EndPointAccessControlledServer {
 
     public static final String ENDPOINT_NAME = "study";
 

@@ -14,6 +14,9 @@ import org.springframework.cloud.gateway.route.builder.PredicateSpec;
 import static org.gridsuite.gateway.GatewayConfig.END_POINT_SERVICE_NAME;
 
 /**
+ * Declare a service/server accessible on this gateway under path {@code <host_gateway>/<service_name>/*}
+ * and redirect it to {@code <host_service>/*}.
+ *
  * @author Slimane Amar <slimane.amar at rte-france.com>
  */
 public interface EndPointServer {
@@ -26,9 +29,5 @@ public interface EndPointServer {
             .filters(f -> f.rewritePath(String.format("/%s/(.*)", getEndpointName()), "/$1"))
             .metadata(END_POINT_SERVICE_NAME, getEndpointName())
             .uri(getEndpointBaseUri());
-    }
-
-    default boolean hasElementsAccessControl() {
-        return false;
     }
 }
