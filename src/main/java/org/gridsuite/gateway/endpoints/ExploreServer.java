@@ -28,6 +28,7 @@ public class ExploreServer implements EndPointElementServer {
     public static final String ENDPOINT_NAME = "explore";
 
     public static final String QUERY_PARAM_PARENT_DIRECTORY_ID = "parentDirectoryUuid";
+    public static final String QUERY_PARAM_DUPLICATE_FROM_ID = "duplicateFrom";
 
     private final ServiceURIsConfig servicesURIsConfig;
 
@@ -65,12 +66,18 @@ public class ExploreServer implements EndPointElementServer {
             if (elementUuid != null) {
                 return Optional.of(AccessControlInfos.create(List.of(elementUuid)));
             } else {
-                List<String> ids = request.getQueryParams().get(QUERY_PARAM_PARENT_DIRECTORY_ID);
-                if (ids == null || ids.size() != 1) {
-                    return Optional.empty();
-                } else {
-                    UUID uuid = EndPointElementServer.getUuid(ids.get(0));
+                List<String> creationIds = request.getQueryParams().get(QUERY_PARAM_PARENT_DIRECTORY_ID);
+                List<String> duplicationIds = request.getQueryParams().get(QUERY_PARAM_DUPLICATE_FROM_ID);
+                if (creationIds != null && creationIds.size() == 1) {
+                    UUID uuid = EndPointElementServer.getUuid(creationIds.get(0));
                     return uuid == null ? Optional.empty() : Optional.of(AccessControlInfos.create(List.of(uuid)));
+                } else {
+                    if (duplicationIds != null && duplicationIds.size() == 1) {
+                        UUID uuid = EndPointElementServer.getUuid(duplicationIds.get(0));
+                        return uuid == null ? Optional.empty() : Optional.of(AccessControlInfos.create(List.of(uuid)));
+                    } else {
+                        return Optional.empty();
+                    }
                 }
             }
         } else {
