@@ -10,7 +10,7 @@ package org.gridsuite.gateway.filters;
 import lombok.NonNull;
 import org.gridsuite.gateway.ServiceURIsConfig;
 import org.gridsuite.gateway.dto.AccessControlInfos;
-import org.gridsuite.gateway.endpoints.EndPointElementServer;
+import org.gridsuite.gateway.endpoints.EndPointAccessControlledServer;
 import org.gridsuite.gateway.endpoints.EndPointServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,7 +36,7 @@ import java.util.regex.Pattern;
 
 import static org.gridsuite.gateway.GatewayConfig.END_POINT_SERVICE_NAME;
 import static org.gridsuite.gateway.GatewayConfig.HEADER_USER_ID;
-import static org.gridsuite.gateway.endpoints.EndPointElementServer.QUERY_PARAM_IDS;
+import static org.gridsuite.gateway.endpoints.EndPointAccessControlledServer.QUERY_PARAM_IDS;
 import static org.springframework.http.HttpStatus.*;
 
 /**
@@ -82,23 +82,23 @@ public class ElementAccessControllerGlobalPreFilter extends AbstractGlobalPreFil
                 .map(metadata -> (String) metadata.get(END_POINT_SERVICE_NAME))
                 .map(endPointServiceName -> applicationContext.containsBean(endPointServiceName) ? (EndPointServer) applicationContext.getBean(endPointServiceName) : null)
                 .orElse(null);
-        if (!(endPointServer instanceof EndPointElementServer endPointElementServer)) {
+        if (!(endPointServer instanceof EndPointAccessControlledServer accessControlledServer)) {
             return chain.filter(exchange);
         }
 
         // Is a root path with controlled access?
-        if (endPointElementServer.isNotControlledRootPath(path.elements().get(3).value())) {
+        if (accessControlledServer.isNotControlledRootPath(path.elements().get(3).value())) {
             return chain.filter(exchange);
         }
 
         // Is a method allowed?
-        if (!endPointElementServer.isAllowedMethod(exchange.getRequest().getMethod())) {
+        if (!accessControlledServer.isAllowedMethod(exchange.getRequest().getMethod())) {
             return completeWithCode(exchange, FORBIDDEN);
         }
 
-        return endPointElementServer.getAccessControlInfos(exchange.getRequest())
-                                    .map(controlInfos -> isAccessAllowed(exchange, chain, controlInfos))
-                                    .orElseGet(() -> completeWithCode(exchange, FORBIDDEN));
+        return accessControlledServer.getAccessControlInfos(exchange.getRequest())
+                                     .map(controlInfos -> isAccessAllowed(exchange, chain, controlInfos))
+                                     .orElseGet(() -> completeWithCode(exchange, FORBIDDEN));
     }
 
     private Mono<Void> isAccessAllowed(ServerWebExchange exchange, GatewayFilterChain chain, AccessControlInfos accessControlInfos) {

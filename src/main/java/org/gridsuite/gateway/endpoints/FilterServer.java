@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
  * @author Slimane Amar <slimane.amar at rte-france.com>
  */
 @Component(value = FilterServer.ENDPOINT_NAME)
-public class FilterServer implements EndPointElementServer {
+public class FilterServer implements EndPointAccessControlledServer {
 
     public static final String ENDPOINT_NAME = "filter";
 

@@ -22,7 +22,7 @@ import static org.springframework.http.HttpMethod.*;
  *
  * @author Slimane Amar <slimane.amar at rte-france.com>
  */
-public interface EndPointElementServer extends EndPointServer {
+public interface EndPointAccessControlledServer extends EndPointServer {
 
     String QUERY_PARAM_IDS = "ids";
 
@@ -66,7 +66,7 @@ public interface EndPointElementServer extends EndPointServer {
                     return Optional.empty();
                 } else {
                     List<String> ids = request.getQueryParams().get(QUERY_PARAM_IDS);
-                    List<UUID> elementUuids = ids.stream().map(EndPointElementServer::getUuid).filter(Objects::nonNull).collect(Collectors.toList());
+                    List<UUID> elementUuids = ids.stream().map(EndPointAccessControlledServer::getUuid).filter(Objects::nonNull).collect(Collectors.toList());
                     return elementUuids.size() == ids.size() ? Optional.of(AccessControlInfos.create(elementUuids)) : Optional.empty();
                 }
             }
