@@ -17,15 +17,14 @@ import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import org.gridsuite.gateway.dto.AccessControlInfos;
 import org.gridsuite.gateway.endpoints.ExploreServer;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
 import org.springframework.cloud.contract.wiremock.AutoConfigureWireMock;
 import org.springframework.http.HttpStatus;
-import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 import java.util.Date;
@@ -33,26 +32,23 @@ import java.util.List;
 import java.util.UUID;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * @author Slimane Amar <slimane.amar at rte-france.com>
  */
-@RunWith(SpringRunner.class)
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-    properties = {
-        "gridsuite.services.directory-server.base-uri=http://localhost:${wiremock.server.port}",
-        "gridsuite.services.explore-server.base-uri=http://localhost:${wiremock.server.port}",
-        "gridsuite.services.study-server.base-uri=http://localhost:${wiremock.server.port}",
-        "gridsuite.services.actions-server.base-uri=http://localhost:${wiremock.server.port}",
-        "gridsuite.services.filter-server.base-uri=http://localhost:${wiremock.server.port}",
-        "gridsuite.services.user-admin-server.base-uri=http://localhost:${wiremock.server.port}",
-        "gridsuite.services.sensitivity-analysis-server.base-uri=http://localhost:${wiremock.server.port}",
-    }
-)
+@SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT, properties = {
+    "gridsuite.services.directory-server.base-uri=http://localhost:${wiremock.server.port}",
+    "gridsuite.services.explore-server.base-uri=http://localhost:${wiremock.server.port}",
+    "gridsuite.services.study-server.base-uri=http://localhost:${wiremock.server.port}",
+    "gridsuite.services.actions-server.base-uri=http://localhost:${wiremock.server.port}",
+    "gridsuite.services.filter-server.base-uri=http://localhost:${wiremock.server.port}",
+    "gridsuite.services.user-admin-server.base-uri=http://localhost:${wiremock.server.port}",
+    "gridsuite.services.sensitivity-analysis-server.base-uri=http://localhost:${wiremock.server.port}",
+})
 @AutoConfigureWireMock(port = 0)
-public class ElementAccessControlTest {
+class ElementAccessControlTest {
 
     @Value("${wiremock.server.port}")
     int port;
@@ -69,7 +65,7 @@ public class ElementAccessControlTest {
 
     private RSAKey rsaKey;
 
-    @Before
+    @BeforeEach
     public void prepareToken() throws JOSEException {
         // RSA signatures require a public and private RSA key pair, the public key
         // must be made known to the JWS recipient in order to verify the signatures
@@ -112,7 +108,7 @@ public class ElementAccessControlTest {
     }
 
     @Test
-    public void testWithNoControl() {
+    void testWithNoControl() {
         initStubForJwk();
 
         // No control for directory server (made inside the endpoint)
@@ -177,7 +173,7 @@ public class ElementAccessControlTest {
     }
 
     @Test
-    public void testGetElements() {
+    void testGetElements() {
         initStubForJwk();
 
         UUID uuid = UUID.randomUUID();
@@ -271,7 +267,7 @@ public class ElementAccessControlTest {
     }
 
     @Test
-    public void testCreateElements() {
+    void testCreateElements() {
         initStubForJwk();
 
         UUID uuid = UUID.randomUUID();
@@ -368,7 +364,7 @@ public class ElementAccessControlTest {
     }
 
     @Test
-    public void testCreateSubElements() {
+    void testCreateSubElements() {
         initStubForJwk();
 
         UUID uuid = UUID.randomUUID();
@@ -394,7 +390,7 @@ public class ElementAccessControlTest {
     }
 
     @Test
-    public void testUpdateElements() {
+    void testUpdateElements() {
         initStubForJwk();
 
         UUID uuid = UUID.randomUUID();
@@ -453,7 +449,7 @@ public class ElementAccessControlTest {
     }
 
     @Test
-    public void testDeleteElements() {
+    void testDeleteElements() {
         initStubForJwk();
 
         UUID uuid = UUID.randomUUID();
@@ -527,7 +523,7 @@ public class ElementAccessControlTest {
     }
 
     @Test
-    public void testAccessControlInfos() {
+    void testAccessControlInfos() {
         List<UUID> emptyList = List.of();
 
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> AccessControlInfos.create(emptyList));
