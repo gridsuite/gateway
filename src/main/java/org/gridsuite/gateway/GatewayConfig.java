@@ -6,14 +6,14 @@
  */
 package org.gridsuite.gateway;
 
-import org.gridsuite.gateway.endpoints.CgmesGlServer;
-import org.gridsuite.gateway.endpoints.*;
+import org.gridsuite.gateway.endpoints.EndPointServer;
 import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
-import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.PropertySource;
+
+import java.util.List;
 
 /**
  * @author Chamseddine Benhamed <chamseddine.benhamed at rte-france.com>
@@ -30,36 +30,11 @@ public class GatewayConfig {
     public static final String HEADER_CLIENT_ID = "clientId";
 
     @Bean
-    public RouteLocator myRoutes(RouteLocatorBuilder builder, ApplicationContext context) {
-        return builder.routes()
-            .route(p -> context.getBean(StudyServer.class).getRoute(p))
-            .route(p -> context.getBean(CaseServer.class).getRoute(p))
-            .route(p -> context.getBean(MergeServer.class).getRoute(p))
-            .route(p -> context.getBean(StudyNotificationServer.class).getRoute(p))
-            .route(p -> context.getBean(MergeNotificationServer.class).getRoute(p))
-            .route(p -> context.getBean(DirectoryNotificationServer.class).getRoute(p))
-            .route(p -> context.getBean(ContingencyServer.class).getRoute(p))
-            .route(p -> context.getBean(ConfigServer.class).getRoute(p))
-            .route(p -> context.getBean(ConfigNotificationServer.class).getRoute(p))
-            .route(p -> context.getBean(DirectoryServer.class).getRoute(p))
-            .route(p -> context.getBean(ExploreServer.class).getRoute(p))
-            .route(p -> context.getBean(CgmesBoundaryServer.class).getRoute(p))
-            .route(p -> context.getBean(DynamicMappingServer.class).getRoute(p))
-            .route(p -> context.getBean(FilterServer.class).getRoute(p))
-            .route(p -> context.getBean(ReportServer.class).getRoute(p))
-            .route(p -> context.getBean(NetworkModificationServer.class).getRoute(p))
-            .route(p -> context.getBean(NetworkConversionServer.class).getRoute(p))
-            .route(p -> context.getBean(OdreServer.class).getRoute(p))
-            .route(p -> context.getBean(GeoDataServer.class).getRoute(p))
-            .route(p -> context.getBean(UserAdminServer.class).getRoute(p))
-            .route(p -> context.getBean(CgmesGlServer.class).getRoute(p))
-            .route(p -> context.getBean(SensitivityAnalysisServer.class).getRoute(p))
-            .route(p -> context.getBean(LoadFlowServer.class).getRoute(p))
-            .route(p -> context.getBean(SecurityAnalysisServer.class).getRoute(p))
-            .route(p -> context.getBean(DynamicSimulationServer.class).getRoute(p))
-            .route(p -> context.getBean(CaseImportServer.class).getRoute(p))
-            .route(p -> context.getBean(VoltageInitServer.class).getRoute(p))
-            .route(p -> context.getBean(ShortCircuitServer.class).getRoute(p))
-            .build();
+    public RouteLocator myRoutes(RouteLocatorBuilder builder, List<EndPointServer> servers) {
+        final RouteLocatorBuilder.Builder routes = builder.routes();
+        for (final EndPointServer server : servers) {
+            routes.route(server.getClass().getName(), server::getRoute);
+        }
+        return routes.build();
     }
 }
