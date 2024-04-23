@@ -16,12 +16,12 @@ import reactor.core.publisher.Mono;
 /**
  * @author Slimane Amar <slimane.amar at rte-france.com>
  */
-public abstract class AbstractGlobalPreFilter implements GlobalFilter, Ordered {
+abstract class AbstractGlobalPreFilter implements GlobalFilter, Ordered {
 
     protected Mono<Void> completeWithCode(ServerWebExchange exchange, HttpStatus code) {
         exchange.getResponse().setStatusCode(code);
         if ("websocket".equalsIgnoreCase(exchange.getRequest().getHeaders().getUpgrade())) {
-            // Force the connection to close for websockets handshakes to workaround apache
+            // Force the connection to close for websockets handshakes to work around apache
             // httpd reusing the connection for all subsequent requests in this connection.
             exchange.getResponse().getHeaders().set(HttpHeaders.CONNECTION, "close");
         }
