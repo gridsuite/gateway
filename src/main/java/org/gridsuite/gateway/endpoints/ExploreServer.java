@@ -71,14 +71,12 @@ public class ExploreServer implements EndPointElementServer {
                 if (creationIds != null && creationIds.size() == 1) {
                     UUID uuid = EndPointElementServer.getUuid(creationIds.get(0));
                     return uuid == null ? Optional.empty() : Optional.of(AccessControlInfos.create(List.of(uuid)));
-                } else {
-                    if (duplicationIds != null && duplicationIds.size() == 1) {
-                        UUID uuid = EndPointElementServer.getUuid(duplicationIds.get(0));
-                        return uuid == null ? Optional.empty() : Optional.of(AccessControlInfos.create(List.of(uuid)));
-                    } else {
-                        return Optional.empty();
-                    }
                 }
+                if (duplicationIds != null && duplicationIds.size() == 1) {
+                    UUID uuid = EndPointElementServer.getUuid(duplicationIds.get(0));
+                    return uuid == null ? Optional.empty() : Optional.of(AccessControlInfos.create(List.of(uuid)));
+                }
+                return Optional.empty();
             }
         } else {
             return EndPointElementServer.super.getAccessControlInfos(request);
