@@ -551,4 +551,34 @@ public class ElementAccessControlTest {
                 .withHeader("Content-Type", "application/json")
                 .withBody("{\"keys\" : [ " + rsaKey.toJSONString() + " ] }")));
     }
+
+    @Test
+    public void testDuplicateElements() {
+        initStubForJwk();
+
+        UUID uuid = UUID.randomUUID();
+
+        // user1 allowed
+        stubFor(head(urlEqualTo(String.format("/v1/directories?ids=%s", uuid))).withPort(port).withHeader("userId", equalTo("user1"))
+                .willReturn(aResponse()));
+        stubFor(head(urlEqualTo(String.format("/v1/elements?ids=%s", uuid))).withPort(port).withHeader("userId", equalTo("user1"))
+                .willReturn(aResponse()));
+
+        stubFor(post(urlEqualTo(String.format("/v1/explore/studies/%s?%s=%s", "study1", ExploreServer.QUERY_PARAM_DUPLICATE_FROM_ID, uuid))).withHeader("userId", equalTo("user1"))
+                .willReturn(aResponse()));
+
+        // Direct creation of elements without going through the explor server is forbidden
+        webClient
+                .post().uri("study/v1/studies")
+                .header("Authorization", "Bearer " + tokenUser1)
+                .exchange()
+                .expectStatus().isForbidden();
+
+        webClient
+                .post().uri(String.format("explore/v1/explore/studies/%s?%s=%s", "study1", ExploreServer.QUERY_PARAM_DUPLICATE_FROM_ID, uuid))
+                .header("Authorization", "Bearer " + tokenUser1)
+                .exchange()
+                .expectStatus().isOk();
+    }
+
 }
