@@ -66,14 +66,14 @@ public class ExploreServer implements EndPointElementServer {
             if (elementUuid != null) {
                 return Optional.of(AccessControlInfos.create(List.of(elementUuid)));
             } else {
-                List<String> creationIds = request.getQueryParams().get(QUERY_PARAM_PARENT_DIRECTORY_ID);
-                List<String> duplicationIds = request.getQueryParams().get(QUERY_PARAM_DUPLICATE_FROM_ID);
-                if (creationIds != null && creationIds.size() == 1) {
-                    UUID uuid = EndPointElementServer.getUuid(creationIds.get(0));
+                List<String> parentDirectoryIds = request.getQueryParams().get(QUERY_PARAM_PARENT_DIRECTORY_ID);
+                List<String> sourceElementIds = request.getQueryParams().get(QUERY_PARAM_DUPLICATE_FROM_ID);
+                if (parentDirectoryIds != null && parentDirectoryIds.size() == 1) {
+                    UUID uuid = EndPointElementServer.getUuid(parentDirectoryIds.get(0));
                     return uuid == null ? Optional.empty() : Optional.of(AccessControlInfos.create(List.of(uuid)));
                 }
-                if (duplicationIds != null && duplicationIds.size() == 1) {
-                    UUID uuid = EndPointElementServer.getUuid(duplicationIds.get(0));
+                if (sourceElementIds != null && sourceElementIds.size() == 1) {
+                    UUID uuid = EndPointElementServer.getUuid(sourceElementIds.get(0));
                     return uuid == null ? Optional.empty() : Optional.of(AccessControlInfos.create(List.of(uuid)));
                 }
                 return Optional.empty();
