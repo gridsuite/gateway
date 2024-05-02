@@ -288,13 +288,13 @@ public class ElementAccessControlTest {
         stubFor(head(urlEqualTo(String.format("/v1/elements?ids=%s", uuid))).withPort(port).withHeader("userId", equalTo("user2"))
             .willReturn(aResponse().withStatus(HttpStatus.FORBIDDEN.value())));
 
-        stubFor(post(urlEqualTo(String.format("/v1/explore/studies/%s?%s=%s", "study1", ExploreServer.QUERY_PARAM_PARENT_DIRECTORY_ID, uuid))).withHeader("userId", equalTo("user1"))
+        stubFor(post(urlEqualTo(String.format("/v1/explore/studies?%s=%s", ExploreServer.QUERY_PARAM_PARENT_DIRECTORY_ID, uuid))).withHeader("userId", equalTo("user1"))
             .willReturn(aResponse()));
 
-        stubFor(post(urlEqualTo(String.format("/v1/explore/script-contingency-lists/%s?%s=%s", "scl1", ExploreServer.QUERY_PARAM_PARENT_DIRECTORY_ID, uuid))).withHeader("userId", equalTo("user1"))
+        stubFor(post(urlEqualTo(String.format("/v1/explore/script-contingency-lists?%s=%s", ExploreServer.QUERY_PARAM_PARENT_DIRECTORY_ID, uuid))).withHeader("userId", equalTo("user1"))
             .willReturn(aResponse()));
 
-        stubFor(post(urlEqualTo(String.format("/v1/explore/filters/%s?%s=%s", "filter1", ExploreServer.QUERY_PARAM_PARENT_DIRECTORY_ID, uuid))).withHeader("userId", equalTo("user1"))
+        stubFor(post(urlEqualTo(String.format("/v1/explore/filters?%s=%s", ExploreServer.QUERY_PARAM_PARENT_DIRECTORY_ID, uuid))).withHeader("userId", equalTo("user1"))
             .willReturn(aResponse()));
 
         // Direct creation of elements without going through the explor server is forbidden
@@ -316,51 +316,51 @@ public class ElementAccessControlTest {
 
         // Creation of elements without directory parent is forbidden
         webClient
-            .post().uri(String.format("explore/v1/explore/studies/%s", "study1"))
+            .post().uri(String.format("explore/v1/explore/studies"))
             .header("Authorization", "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isForbidden();
 
         // Creation of elements with bad parameter for directory parent uuid is forbidden
         webClient
-            .post().uri(String.format("explore/v1/explore/studies/%s?%s=%s", "study1", ExploreServer.QUERY_PARAM_PARENT_DIRECTORY_ID + "bad", uuid))
+            .post().uri(String.format("explore/v1/explore/studies?%s=%s", ExploreServer.QUERY_PARAM_PARENT_DIRECTORY_ID + "bad", uuid))
             .header("Authorization", "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isForbidden();
 
         // Creation of elements with bad directory parent uuid is forbidden
         webClient
-            .post().uri(String.format("explore/v1/explore/studies/%s?%s=%s", "study1", ExploreServer.QUERY_PARAM_PARENT_DIRECTORY_ID, "badUuid"))
+            .post().uri(String.format("explore/v1/explore/studies?%s=%s", ExploreServer.QUERY_PARAM_PARENT_DIRECTORY_ID, "badUuid"))
             .header("Authorization", "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isForbidden();
         webClient
-            .post().uri(String.format("explore/v1/explore/studies/%s?%s=%s", "study1", ExploreServer.QUERY_PARAM_PARENT_DIRECTORY_ID, null))
+            .post().uri(String.format("explore/v1/explore/studies?%s=%s", ExploreServer.QUERY_PARAM_PARENT_DIRECTORY_ID, null))
             .header("Authorization", "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isForbidden();
 
         // Creation of elements with multiple directory parent uuids is forbidden
         webClient
-            .post().uri(String.format("explore/v1/explore/studies/%s?%s=%s,%s", "study1", ExploreServer.QUERY_PARAM_PARENT_DIRECTORY_ID, uuid, uuid))
+            .post().uri(String.format("explore/v1/explore/studies?%s=%s,%s", ExploreServer.QUERY_PARAM_PARENT_DIRECTORY_ID, uuid, uuid))
             .header("Authorization", "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isForbidden();
 
         webClient
-            .post().uri(String.format("explore/v1/explore/studies/%s?%s=%s", "study1", ExploreServer.QUERY_PARAM_PARENT_DIRECTORY_ID, uuid))
+            .post().uri(String.format("explore/v1/explore/studies?%s=%s", ExploreServer.QUERY_PARAM_PARENT_DIRECTORY_ID, uuid))
             .header("Authorization", "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isOk();
 
         webClient
-            .post().uri(String.format("explore/v1/explore/script-contingency-lists/%s?%s=%s", "scl1", ExploreServer.QUERY_PARAM_PARENT_DIRECTORY_ID, uuid))
+            .post().uri(String.format("explore/v1/explore/script-contingency-lists?%s=%s", ExploreServer.QUERY_PARAM_PARENT_DIRECTORY_ID, uuid))
             .header("Authorization", "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isOk();
 
         webClient
-            .post().uri(String.format("explore/v1/explore/filters/%s?%s=%s", "filter1", ExploreServer.QUERY_PARAM_PARENT_DIRECTORY_ID, uuid))
+            .post().uri(String.format("explore/v1/explore/filters?%s=%s", ExploreServer.QUERY_PARAM_PARENT_DIRECTORY_ID, uuid))
             .header("Authorization", "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isOk();
@@ -551,4 +551,34 @@ public class ElementAccessControlTest {
                 .withHeader("Content-Type", "application/json")
                 .withBody("{\"keys\" : [ " + rsaKey.toJSONString() + " ] }")));
     }
+
+    @Test
+    public void testDuplicateElements() {
+        initStubForJwk();
+
+        UUID uuid = UUID.randomUUID();
+
+        // user1 allowed
+        stubFor(head(urlEqualTo(String.format("/v1/directories?ids=%s", uuid))).withPort(port).withHeader("userId", equalTo("user1"))
+                .willReturn(aResponse()));
+        stubFor(head(urlEqualTo(String.format("/v1/elements?ids=%s", uuid))).withPort(port).withHeader("userId", equalTo("user1"))
+                .willReturn(aResponse()));
+
+        stubFor(post(urlEqualTo(String.format("/v1/explore/studies?%s=%s", ExploreServer.QUERY_PARAM_DUPLICATE_FROM_ID, uuid))).withHeader("userId", equalTo("user1"))
+                .willReturn(aResponse()));
+
+        // Direct creation of elements without going through the explor server is forbidden
+        webClient
+                .post().uri("study/v1/studies")
+                .header("Authorization", "Bearer " + tokenUser1)
+                .exchange()
+                .expectStatus().isForbidden();
+
+        webClient
+                .post().uri(String.format("explore/v1/explore/studies?%s=%s", ExploreServer.QUERY_PARAM_DUPLICATE_FROM_ID, uuid))
+                .header("Authorization", "Bearer " + tokenUser1)
+                .exchange()
+                .expectStatus().isOk();
+    }
+
 }
