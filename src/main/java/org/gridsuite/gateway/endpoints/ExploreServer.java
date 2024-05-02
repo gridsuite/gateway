@@ -9,21 +9,21 @@ package org.gridsuite.gateway.endpoints;
 import lombok.NonNull;
 import org.gridsuite.gateway.ServiceURIsConfig;
 import org.gridsuite.gateway.dto.AccessControlInfos;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.server.RequestPath;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 /**
  * @author Slimane Amar <slimane.amar at rte-france.com>
  */
 @Component(value = ExploreServer.ENDPOINT_NAME)
 public class ExploreServer implements EndPointElementServer {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ExploreServer.class);
 
     public static final String ENDPOINT_NAME = "explore";
 
@@ -56,30 +56,51 @@ public class ExploreServer implements EndPointElementServer {
         return true;
     }
 
+    private UUID getUniqueOptionalUuidFromParam(@NonNull ServerHttpRequest request, @NonNull String queryParamName) {
+        List<String> ids = request.getQueryParams().get(queryParamName);
+        if (ids != null && ids.size() != 1) {
+            throw new IllegalArgumentException("There must be only one " + queryParamName);
+        }
+        if (ids != null) {
+            UUID uuid = EndPointElementServer.getUuid(ids.get(0));
+            if (uuid == null) {
+                throw new IllegalArgumentException(queryParamName + " must be an UUID");
+            }
+            return uuid;
+        }
+        return null;
+    }
+
     @Override
     public Optional<AccessControlInfos> getAccessControlInfos(@NonNull ServerHttpRequest request) {
         RequestPath path = Objects.requireNonNull(request.getPath());
         UUID elementUuid = getElementUuidIfExist(path);
-
+        if (Objects.requireNonNull(request.getMethod()) != HttpMethod.POST) {
+            return EndPointElementServer.super.getAccessControlInfos(request);
+        }
         // Elements creation
-        if (Objects.requireNonNull(request.getMethod()) == HttpMethod.POST) {
-            if (elementUuid != null) {
-                return Optional.of(AccessControlInfos.create(List.of(elementUuid)));
-            } else {
-                List<String> parentDirectoryIds = request.getQueryParams().get(QUERY_PARAM_PARENT_DIRECTORY_ID);
-                List<String> sourceElementIds = request.getQueryParams().get(QUERY_PARAM_DUPLICATE_FROM_ID);
-                if (parentDirectoryIds != null && parentDirectoryIds.size() == 1) {
-                    UUID uuid = EndPointElementServer.getUuid(parentDirectoryIds.get(0));
-                    return uuid == null ? Optional.empty() : Optional.of(AccessControlInfos.create(List.of(uuid)));
-                }
-                if (sourceElementIds != null && sourceElementIds.size() == 1) {
-                    UUID uuid = EndPointElementServer.getUuid(sourceElementIds.get(0));
-                    return uuid == null ? Optional.empty() : Optional.of(AccessControlInfos.create(List.of(uuid)));
-                }
+        if (elementUuid != null) {
+            return Optional.of(AccessControlInfos.create(List.of(elementUuid)));
+        }
+        try {
+            List<UUID> uuidsToControl = new ArrayList<>();
+            UUID duplicateFromUuid = getUniqueOptionalUuidFromParam(request, QUERY_PARAM_DUPLICATE_FROM_ID);
+            if (duplicateFromUuid != null) {
+                uuidsToControl.add(duplicateFromUuid);
+            }
+            UUID parentDirectoryUuid = getUniqueOptionalUuidFromParam(request, QUERY_PARAM_PARENT_DIRECTORY_ID);
+            if (parentDirectoryUuid != null) {
+                uuidsToControl.add(parentDirectoryUuid);
+            }
+            if (uuidsToControl.isEmpty()) {
+                // At least one of the param is required
                 return Optional.empty();
             }
-        } else {
-            return EndPointElementServer.super.getAccessControlInfos(request);
+            // Check resources access
+            return Optional.of(AccessControlInfos.create(uuidsToControl));
+        } catch (IllegalArgumentException e) {
+            LOGGER.error(e.getMessage());
+            return Optional.empty();
         }
     }
 }
