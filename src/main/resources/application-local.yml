@@ -62,3 +62,5 @@ gridsuite:
       base-uri: http://localhost:5038
     shortcircuit-server:
       base-uri: http://localhost:5031
+    state-estimation-server:
+      base-uri: http://localhost:5040
