@@ -21,12 +21,6 @@ import org.springframework.context.annotation.Configuration;
 @Setter
 @ConfigurationProperties(prefix = "gateway")
 public class ServiceURIsConfig {
-
-    // to avoid sonar blocking java:S6857 (because ':' found in the default value)
-    public static String getUrl(String host) {
-        return "http://" + host + "/";
-    }
-
     @Value("${powsybl.services.case-server.base-uri:http://case-server/}")
     String caseServerBaseUri;
 
@@ -111,6 +105,6 @@ public class ServiceURIsConfig {
     @Value("${gridsuite.services.shortcircuit-server.base-uri:http://shortcircuit-server/}")
     String shortCircuitServerBaseUri;
 
-    @Value("${gridsuite.services.state-estimation-server.base-uri:#{T(org.gridsuite.gateway.ServiceURIsConfig).getUrl('state-estimation-server')}}")
+    @Value("${gridsuite.services.state-estimation-server.base-uri:http://state-estimation-server/}")
     String stateEstimationServerBaseUri;
 }
