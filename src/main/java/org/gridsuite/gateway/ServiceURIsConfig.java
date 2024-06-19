@@ -104,4 +104,7 @@ public class ServiceURIsConfig {
 
     @Value("${gridsuite.services.shortcircuit-server.base-uri:http://shortcircuit-server/}")
     String shortCircuitServerBaseUri;
+
+    @Value("${gridsuite.services.state-estimation-server.base-uri:http://state-estimation-server/}")
+    String stateEstimationServerBaseUri;
 }
