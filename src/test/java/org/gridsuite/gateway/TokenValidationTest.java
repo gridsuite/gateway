@@ -9,27 +9,28 @@ package org.gridsuite.gateway;
 import com.github.tomakehurst.wiremock.client.VerificationException;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import com.github.tomakehurst.wiremock.extension.responsetemplating.ResponseTemplateTransformer;
-import com.nimbusds.jose.*;
+import com.nimbusds.jose.JOSEException;
+import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.JWSHeader;
+import com.nimbusds.jose.JWSSigner;
 import com.nimbusds.jose.crypto.RSASSASigner;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
-import lombok.SneakyThrows;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.assertj.core.api.WithAssertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.cloud.contract.wiremock.AutoConfigureWireMock;
 import org.springframework.cloud.contract.wiremock.WireMockConfigurationCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.http.HttpHeaders;
-import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.web.reactive.socket.client.StandardWebSocketClient;
 import org.springframework.web.reactive.socket.client.WebSocketClient;
@@ -50,31 +51,29 @@ import static com.github.tomakehurst.wiremock.client.WireMock.*;
 /**
  * @author Chamseddine Benhamed <chamseddine.benhamed at rte-france.com>
  */
-@RunWith(SpringRunner.class)
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-    properties = {"powsybl.services.case-server.base-uri=http://localhost:${wiremock.server.port}",
-        "gridsuite.services.study-server.base-uri=http://localhost:${wiremock.server.port}",
-        "gridsuite.services.merge-orchestrator-server.base-uri=http://localhost:${wiremock.server.port}",
-        "gridsuite.services.merge-notification-server.base-uri=http://localhost:${wiremock.server.port}",
-        "gridsuite.services.directory-notification-server.base-uri=http://localhost:${wiremock.server.port}",
-        "gridsuite.services.actions-server.base-uri=http://localhost:${wiremock.server.port}",
-        "gridsuite.services.study-notification-server.base-uri=http://localhost:${wiremock.server.port}",
-        "gridsuite.services.config-server.base-uri=http://localhost:${wiremock.server.port}",
-        "gridsuite.services.config-notification-server.base-uri=http://localhost:${wiremock.server.port}",
-        "gridsuite.services.directory-server.base-uri=http://localhost:${wiremock.server.port}",
-        "gridsuite.services.explore-server.base-uri=http://localhost:${wiremock.server.port}",
-        "gridsuite.services.cgmes-boundary-server.base-uri=http://localhost:${wiremock.server.port}",
-        "gridsuite.services.dynamic-mapping-server.base-uri=http://localhost:${wiremock.server.port}",
-        "gridsuite.services.filter-server.base-uri=http://localhost:${wiremock.server.port}",
-        "gridsuite.services.report-server.base-uri=http://localhost:${wiremock.server.port}",
-        "gridsuite.services.network-modification-server.base-uri=http://localhost:${wiremock.server.port}",
-        "gridsuite.services.user-admin-server.base-uri=http://localhost:${wiremock.server.port}",
-        "gridsuite.services.sensitivity-analysis-server.base-uri=http://localhost:${wiremock.server.port}",
-        "allowed-issuers=http://localhost:${wiremock.server.port}"
-    })
-
+@SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT, properties = {
+    "powsybl.services.case-server.base-uri=http://localhost:${wiremock.server.port}",
+    "gridsuite.services.study-server.base-uri=http://localhost:${wiremock.server.port}",
+    "gridsuite.services.merge-orchestrator-server.base-uri=http://localhost:${wiremock.server.port}",
+    "gridsuite.services.merge-notification-server.base-uri=http://localhost:${wiremock.server.port}",
+    "gridsuite.services.directory-notification-server.base-uri=http://localhost:${wiremock.server.port}",
+    "gridsuite.services.actions-server.base-uri=http://localhost:${wiremock.server.port}",
+    "gridsuite.services.study-notification-server.base-uri=http://localhost:${wiremock.server.port}",
+    "gridsuite.services.config-server.base-uri=http://localhost:${wiremock.server.port}",
+    "gridsuite.services.config-notification-server.base-uri=http://localhost:${wiremock.server.port}",
+    "gridsuite.services.directory-server.base-uri=http://localhost:${wiremock.server.port}",
+    "gridsuite.services.explore-server.base-uri=http://localhost:${wiremock.server.port}",
+    "gridsuite.services.cgmes-boundary-server.base-uri=http://localhost:${wiremock.server.port}",
+    "gridsuite.services.dynamic-mapping-server.base-uri=http://localhost:${wiremock.server.port}",
+    "gridsuite.services.filter-server.base-uri=http://localhost:${wiremock.server.port}",
+    "gridsuite.services.report-server.base-uri=http://localhost:${wiremock.server.port}",
+    "gridsuite.services.network-modification-server.base-uri=http://localhost:${wiremock.server.port}",
+    "gridsuite.services.user-admin-server.base-uri=http://localhost:${wiremock.server.port}",
+    "gridsuite.services.sensitivity-analysis-server.base-uri=http://localhost:${wiremock.server.port}",
+    "allowed-issuers=http://localhost:${wiremock.server.port}"
+})
 @AutoConfigureWireMock(port = 0)
-public class TokenValidationTest {
+class TokenValidationTest implements WithAssertions {
 
     @Value("${wiremock.server.port}")
     int port;
@@ -97,7 +96,7 @@ public class TokenValidationTest {
     @Autowired
     WebTestClient webClient;
 
-    @Before
+    @BeforeEach
     public void prepareToken() throws JOSEException {
         // RSA signatures require a public and private RSA key pair, the public key
         // must be made known to the JWS recipient in order to verify the signatures
@@ -187,18 +186,18 @@ public class TokenValidationTest {
             }
         }
         if (!done) {
-            Assert.fail("Wiremock didn't receive the websocket connection");
+            fail("Wiremock didn't receive the websocket connection");
         }
         try {
             wsconnection.timeout(Duration.ofMillis(100)).block();
-            Assert.fail("websocket client was closed but should remain open");
+            fail("websocket client was closed but should remain open");
         } catch (Exception ignored) {
             //should timeout
         }
     }
 
     @Test
-    public void gatewayTest() {
+    void gatewayTest() {
         initStubForJwk();
 
         UUID elementUuid = UUID.randomUUID();
@@ -370,8 +369,7 @@ public class TokenValidationTest {
     }
 
     @Test
-    @SneakyThrows
-    public void testWebsockets() {
+    void testWebsockets() throws InterruptedException {
         initStubForJwk();
 
         stubFor(get(urlPathEqualTo("/notify")).withHeader("userId", equalTo("chmits"))
@@ -413,7 +411,7 @@ public class TokenValidationTest {
     }
 
     @Test
-    public void testJwksUpdate() {
+    void testJwksUpdate() {
         stubFor(head(urlEqualTo(String.format("/v1/users/%s", "chmits"))).withPort(port)
                 .willReturn(aResponse().withStatus(200)));
 
@@ -481,7 +479,7 @@ public class TokenValidationTest {
     }
 
     @Test
-    public void invalidToken() {
+    void invalidToken() {
         stubFor(head(urlEqualTo(String.format("/v1/users/%s", "chmits"))).withPort(port)
                 .willReturn(aResponse().withStatus(200)));
 
@@ -552,7 +550,7 @@ public class TokenValidationTest {
                 .exchange()
                 .expectStatus().isEqualTo(401);
 
-        //test with a incorrect Authorization value
+        //test with an incorrect Authorization value
         webClient
                 .get().uri("case/v1/cases")
                 .header("Authorization", token)
@@ -561,13 +559,12 @@ public class TokenValidationTest {
 
         // test without a token
         WebSocketClient client = new StandardWebSocketClient();
-        client.execute(URI.create("ws://localhost:" +
-                this.localServerPort + "/study-notification/notify"),
-            ws -> ws.receive().then()).doOnSuccess(s -> Assert.fail("Should have thrown"));
+        client.execute(URI.create("ws://localhost:" + this.localServerPort + "/study-notification/notify"), ws -> ws.receive().then())
+              .doOnSuccess(s -> fail("Should have thrown"));
     }
 
     @Test
-    public void forbiddenUserTest() {
+    void forbiddenUserTest() {
         initStubForJwk();
         stubFor(head(urlEqualTo(String.format("/v1/users/%s", "chmits"))).withPort(port)
                 .willReturn(aResponse().withStatus(204)));
@@ -582,7 +579,7 @@ public class TokenValidationTest {
     @TestConfiguration
     static class MyTestConfiguration {
         @Bean
-        WireMockConfigurationCustomizer optionsCustomizer() {
+        public WireMockConfigurationCustomizer optionsCustomizer() {
             return new WireMockConfigurationCustomizer() {
                 private static final String SEC_WEBSOCKET_MAGIC = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
                 @Override
