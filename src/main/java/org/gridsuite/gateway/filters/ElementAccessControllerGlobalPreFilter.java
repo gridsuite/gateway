@@ -96,7 +96,8 @@ public class ElementAccessControllerGlobalPreFilter extends AbstractGlobalPreFil
         }
 
         Optional<AccessControlInfos> accessControlInfos = endPointElementServer.getAccessControlInfos(exchange.getRequest());
-        return accessControlInfos.isEmpty() ? completeWithCode(exchange, FORBIDDEN) : isAccessAllowed(exchange, chain, accessControlInfos.get());
+        //TODO: the control is disabled for the moment, it will be processed in another US. For more details  contact slimane
+        return accessControlInfos.isEmpty() ? chain.filter(exchange) : isAccessAllowed(exchange, chain, accessControlInfos.get());
     }
 
     private Mono<Void> isAccessAllowed(ServerWebExchange exchange, GatewayFilterChain chain, AccessControlInfos accessControlInfos) {
