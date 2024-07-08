@@ -24,7 +24,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cloud.contract.wiremock.AutoConfigureWireMock;
-import org.springframework.http.HttpStatus;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
@@ -186,15 +185,21 @@ public class ElementAccessControlTest {
         stubFor(head(urlEqualTo(String.format("/v1/elements?ids=%s", uuid))).withPort(port).withHeader("userId", equalTo("user1"))
             .willReturn(aResponse()));
 
-        // user2 not allowed
+        // user2 allowed
         stubFor(head(urlEqualTo(String.format("/v1/elements?ids=%s", uuid))).withPort(port).withHeader("userId", equalTo("user2"))
-            .willReturn(aResponse().withStatus(HttpStatus.FORBIDDEN.value())));
+            .willReturn(aResponse()));
 
         stubFor(get(urlEqualTo(String.format("/v1/studies/%s", uuid))).withHeader("userId", equalTo("user1"))
             .willReturn(aResponse()));
 
+        stubFor(get(urlEqualTo(String.format("/v1/studies/%s", uuid))).withHeader("userId", equalTo("user2"))
+                .willReturn(aResponse()));
+
         stubFor(get(urlEqualTo(String.format("/v1/studies/metadata?ids=%s", uuid))).withHeader("userId", equalTo("user1"))
             .willReturn(aResponse()));
+
+        stubFor(get(urlEqualTo(String.format("/v1/studies/metadata?ids=%s", uuid))).withHeader("userId", equalTo("user2"))
+                .willReturn(aResponse()));
 
         stubFor(get(urlEqualTo(String.format("/v1/filters/%s", uuid))).withHeader("userId", equalTo("user1"))
             .willReturn(aResponse()));
@@ -202,24 +207,23 @@ public class ElementAccessControlTest {
         stubFor(get(urlEqualTo(String.format("/v1/contingency-lists/%s", uuid))).withHeader("userId", equalTo("user1"))
             .willReturn(aResponse()));
 
-        // No uuid element forbidden
         webClient
             .get().uri("study/v1/studies")
             .header("Authorization", "Bearer " + tokenUser1)
             .exchange()
-            .expectStatus().isForbidden();
+            .expectStatus().isNotFound();
 
-        // Bad uuid forbidden
+        // Bad uuid
         webClient
             .get().uri(String.format("study/v1/studies/%s", "badUuid"))
             .header("Authorization", "Bearer " + tokenUser1)
             .exchange()
-            .expectStatus().isForbidden();
+            .expectStatus().isNotFound();
         webClient
             .get().uri(String.format("study/v1/studies/%s", (UUID) null))
             .header("Authorization", "Bearer " + tokenUser1)
             .exchange()
-            .expectStatus().isForbidden();
+            .expectStatus().isNotFound();
 
         webClient
             .get().uri(String.format("study/v1/studies/%s", uuid))
@@ -249,25 +253,25 @@ public class ElementAccessControlTest {
             .get().uri(String.format("study/v1/studies/%s", uuid))
             .header("Authorization", "Bearer " + tokenUser2)
             .exchange()
-            .expectStatus().isForbidden();
+            .expectStatus().isOk();
 
         webClient
             .get().uri(String.format("study/v1/studies/metadata?ids=%s", uuid))
             .header("Authorization", "Bearer " + tokenUser2)
             .exchange()
-            .expectStatus().isForbidden();
+            .expectStatus().isOk();
 
         webClient
             .get().uri(String.format("actions/v1/contingency-lists/%s", uuid))
             .header("Authorization", "Bearer " + tokenUser2)
             .exchange()
-            .expectStatus().isForbidden();
+            .expectStatus().isNotFound();
 
         webClient
             .get().uri(String.format("filter/v1/filters/%s", uuid))
             .header("Authorization", "Bearer " + tokenUser2)
             .exchange()
-            .expectStatus().isForbidden();
+            .expectStatus().isNotFound();
     }
 
     @Test
@@ -282,11 +286,11 @@ public class ElementAccessControlTest {
         stubFor(head(urlEqualTo(String.format("/v1/elements?ids=%s", uuid))).withPort(port).withHeader("userId", equalTo("user1"))
             .willReturn(aResponse()));
 
-        // user2 not allowed
+        // user2 is also allowed
         stubFor(head(urlEqualTo(String.format("/v1/directories?ids=%s", uuid))).withPort(port).withHeader("userId", equalTo("user2"))
-            .willReturn(aResponse().withStatus(HttpStatus.FORBIDDEN.value())));
+            .willReturn(aResponse()));
         stubFor(head(urlEqualTo(String.format("/v1/elements?ids=%s", uuid))).withPort(port).withHeader("userId", equalTo("user2"))
-            .willReturn(aResponse().withStatus(HttpStatus.FORBIDDEN.value())));
+            .willReturn(aResponse()));
 
         stubFor(post(urlEqualTo(String.format("/v1/explore/studies?%s=%s", ExploreServer.QUERY_PARAM_PARENT_DIRECTORY_ID, uuid))).withHeader("userId", equalTo("user1"))
             .willReturn(aResponse()));
@@ -297,55 +301,55 @@ public class ElementAccessControlTest {
         stubFor(post(urlEqualTo(String.format("/v1/explore/filters?%s=%s", ExploreServer.QUERY_PARAM_PARENT_DIRECTORY_ID, uuid))).withHeader("userId", equalTo("user1"))
             .willReturn(aResponse()));
 
-        // Direct creation of elements without going through the explor server is forbidden
+        // Direct creation of elements without going through the explore server
         webClient
             .post().uri("study/v1/studies")
             .header("Authorization", "Bearer " + tokenUser1)
             .exchange()
-            .expectStatus().isForbidden();
+            .expectStatus().isNotFound();
         webClient
             .post().uri("actions/v1/script-contingency-lists")
             .header("Authorization", "Bearer " + tokenUser1)
             .exchange()
-            .expectStatus().isForbidden();
+            .expectStatus().isNotFound();
         webClient
             .post().uri("filter/v1/filters")
             .header("Authorization", "Bearer " + tokenUser1)
             .exchange()
-            .expectStatus().isForbidden();
+            .expectStatus().isNotFound();
 
-        // Creation of elements without directory parent is forbidden
+        // Creation of elements without directory parent
         webClient
             .post().uri(String.format("explore/v1/explore/studies"))
             .header("Authorization", "Bearer " + tokenUser1)
             .exchange()
-            .expectStatus().isForbidden();
+            .expectStatus().isNotFound();
 
-        // Creation of elements with bad parameter for directory parent uuid is forbidden
+        // Creation of elements with bad parameter for directory parent uuid
         webClient
             .post().uri(String.format("explore/v1/explore/studies?%s=%s", ExploreServer.QUERY_PARAM_PARENT_DIRECTORY_ID + "bad", uuid))
             .header("Authorization", "Bearer " + tokenUser1)
             .exchange()
-            .expectStatus().isForbidden();
+            .expectStatus().isNotFound();
 
-        // Creation of elements with bad directory parent uuid is forbidden
+        // Creation of elements with bad directory parent uuid
         webClient
             .post().uri(String.format("explore/v1/explore/studies?%s=%s", ExploreServer.QUERY_PARAM_PARENT_DIRECTORY_ID, "badUuid"))
             .header("Authorization", "Bearer " + tokenUser1)
             .exchange()
-            .expectStatus().isForbidden();
+            .expectStatus().isNotFound();
         webClient
             .post().uri(String.format("explore/v1/explore/studies?%s=%s", ExploreServer.QUERY_PARAM_PARENT_DIRECTORY_ID, null))
             .header("Authorization", "Bearer " + tokenUser1)
             .exchange()
-            .expectStatus().isForbidden();
+            .expectStatus().isNotFound();
 
-        // Creation of elements with multiple directory parent uuids is forbidden
+        // Creation of elements with multiple directory parent uuids
         webClient
             .post().uri(String.format("explore/v1/explore/studies?%s=%s,%s", ExploreServer.QUERY_PARAM_PARENT_DIRECTORY_ID, uuid, uuid))
             .header("Authorization", "Bearer " + tokenUser1)
             .exchange()
-            .expectStatus().isForbidden();
+            .expectStatus().isNotFound();
 
         webClient
             .post().uri(String.format("explore/v1/explore/studies?%s=%s", ExploreServer.QUERY_PARAM_PARENT_DIRECTORY_ID, uuid))
@@ -384,7 +388,7 @@ public class ElementAccessControlTest {
             .post().uri("study/v1/studies")
             .header("Authorization", "Bearer " + tokenUser1)
             .exchange()
-            .expectStatus().isForbidden();
+            .expectStatus().isNotFound();
 
         webClient
             .post().uri(String.format("study/v1/studies/%s/tree/nodes", uuid))
@@ -403,9 +407,9 @@ public class ElementAccessControlTest {
         stubFor(head(urlEqualTo(String.format("/v1/elements?ids=%s", uuid))).withPort(port).withHeader("userId", equalTo("user1"))
             .willReturn(aResponse()));
 
-        // user2 not allowed
+        // user2 allowed
         stubFor(head(urlEqualTo(String.format("/v1/elements?ids=%s", uuid))).withPort(port).withHeader("userId", equalTo("user2"))
-            .willReturn(aResponse().withStatus(HttpStatus.FORBIDDEN.value())));
+            .willReturn(aResponse()));
 
         stubFor(put(urlEqualTo(String.format("/v1/studies/%s/nodes/idNode", uuid))).withHeader("userId", equalTo("user1"))
             .willReturn(aResponse()));
@@ -416,22 +420,22 @@ public class ElementAccessControlTest {
         stubFor(put(urlEqualTo(String.format("/v1/filters/%s", uuid))).withHeader("userId", equalTo("user1"))
             .willReturn(aResponse()));
 
-        // Put with no or bad uuid is forbidden
+        // Put with no or bad uuid
         webClient
             .put().uri("study/v1/studies/nodes/idNode")
             .header("Authorization", "Bearer " + tokenUser1)
             .exchange()
-            .expectStatus().isForbidden();
+            .expectStatus().isNotFound();
         webClient
             .put().uri(String.format("study/v1/studies/%s/nodes/idNode", (UUID) null))
             .header("Authorization", "Bearer " + tokenUser1)
             .exchange()
-            .expectStatus().isForbidden();
+            .expectStatus().isNotFound();
         webClient
             .put().uri(String.format("study/v1/studies/%s/nodes/idNode", "badUuid"))
             .header("Authorization", "Bearer " + tokenUser1)
             .exchange()
-            .expectStatus().isForbidden();
+            .expectStatus().isNotFound();
 
         webClient
             .put().uri(String.format("study/v1/studies/%s/nodes/idNode", uuid))
@@ -462,9 +466,9 @@ public class ElementAccessControlTest {
         stubFor(head(urlEqualTo(String.format("/v1/elements?ids=%s", uuid))).withPort(port).withHeader("userId", equalTo("user1"))
             .willReturn(aResponse()));
 
-        // user2 not allowed
+        // user2 allowed
         stubFor(head(urlEqualTo(String.format("/v1/elements?ids=%s", uuid))).withPort(port).withHeader("userId", equalTo("user2"))
-            .willReturn(aResponse().withStatus(HttpStatus.FORBIDDEN.value())));
+            .willReturn(aResponse()));
 
         stubFor(delete(urlEqualTo(String.format("/v1/explore/elements/%s", uuid))).withHeader("userId", equalTo("user1"))
             .willReturn(aResponse()));
@@ -478,28 +482,28 @@ public class ElementAccessControlTest {
         stubFor(delete(urlEqualTo(String.format("/v1/filters/%s", uuid))).withHeader("userId", equalTo("user1"))
             .willReturn(aResponse()));
 
-        // Delete elements with no or bad uuid is forbidden
+        // Delete elements with no or bad uuid
         webClient
             .delete().uri("explore/v1/explore/elements")
             .header("Authorization", "Bearer " + tokenUser1)
             .exchange()
-            .expectStatus().isForbidden();
+            .expectStatus().isNotFound();
         webClient
             .delete().uri(String.format("explore/v1/explore/elements/%s", (UUID) null))
             .header("Authorization", "Bearer " + tokenUser1)
             .exchange()
-            .expectStatus().isForbidden();
+            .expectStatus().isNotFound();
         webClient
             .delete().uri(String.format("explore/v1/explore/elements/%s", "badUuid"))
             .header("Authorization", "Bearer " + tokenUser1)
             .exchange()
-            .expectStatus().isForbidden();
+            .expectStatus().isNotFound();
 
         webClient
             .delete().uri(String.format("explore/v1/explore/elements/%s", uuid))
             .header("Authorization", "Bearer " + tokenUser2)
             .exchange()
-            .expectStatus().isForbidden();
+            .expectStatus().isNotFound();
 
         webClient
             .delete().uri(String.format("explore/v1/explore/elements/%s", uuid))
@@ -572,7 +576,7 @@ public class ElementAccessControlTest {
                 .post().uri("study/v1/studies")
                 .header("Authorization", "Bearer " + tokenUser1)
                 .exchange()
-                .expectStatus().isForbidden();
+                .expectStatus().isNotFound();
 
         webClient
                 .post().uri(String.format("explore/v1/explore/studies?%s=%s", ExploreServer.QUERY_PARAM_DUPLICATE_FROM_ID, uuid))
