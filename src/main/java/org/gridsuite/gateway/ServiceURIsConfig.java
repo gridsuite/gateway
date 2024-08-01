@@ -107,4 +107,7 @@ public class ServiceURIsConfig {
 
     @Value("${gridsuite.services.state-estimation-server.base-uri:http://state-estimation-server/}")
     String stateEstimationServerBaseUri;
+
+    @Value("${gridsuite.services.state-estimation-orchestrator-server.base-uri:http://state-estimation-orchestrator-server/}")
+    String stateEstimationOrchestratorServerBaseUri;
 }
