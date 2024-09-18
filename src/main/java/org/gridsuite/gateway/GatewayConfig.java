@@ -6,7 +6,6 @@
  */
 package org.gridsuite.gateway;
 
-import org.gridsuite.gateway.endpoints.CgmesGlServer;
 import org.gridsuite.gateway.endpoints.*;
 import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
@@ -34,34 +33,24 @@ public class GatewayConfig {
         return builder.routes()
             .route(p -> context.getBean(StudyServer.class).getRoute(p))
             .route(p -> context.getBean(CaseServer.class).getRoute(p))
-            .route(p -> context.getBean(MergeServer.class).getRoute(p))
             .route(p -> context.getBean(StudyNotificationServer.class).getRoute(p))
-            .route(p -> context.getBean(MergeNotificationServer.class).getRoute(p))
             .route(p -> context.getBean(DirectoryNotificationServer.class).getRoute(p))
             .route(p -> context.getBean(ContingencyServer.class).getRoute(p))
             .route(p -> context.getBean(ConfigServer.class).getRoute(p))
             .route(p -> context.getBean(ConfigNotificationServer.class).getRoute(p))
             .route(p -> context.getBean(DirectoryServer.class).getRoute(p))
             .route(p -> context.getBean(ExploreServer.class).getRoute(p))
-            .route(p -> context.getBean(CgmesBoundaryServer.class).getRoute(p))
             .route(p -> context.getBean(DynamicMappingServer.class).getRoute(p))
             .route(p -> context.getBean(FilterServer.class).getRoute(p))
-            .route(p -> context.getBean(ReportServer.class).getRoute(p))
             .route(p -> context.getBean(NetworkModificationServer.class).getRoute(p))
             .route(p -> context.getBean(NetworkConversionServer.class).getRoute(p))
-            .route(p -> context.getBean(OdreServer.class).getRoute(p))
-            .route(p -> context.getBean(GeoDataServer.class).getRoute(p))
             .route(p -> context.getBean(UserAdminServer.class).getRoute(p))
-            .route(p -> context.getBean(CgmesGlServer.class).getRoute(p))
             .route(p -> context.getBean(SensitivityAnalysisServer.class).getRoute(p))
             .route(p -> context.getBean(LoadFlowServer.class).getRoute(p))
             .route(p -> context.getBean(SecurityAnalysisServer.class).getRoute(p))
             .route(p -> context.getBean(DynamicSimulationServer.class).getRoute(p))
-            .route(p -> context.getBean(CaseImportServer.class).getRoute(p))
             .route(p -> context.getBean(VoltageInitServer.class).getRoute(p))
             .route(p -> context.getBean(ShortCircuitServer.class).getRoute(p))
-            .route(p -> context.getBean(StateEstimationServer.class).getRoute(p))
-            .route(p -> context.getBean(StateEstimationOrchestratorServer.class).getRoute(p))
             .build();
     }
 }

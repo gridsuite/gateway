@@ -288,16 +288,6 @@ public class TokenValidationTest {
                 .jsonPath("$[0].caseFormat").isEqualTo("IIDM");
 
         webClient
-                .get().uri("merge/v1/configs")
-                .header("Authorization", "Bearer " + token)
-                .exchange()
-                .expectStatus().isOk()
-                .expectBody()
-                .jsonPath("$[0].process").isEqualTo("TEST")
-                .jsonPath("$[0].tsos[0]").isEqualTo("BE")
-                .jsonPath("$[0].tsos[1]").isEqualTo("NL");
-
-        webClient
                 .get().uri("actions/v1/contingency-lists/metadata?ids=" + elementUuid)
                 .header("Authorization", "Bearer " + token)
                 .exchange()
@@ -323,15 +313,6 @@ public class TokenValidationTest {
                 .jsonPath("$[0].name").isEqualTo("test");
 
         webClient
-            .get().uri("boundary/v1/boundaries")
-            .header("Authorization", "Bearer " + token)
-            .exchange()
-            .expectStatus().isOk()
-            .expectBody()
-            .jsonPath("$[0].name").isEqualTo("boundary1")
-            .jsonPath("$[0].id").isEqualTo("da47a173-22d2-47e8-8a84-aa66e2d0fafb");
-
-        webClient
                 .get().uri("dynamic-mapping/mappings")
                 .header("Authorization", "Bearer " + token)
                 .exchange()
@@ -347,16 +328,6 @@ public class TokenValidationTest {
             .expectBody()
             .jsonPath("$[0].id").isEqualTo(elementUuid.toString())
             .jsonPath("$[0].type").isEqualTo("LINE");
-
-        webClient
-            .get().uri("report/v1/reports")
-            .header("Authorization", "Bearer " + token)
-            .exchange()
-            .expectStatus().isOk()
-            .expectBody()
-            .jsonPath("$.id").isEqualTo("report1")
-            .jsonPath("$.reports[0].report").isEqualTo("Lets Rock")
-            .jsonPath("$.reports[0].date").isEqualTo("2001:01:01T11:11");
 
         webClient
             .get().uri("explore/v1/explore/elements/metadata?ids=" + elementUuid)
