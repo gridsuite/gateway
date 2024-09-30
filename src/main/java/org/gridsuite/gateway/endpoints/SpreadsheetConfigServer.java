@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component;
  * @author Achour BERRAHMA <achour.berrahma at rte-france.com>
  */
 @RequiredArgsConstructor
-@Component
+@Component(value = SpreadsheetConfigServer.ENDPOINT_NAME)
 public class SpreadsheetConfigServer implements EndPointServer {
 
     public static final String ENDPOINT_NAME = "spreadsheet-config";
