@@ -51,6 +51,7 @@ public class GatewayConfig {
             .route(p -> context.getBean(DynamicSimulationServer.class).getRoute(p))
             .route(p -> context.getBean(VoltageInitServer.class).getRoute(p))
             .route(p -> context.getBean(ShortCircuitServer.class).getRoute(p))
+            .route(p -> context.getBean(StateEstimationOrchestratorServer.class).getRoute(p))
             .route(p -> context.getBean(SpreadsheetConfigServer.class).getRoute(p))
             .build();
     }
