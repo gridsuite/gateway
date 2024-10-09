@@ -8,7 +8,7 @@ package org.gridsuite.gateway.endpoints;
 
 import org.springframework.http.HttpMethod;
 
-import java.util.*;
+import java.util.Set;
 
 import static org.springframework.http.HttpMethod.*;
 

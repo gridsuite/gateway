@@ -7,7 +7,6 @@
 package org.gridsuite.gateway.services;
 
 import org.gridsuite.gateway.ServiceURIsConfig;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
@@ -26,7 +25,6 @@ public class UserAdminService {
 
     private final WebClient webClient;
 
-    @Autowired
     public UserAdminService(ServiceURIsConfig servicesURIsConfig, WebClient.Builder webClientBuilder) {
         this.webClient = webClientBuilder.baseUrl(servicesURIsConfig.getUserAdminServerBaseUri()).build();
     }
