@@ -17,14 +17,14 @@ import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import org.gridsuite.gateway.dto.AccessControlInfos;
 import org.gridsuite.gateway.endpoints.ExploreServer;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cloud.contract.wiremock.AutoConfigureWireMock;
-import org.springframework.test.context.junit4.SpringRunner;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 import java.util.Date;
@@ -32,13 +32,12 @@ import java.util.List;
 import java.util.UUID;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * @author Slimane Amar <slimane.amar at rte-france.com>
  */
-@RunWith(SpringRunner.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
     properties = {
         "gridsuite.services.directory-server.base-uri=http://localhost:${wiremock.server.port}",
@@ -51,16 +50,13 @@ import static org.junit.Assert.assertThrows;
     }
 )
 @AutoConfigureWireMock(port = 0)
-public class ElementAccessControlTest {
+class ElementAccessControlTest {
 
     @Value("${wiremock.server.port}")
-    int port;
+    private int port;
 
     @Autowired
-    WebTestClient webClient;
-
-    @Autowired
-    ServiceURIsConfig servicesURIsConfig;
+    private WebTestClient webClient;
 
     private String tokenUser1;
 
@@ -68,8 +64,8 @@ public class ElementAccessControlTest {
 
     private RSAKey rsaKey;
 
-    @Before
-    public void prepareToken() throws JOSEException {
+    @BeforeEach
+    void prepareToken() throws JOSEException {
         // RSA signatures require a public and private RSA key pair, the public key
         // must be made known to the JWS recipient in order to verify the signatures
         RSAKey rsaJWK = new RSAKeyGenerator(2048)
@@ -111,7 +107,7 @@ public class ElementAccessControlTest {
     }
 
     @Test
-    public void testWithNoControl() {
+    void testWithNoControl() {
         initStubForJwk();
 
         // No control for directory server (made inside the endpoint)
@@ -120,7 +116,7 @@ public class ElementAccessControlTest {
 
         webClient
             .get().uri("directory/v1/root_directories")
-            .header("Authorization", "Bearer " + tokenUser1)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isOk();
 
@@ -135,48 +131,48 @@ public class ElementAccessControlTest {
         stubFor(get(urlEqualTo("/v1/dynamic-simulation-default-provider")).withHeader("userId", equalTo("user1")).willReturn(aResponse()));
         webClient
             .get().uri("study/v1/search")
-            .header("Authorization", "Bearer " + tokenUser1)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isOk();
         webClient
             .get().uri("study/v1/svg-component-libraries")
-            .header("Authorization", "Bearer " + tokenUser1)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isOk();
         webClient
             .get().uri("study/v1/export-network-formats")
-            .header("Authorization", "Bearer " + tokenUser1)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isOk();
         webClient
             .get().uri("study/v1/loadflow-default-provider")
-            .header("Authorization", "Bearer " + tokenUser1)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isOk();
         webClient
                 .get().uri("study/v1/security-analysis-default-provider")
-                .header("Authorization", "Bearer " + tokenUser1)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser1)
                 .exchange()
                 .expectStatus().isOk();
         webClient
                 .get().uri("study/v1/sensitivity-analysis-default-provider")
-                .header("Authorization", "Bearer " + tokenUser1)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser1)
                 .exchange()
                 .expectStatus().isOk();
         webClient
             .get().uri("study/v1/non-evacuated-energy-default-provider")
-            .header("Authorization", "Bearer " + tokenUser1)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isOk();
         webClient
                 .get().uri("study/v1/dynamic-simulation-default-provider")
-                .header("Authorization", "Bearer " + tokenUser1)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser1)
                 .exchange()
                 .expectStatus().isOk();
     }
 
     @Test
-    public void testGetElements() {
+    void testGetElements() {
         initStubForJwk();
 
         UUID uuid = UUID.randomUUID();
@@ -209,73 +205,73 @@ public class ElementAccessControlTest {
 
         webClient
             .get().uri("study/v1/studies")
-            .header("Authorization", "Bearer " + tokenUser1)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isNotFound();
 
         // Bad uuid
         webClient
             .get().uri(String.format("study/v1/studies/%s", "badUuid"))
-            .header("Authorization", "Bearer " + tokenUser1)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isNotFound();
         webClient
             .get().uri(String.format("study/v1/studies/%s", (UUID) null))
-            .header("Authorization", "Bearer " + tokenUser1)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isNotFound();
 
         webClient
             .get().uri(String.format("study/v1/studies/%s", uuid))
-            .header("Authorization", "Bearer " + tokenUser1)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isOk();
 
         webClient
             .get().uri(String.format("study/v1/studies/metadata?ids=%s", uuid))
-            .header("Authorization", "Bearer " + tokenUser1)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isOk();
 
         webClient
             .get().uri(String.format("actions/v1/contingency-lists/%s", uuid))
-            .header("Authorization", "Bearer " + tokenUser1)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isOk();
 
         webClient
             .get().uri(String.format("filter/v1/filters/%s", uuid))
-            .header("Authorization", "Bearer " + tokenUser1)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isOk();
 
         webClient
             .get().uri(String.format("study/v1/studies/%s", uuid))
-            .header("Authorization", "Bearer " + tokenUser2)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser2)
             .exchange()
             .expectStatus().isOk();
 
         webClient
             .get().uri(String.format("study/v1/studies/metadata?ids=%s", uuid))
-            .header("Authorization", "Bearer " + tokenUser2)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser2)
             .exchange()
             .expectStatus().isOk();
 
         webClient
             .get().uri(String.format("actions/v1/contingency-lists/%s", uuid))
-            .header("Authorization", "Bearer " + tokenUser2)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser2)
             .exchange()
             .expectStatus().isNotFound();
 
         webClient
             .get().uri(String.format("filter/v1/filters/%s", uuid))
-            .header("Authorization", "Bearer " + tokenUser2)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser2)
             .exchange()
             .expectStatus().isNotFound();
     }
 
     @Test
-    public void testCreateElements() {
+    void testCreateElements() {
         initStubForJwk();
 
         UUID uuid = UUID.randomUUID();
@@ -304,75 +300,75 @@ public class ElementAccessControlTest {
         // Direct creation of elements without going through the explore server
         webClient
             .post().uri("study/v1/studies")
-            .header("Authorization", "Bearer " + tokenUser1)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isNotFound();
         webClient
             .post().uri("actions/v1/script-contingency-lists")
-            .header("Authorization", "Bearer " + tokenUser1)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isNotFound();
         webClient
             .post().uri("filter/v1/filters")
-            .header("Authorization", "Bearer " + tokenUser1)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isNotFound();
 
         // Creation of elements without directory parent
         webClient
             .post().uri(String.format("explore/v1/explore/studies"))
-            .header("Authorization", "Bearer " + tokenUser1)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isNotFound();
 
         // Creation of elements with bad parameter for directory parent uuid
         webClient
             .post().uri(String.format("explore/v1/explore/studies?%s=%s", ExploreServer.QUERY_PARAM_PARENT_DIRECTORY_ID + "bad", uuid))
-            .header("Authorization", "Bearer " + tokenUser1)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isNotFound();
 
         // Creation of elements with bad directory parent uuid
         webClient
             .post().uri(String.format("explore/v1/explore/studies?%s=%s", ExploreServer.QUERY_PARAM_PARENT_DIRECTORY_ID, "badUuid"))
-            .header("Authorization", "Bearer " + tokenUser1)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isNotFound();
         webClient
             .post().uri(String.format("explore/v1/explore/studies?%s=%s", ExploreServer.QUERY_PARAM_PARENT_DIRECTORY_ID, null))
-            .header("Authorization", "Bearer " + tokenUser1)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isNotFound();
 
         // Creation of elements with multiple directory parent uuids
         webClient
             .post().uri(String.format("explore/v1/explore/studies?%s=%s,%s", ExploreServer.QUERY_PARAM_PARENT_DIRECTORY_ID, uuid, uuid))
-            .header("Authorization", "Bearer " + tokenUser1)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isNotFound();
 
         webClient
             .post().uri(String.format("explore/v1/explore/studies?%s=%s", ExploreServer.QUERY_PARAM_PARENT_DIRECTORY_ID, uuid))
-            .header("Authorization", "Bearer " + tokenUser1)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isOk();
 
         webClient
             .post().uri(String.format("explore/v1/explore/script-contingency-lists?%s=%s", ExploreServer.QUERY_PARAM_PARENT_DIRECTORY_ID, uuid))
-            .header("Authorization", "Bearer " + tokenUser1)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isOk();
 
         webClient
             .post().uri(String.format("explore/v1/explore/filters?%s=%s", ExploreServer.QUERY_PARAM_PARENT_DIRECTORY_ID, uuid))
-            .header("Authorization", "Bearer " + tokenUser1)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isOk();
 
     }
 
     @Test
-    public void testCreateSubElements() {
+    void testCreateSubElements() {
         initStubForJwk();
 
         UUID uuid = UUID.randomUUID();
@@ -386,19 +382,19 @@ public class ElementAccessControlTest {
 
         webClient
             .post().uri("study/v1/studies")
-            .header("Authorization", "Bearer " + tokenUser1)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isNotFound();
 
         webClient
             .post().uri(String.format("study/v1/studies/%s/tree/nodes", uuid))
-            .header("Authorization", "Bearer " + tokenUser1)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isOk();
     }
 
     @Test
-    public void testUpdateElements() {
+    void testUpdateElements() {
         initStubForJwk();
 
         UUID uuid = UUID.randomUUID();
@@ -423,41 +419,41 @@ public class ElementAccessControlTest {
         // Put with no or bad uuid
         webClient
             .put().uri("study/v1/studies/nodes/idNode")
-            .header("Authorization", "Bearer " + tokenUser1)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isNotFound();
         webClient
             .put().uri(String.format("study/v1/studies/%s/nodes/idNode", (UUID) null))
-            .header("Authorization", "Bearer " + tokenUser1)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isNotFound();
         webClient
             .put().uri(String.format("study/v1/studies/%s/nodes/idNode", "badUuid"))
-            .header("Authorization", "Bearer " + tokenUser1)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isNotFound();
 
         webClient
             .put().uri(String.format("study/v1/studies/%s/nodes/idNode", uuid))
-            .header("Authorization", "Bearer " + tokenUser1)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isOk();
 
         webClient
             .put().uri(String.format("actions/v1/script-contingency-lists/%s", uuid))
-            .header("Authorization", "Bearer " + tokenUser1)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isOk();
 
         webClient
             .put().uri(String.format("filter/v1/filters/%s", uuid))
-            .header("Authorization", "Bearer " + tokenUser1)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isOk();
     }
 
     @Test
-    public void testDeleteElements() {
+    void testDeleteElements() {
         initStubForJwk();
 
         UUID uuid = UUID.randomUUID();
@@ -485,53 +481,53 @@ public class ElementAccessControlTest {
         // Delete elements with no or bad uuid
         webClient
             .delete().uri("explore/v1/explore/elements")
-            .header("Authorization", "Bearer " + tokenUser1)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isNotFound();
         webClient
             .delete().uri(String.format("explore/v1/explore/elements/%s", (UUID) null))
-            .header("Authorization", "Bearer " + tokenUser1)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isNotFound();
         webClient
             .delete().uri(String.format("explore/v1/explore/elements/%s", "badUuid"))
-            .header("Authorization", "Bearer " + tokenUser1)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isNotFound();
 
         webClient
             .delete().uri(String.format("explore/v1/explore/elements/%s", uuid))
-            .header("Authorization", "Bearer " + tokenUser2)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser2)
             .exchange()
             .expectStatus().isNotFound();
 
         webClient
             .delete().uri(String.format("explore/v1/explore/elements/%s", uuid))
-            .header("Authorization", "Bearer " + tokenUser1)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isOk();
 
         webClient
             .delete().uri(String.format("study/v1/studies/%s", uuid))
-            .header("Authorization", "Bearer " + tokenUser1)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isOk();
 
         webClient
             .delete().uri(String.format("actions/v1/contingency-lists/%s", uuid))
-            .header("Authorization", "Bearer " + tokenUser1)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isOk();
 
         webClient
             .delete().uri(String.format("filter/v1/filters/%s", uuid))
-            .header("Authorization", "Bearer " + tokenUser1)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser1)
             .exchange()
             .expectStatus().isOk();
     }
 
     @Test
-    public void testAccessControlInfos() {
+    void testAccessControlInfos() {
         List<UUID> emptyList = List.of();
 
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> AccessControlInfos.create(emptyList));
@@ -547,17 +543,17 @@ public class ElementAccessControlTest {
 
         stubFor(get(urlEqualTo("/.well-known/openid-configuration"))
             .willReturn(aResponse()
-                .withHeader("Content-Type", "application/json")
+                .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .withBody("{\"jwks_uri\": \"http://localhost:" + port + "/jwks\"}")));
 
         stubFor(get(urlEqualTo("/jwks"))
             .willReturn(aResponse()
-                .withHeader("Content-Type", "application/json")
+                .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .withBody("{\"keys\" : [ " + rsaKey.toJSONString() + " ] }")));
     }
 
     @Test
-    public void testDuplicateElements() {
+    void testDuplicateElements() {
         initStubForJwk();
 
         UUID uuid = UUID.randomUUID();
@@ -574,15 +570,14 @@ public class ElementAccessControlTest {
         // Direct creation of elements without going through the explor server is forbidden
         webClient
                 .post().uri("study/v1/studies")
-                .header("Authorization", "Bearer " + tokenUser1)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser1)
                 .exchange()
                 .expectStatus().isNotFound();
 
         webClient
                 .post().uri(String.format("explore/v1/explore/studies?%s=%s", ExploreServer.QUERY_PARAM_DUPLICATE_FROM_ID, uuid))
-                .header("Authorization", "Bearer " + tokenUser1)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser1)
                 .exchange()
                 .expectStatus().isOk();
     }
-
 }
