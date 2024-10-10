@@ -553,6 +553,17 @@ public class ElementAccessControlTest {
     }
 
     @Test
+    public void testSupervisionEndpointsAccess() {
+        initStubForJwk();
+
+        // Test access to a supervision endpoint (should be forbidden)
+        webClient.get().uri("study/v1/supervision/studies")
+            .header("Authorization", "Bearer " + tokenUser1)
+            .exchange()
+            .expectStatus().isForbidden();
+    }
+
+    @Test
     public void testAccessControlInfos() {
         List<UUID> emptyList = List.of();
 
