@@ -553,6 +553,28 @@ public class ElementAccessControlTest {
     }
 
     @Test
+    public void testSupervisionEndpointsAccess() {
+        initStubForJwk();
+
+        // Test access to a supervision endpoint (should be forbidden)
+        webClient.get().uri("study/v1/supervision/studies")
+            .header("Authorization", "Bearer " + tokenUser1)
+            .exchange()
+            .expectStatus().isForbidden();
+
+        // Test access to an endpoint containing 'supervision' but not matching the blocked pattern
+        // This should pass through the filter
+        stubFor(get(urlEqualTo("/v1/studies/supervision-report"))
+                .withHeader("userId", equalTo("user1"))
+                .willReturn(aResponse().withStatus(200)));
+
+        webClient.get().uri("study/v1/studies/supervision-report")
+                .header("Authorization", "Bearer " + tokenUser1)
+                .exchange()
+                .expectStatus().isOk();
+    }
+
+    @Test
     public void testAccessControlInfos() {
         List<UUID> emptyList = List.of();
 
