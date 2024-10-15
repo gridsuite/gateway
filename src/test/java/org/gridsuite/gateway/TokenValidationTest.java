@@ -9,17 +9,17 @@ package org.gridsuite.gateway;
 import com.github.tomakehurst.wiremock.client.VerificationException;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import com.github.tomakehurst.wiremock.extension.responsetemplating.ResponseTemplateTransformer;
-import com.nimbusds.jose.*;
+import com.nimbusds.jose.JOSEException;
+import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.JWSHeader;
+import com.nimbusds.jose.JWSSigner;
 import com.nimbusds.jose.crypto.RSASSASigner;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
-import lombok.SneakyThrows;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -29,7 +29,7 @@ import org.springframework.cloud.contract.wiremock.AutoConfigureWireMock;
 import org.springframework.cloud.contract.wiremock.WireMockConfigurationCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.http.HttpHeaders;
-import org.springframework.test.context.junit4.SpringRunner;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.web.reactive.socket.client.StandardWebSocketClient;
 import org.springframework.web.reactive.socket.client.WebSocketClient;
@@ -46,11 +46,11 @@ import java.util.Date;
 import java.util.UUID;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * @author Chamseddine Benhamed <chamseddine.benhamed at rte-france.com>
  */
-@RunWith(SpringRunner.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
     properties = {"powsybl.services.case-server.base-uri=http://localhost:${wiremock.server.port}",
         "gridsuite.services.study-server.base-uri=http://localhost:${wiremock.server.port}",
@@ -72,33 +72,27 @@ import static com.github.tomakehurst.wiremock.client.WireMock.*;
         "gridsuite.services.sensitivity-analysis-server.base-uri=http://localhost:${wiremock.server.port}",
         "allowed-issuers=http://localhost:${wiremock.server.port}"
     })
-
 @AutoConfigureWireMock(port = 0)
-public class TokenValidationTest {
+class TokenValidationTest {
 
     @Value("${wiremock.server.port}")
-    int port;
+    private int port;
 
     @LocalServerPort
     private String localServerPort;
 
     private String token;
-
     private String token2;
-
     private String expiredToken;
-
-    private String tokenWithNotAllowedissuer;
-
+    private String tokenWithNotAllowedIssuer;
     private RSAKey rsaKey;
-
     private RSAKey rsaKey2;
 
     @Autowired
-    WebTestClient webClient;
+    private WebTestClient webClient;
 
-    @Before
-    public void prepareToken() throws JOSEException {
+    @BeforeEach
+    void prepareToken() throws JOSEException {
         // RSA signatures require a public and private RSA key pair, the public key
         // must be made known to the JWS recipient in order to verify the signatures
         RSAKey rsaJWK = new RSAKeyGenerator(2048)
@@ -157,10 +151,10 @@ public class TokenValidationTest {
         token = signedJWT.serialize();
         token2 = signedJWT2.serialize();
         expiredToken = signedJWTExpired.serialize();
-        tokenWithNotAllowedissuer = signedJWTWithIssuerNotAllowed.serialize();
+        tokenWithNotAllowedIssuer = signedJWTWithIssuerNotAllowed.serialize();
     }
 
-    private void testWebsocket(String name) throws InterruptedException {
+    private void testWebsocket(String name) throws Exception {
         //Test a websocket with token in query parameters
         WebSocketClient client = new StandardWebSocketClient();
         HttpHeaders headers = new HttpHeaders();
@@ -176,8 +170,8 @@ public class TokenValidationTest {
             Thread.sleep(10);
             try {
                 verify(getRequestedFor(urlPathEqualTo("/notify"))
-                        .withHeader("Connection", equalTo("Upgrade"))
-                        .withHeader("Upgrade", equalTo("websocket")));
+                        .withHeader(HttpHeaders.CONNECTION, equalTo(HttpHeaders.UPGRADE))
+                        .withHeader(HttpHeaders.UPGRADE, equalTo("websocket")));
                 done = true;
             } catch (VerificationException e) {
                 // nothing to do
@@ -187,18 +181,18 @@ public class TokenValidationTest {
             }
         }
         if (!done) {
-            Assert.fail("Wiremock didn't receive the websocket connection");
+            fail("Wiremock didn't receive the websocket connection");
         }
         try {
             wsconnection.timeout(Duration.ofMillis(100)).block();
-            Assert.fail("websocket client was closed but should remain open");
+            fail("websocket client was closed but should remain open");
         } catch (Exception ignored) {
             //should timeout
         }
     }
 
     @Test
-    public void gatewayTest() {
+    void gatewayTest() {
         initStubForJwk();
 
         UUID elementUuid = UUID.randomUUID();
@@ -208,57 +202,57 @@ public class TokenValidationTest {
 
         stubFor(get(urlEqualTo(String.format("/v1/explore/elements/metadata?ids=%s", elementUuid))).withHeader("userId", equalTo("chmits"))
             .willReturn(aResponse()
-                .withHeader("Content-Type", "application/json")
+                .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .withBody(String.format("[{\"elementUuid\" : \"%s\", \"type\" : \"STUDY\", \"subdirectoriesCount\" : \"0\", \"specificMetadata\" : {\"id\" : \"%s\", \"caseFormat\" : \"IIDM\"}}]", elementUuid, elementUuid))));
 
         stubFor(get(urlEqualTo(String.format("/v1/studies/metadata?ids=%s", elementUuid))).withHeader("userId", equalTo("chmits"))
                 .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
+                        .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                         .withBody(String.format("[{\"id\" : \"%s\", \"caseFormat\" : \"IIDM\"}]", elementUuid))));
 
         stubFor(get(urlEqualTo(String.format("/v1/contingency-lists/metadata?ids=%s", elementUuid))).withHeader("userId", equalTo("chmits"))
             .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
+                        .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                         .withBody(String.format("[{\"id\" : \"%s\", \"type\" : \"SCRIPT\"}]", elementUuid))));
 
         stubFor(get(urlEqualTo(String.format("/v1/filters/metadata?ids=%s", elementUuid))).withHeader("userId", equalTo("chmits"))
             .willReturn(aResponse()
-                .withHeader("Content-Type", "application/json")
+                .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .withBody(String.format("[{\"id\": \"%s\", \"type\" :\"LINE\"}]", elementUuid))));
 
         stubFor(get(urlEqualTo("/v1/root_directories")).withHeader("userId", equalTo("chmits"))
                 .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
+                        .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                         .withBody("[{\"name\": \"test\"}]")));
 
         stubFor(get(urlEqualTo("/v1/cases")).withHeader("userId", equalTo("chmits"))
                 .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
+                        .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                         .withBody("[{\"name\": \"testCase\", \"format\" :\"XIIDM\"}, {\"name\": \"testCase2\", \"format\" :\"CGMES\"}]")));
 
         stubFor(get(urlEqualTo("/v1/parameters")).withHeader("userId", equalTo("chmits"))
                 .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
+                        .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                         .withBody("[{\"theme\": \"dark\"}]")));
 
         stubFor(get(urlEqualTo("/v1/configs")).withHeader("userId", equalTo("chmits"))
                 .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
+                        .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                         .withBody("[{\"process\": \"TEST\", \"tsos\" : [\"BE\", \"NL\"]}]")));
 
         stubFor(get(urlEqualTo("/v1/boundaries")).withHeader("userId", equalTo("chmits"))
             .willReturn(aResponse()
-                .withHeader("Content-Type", "application/json")
+                .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .withBody("[{\"name\": \"boundary1\", \"id\" :\"da47a173-22d2-47e8-8a84-aa66e2d0fafb\"}]")));
 
         stubFor(get(urlEqualTo("/mappings")).withHeader("userId", equalTo("chmits"))
                 .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
+                        .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                         .withBody("[{\"name\": \"mapping1\", \"rules\":[]}]")));
 
         stubFor(get(urlEqualTo("/v1/reports")).withHeader("userId", equalTo("chmits"))
             .willReturn(aResponse()
-                .withHeader("Content-Type", "application/json")
+                .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .withBody("{\"id\": \"report1\", \"reports\" :[{\"date\":\"2001:01:01T11:11\", \"report\": \"Lets Rock\" }]}")));
 
         testToken(elementUuid, token);
@@ -269,7 +263,7 @@ public class TokenValidationTest {
     private void testToken(UUID elementUuid, String token) {
         webClient
                 .get().uri("case/v1/cases")
-                .header("Authorization", "Bearer " + token)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
@@ -280,7 +274,7 @@ public class TokenValidationTest {
 
         webClient
                 .get().uri("study/v1/studies/metadata?ids=" + elementUuid)
-                .header("Authorization", "Bearer " + token)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
@@ -289,7 +283,7 @@ public class TokenValidationTest {
 
         webClient
                 .get().uri("actions/v1/contingency-lists/metadata?ids=" + elementUuid)
-                .header("Authorization", "Bearer " + token)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
@@ -298,7 +292,7 @@ public class TokenValidationTest {
 
         webClient
                 .get().uri("config/v1/parameters")
-                .header("Authorization", "Bearer " + token)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
@@ -306,7 +300,7 @@ public class TokenValidationTest {
 
         webClient
                 .get().uri("directory/v1/root_directories")
-                .header("Authorization", "Bearer " + token)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
@@ -314,7 +308,7 @@ public class TokenValidationTest {
 
         webClient
                 .get().uri("dynamic-mapping/mappings")
-                .header("Authorization", "Bearer " + token)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
@@ -322,7 +316,7 @@ public class TokenValidationTest {
 
         webClient
             .get().uri("filter/v1/filters/metadata?ids=" + elementUuid)
-            .header("Authorization", "Bearer " + token)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
             .exchange()
             .expectStatus().isOk()
             .expectBody()
@@ -331,7 +325,7 @@ public class TokenValidationTest {
 
         webClient
             .get().uri("explore/v1/explore/elements/metadata?ids=" + elementUuid)
-            .header("Authorization", "Bearer " + token)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
             .exchange()
             .expectStatus().isOk()
             .expectBody()
@@ -341,15 +335,14 @@ public class TokenValidationTest {
     }
 
     @Test
-    @SneakyThrows
-    public void testWebsockets() {
+    void testWebsockets() throws Exception {
         initStubForJwk();
 
         stubFor(get(urlPathEqualTo("/notify")).withHeader("userId", equalTo("chmits"))
             .willReturn(aResponse()
                 .withHeader("Sec-WebSocket-Accept", "{{{sec-websocket-accept request.headers.Sec-WebSocket-Key}}}")
-                .withHeader("Upgrade", "websocket")
-                .withHeader("Connection", "Upgrade")
+                .withHeader(HttpHeaders.UPGRADE, "websocket")
+                .withHeader(HttpHeaders.CONNECTION, HttpHeaders.UPGRADE)
                 .withStatus(101)
                 .withStatusMessage("Switching Protocols")));
 
@@ -365,7 +358,7 @@ public class TokenValidationTest {
 
         stubFor(get(urlEqualTo("/.well-known/openid-configuration"))
             .willReturn(aResponse()
-                .withHeader("Content-Type", "application/json")
+                .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .withBody("{"
                         + "\"jwks_uri\": \"http://localhost:" + port + "/jwks\","
                                 + "\"introspection_endpoint\": \"http://localhost:" + port + "/introspection\""
@@ -373,29 +366,29 @@ public class TokenValidationTest {
 
         stubFor(get(urlEqualTo("/jwks"))
             .willReturn(aResponse()
-                .withHeader("Content-Type", "application/json")
+                .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .withBody("{\"keys\" : [ " + rsaKey.toJSONString() + " ] }")));
 
         stubFor(post(urlEqualTo("/introspection"))
                 .withRequestBody(equalTo("client_id=gridsuite&client_secret=secret&token=clientopaquetoken"))
                 .willReturn(aResponse()
-                    .withHeader("Content-Type", "application/json")
+                    .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                     .withBody("{\"active\":true,\"token_type\":\"Bearer\",\"exp\":2673442276,\"client_id\":\"chmits\"}")));
     }
 
     @Test
-    public void testJwksUpdate() {
+    void testJwksUpdate() {
         stubFor(head(urlEqualTo(String.format("/v1/users/%s", "chmits"))).withPort(port)
                 .willReturn(aResponse().withStatus(200)));
 
         stubFor(get(urlEqualTo("/v1/cases"))
                 .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
+                        .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                         .withBody("[{\"name\": \"testCase\", \"format\" :\"XIIDM\"}, {\"name\": \"testCase2\", \"format\" :\"CGMES\"}]")));
 
         stubFor(get(urlEqualTo("/.well-known/openid-configuration"))
                 .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
+                        .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                         .withBody("{"
                                 + "\"jwks_uri\": \"http://localhost:" + port + "/jwks\","
                                 + "\"introspection_endpoint\": \"http://localhost:" + port + "/introspection\""
@@ -406,64 +399,64 @@ public class TokenValidationTest {
         stubFor(get(urlEqualTo("/jwks"))
                 .withId(stubId)
                 .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
+                        .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                         .withBody("{\"keys\" : [] }")));
 
         webClient
                 .get().uri("case/v1/cases")
-                .header("Authorization", "Bearer " + token)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .exchange()
-                .expectStatus().isEqualTo(401);
+                .expectStatus().isUnauthorized();
 
         editStub(get(urlEqualTo("/jwks"))
                 .withId(stubId)
                 .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
+                        .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                         .withBody("{\"keys\" : [ " + rsaKey.toJSONString() + " ] }")));
         webClient
                 .get().uri("case/v1/cases")
-                .header("Authorization", "Bearer " + token)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .exchange()
-                .expectStatus().isEqualTo(200);
+                .expectStatus().isOk();
 
         webClient
                 .get().uri("case/v1/cases")
-                .header("Authorization", "Bearer " + token2)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token2)
                 .exchange()
-                .expectStatus().isEqualTo(401);
+                .expectStatus().isUnauthorized();
 
         stubFor(get(urlEqualTo("/jwks"))
                 .withId(stubId)
                 .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
+                        .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                         .withBody("{\"keys\" : [ " + rsaKey.toJSONString() + ", " + rsaKey2.toJSONString() + "] }")));
 
         webClient
                 .get().uri("case/v1/cases")
-                .header("Authorization", "Bearer " + token2)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token2)
                 .exchange()
-                .expectStatus().isEqualTo(200);
+                .expectStatus().isOk();
 
         webClient
                 .get().uri("case/v1/cases")
-                .header("Authorization", "Bearer " + token)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .exchange()
-                .expectStatus().isEqualTo(200);
+                .expectStatus().isOk();
     }
 
     @Test
-    public void invalidToken() {
+    void invalidToken() {
         stubFor(head(urlEqualTo(String.format("/v1/users/%s", "chmits"))).withPort(port)
                 .willReturn(aResponse().withStatus(200)));
 
         stubFor(get(urlEqualTo("/v1/cases"))
                 .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
+                        .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                         .withBody("[{\"name\": \"testCase\", \"format\" :\"XIIDM\"}, {\"name\": \"testCase2\", \"format\" :\"CGMES\"}]")));
 
         stubFor(get(urlEqualTo("/.well-known/openid-configuration"))
                 .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
+                        .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                         .withBody("{"
                                 + "\"jwks_uri\": \"http://localhost:" + port + "/jwks\","
                                 + "\"introspection_endpoint\": \"http://localhost:" + port + "/introspection\""
@@ -471,33 +464,33 @@ public class TokenValidationTest {
 
         stubFor(post(urlEqualTo("/introspection"))
                 .willReturn(aResponse()
-                    .withHeader("Content-Type", "application/json")
+                    .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                     .withBody("{\"active\":false}")));
 
         stubFor(get(urlEqualTo("/jwks"))
                 .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
+                        .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                         .withBody("{\"keys\" : [ " + rsaKey.toJSONString() + " ] }")));
 
         // test with no token
         webClient
                 .get().uri("case/v1/cases")
                 .exchange()
-                .expectStatus().isEqualTo(401);
+                .expectStatus().isUnauthorized();
 
         //test with an expired token
         webClient
                 .get().uri("case/v1/cases")
-                .header("Authorization", "Bearer " + expiredToken)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + expiredToken)
                 .exchange()
-                .expectStatus().isEqualTo(401);
+                .expectStatus().isUnauthorized();
 
         //test with with not allowed issuer
         webClient
                 .get().uri("case/v1/cases")
-                .header("Authorization", "Bearer " + tokenWithNotAllowedissuer)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenWithNotAllowedIssuer)
                 .exchange()
-                .expectStatus().isEqualTo(401);
+                .expectStatus().isUnauthorized();
 
         String tokenWithFakeAlgorithm = token.replaceFirst("U", "Q");
         String tokenWithFakeAudience = token.replaceFirst("X", "L");
@@ -505,49 +498,49 @@ public class TokenValidationTest {
         //test with token with a fake algorithm
         webClient
                 .get().uri("case/v1/cases")
-                .header("Authorization", "Bearer " + tokenWithFakeAlgorithm)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenWithFakeAlgorithm)
                 .exchange()
-                .expectStatus().isEqualTo(401);
+                .expectStatus().isUnauthorized();
 
         //test with token with fake audience
         webClient
                 .get().uri("case/v1/cases")
-                .header("Authorization", "Bearer " + tokenWithFakeAudience)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenWithFakeAudience)
                 .exchange()
-                .expectStatus().isEqualTo(401);
+                .expectStatus().isUnauthorized();
 
         // test with non JSON token, non valid reference token
         webClient
                 .get().uri("case/v1/cases")
-                .header("Authorization", "Bearer " + "NonValidToken")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + "NonValidToken")
                 .exchange()
-                .expectStatus().isEqualTo(401);
+                .expectStatus().isUnauthorized();
 
         //test with a incorrect Authorization value
         webClient
                 .get().uri("case/v1/cases")
-                .header("Authorization", token)
+                .header(HttpHeaders.AUTHORIZATION, token)
                 .exchange()
-                .expectStatus().isEqualTo(400);
+                .expectStatus().isBadRequest();
 
         // test without a token
         WebSocketClient client = new StandardWebSocketClient();
         client.execute(URI.create("ws://localhost:" +
                 this.localServerPort + "/study-notification/notify"),
-            ws -> ws.receive().then()).doOnSuccess(s -> Assert.fail("Should have thrown"));
+            ws -> ws.receive().then()).doOnSuccess(s -> fail("Should have thrown"));
     }
 
     @Test
-    public void forbiddenUserTest() {
+    void forbiddenUserTest() {
         initStubForJwk();
         stubFor(head(urlEqualTo(String.format("/v1/users/%s", "chmits"))).withPort(port)
                 .willReturn(aResponse().withStatus(204)));
 
         webClient
                 .get().uri("case/v1/cases")
-                .header("Authorization", "Bearer " + token)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .exchange()
-                .expectStatus().isEqualTo(403);
+                .expectStatus().isForbidden();
     }
 
     @TestConfiguration
