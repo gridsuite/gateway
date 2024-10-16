@@ -1,3 +1,4 @@
 allowed-issuers: http://localhost
 client_id: gridsuite
 client_secret: secret
+storeIdToken: true
