@@ -70,6 +70,7 @@ import static org.junit.jupiter.api.Assertions.fail;
         "gridsuite.services.network-modification-server.base-uri=http://localhost:${wiremock.server.port}",
         "gridsuite.services.user-admin-server.base-uri=http://localhost:${wiremock.server.port}",
         "gridsuite.services.sensitivity-analysis-server.base-uri=http://localhost:${wiremock.server.port}",
+        "gridsuite.services.user-identity-server.base-uri=http://localhost:${wiremock.server.port}",
         "allowed-issuers=http://localhost:${wiremock.server.port}"
     })
 @AutoConfigureWireMock(port = 0)
