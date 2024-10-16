@@ -26,6 +26,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.core.Ordered;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
@@ -39,6 +40,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static org.gridsuite.gateway.GatewayConfig.HEADER_USER_ID;
+
 //TODO add client_id
 //import static org.gridsuite.gateway.GatewayConfig.HEADER_CLIENT_ID;
 
@@ -80,7 +82,7 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         LOGGER.debug("Filter : {}", getClass().getSimpleName());
         ServerHttpRequest req = exchange.getRequest();
-        List<String> ls = req.getHeaders().get("Authorization");
+        List<String> ls = req.getHeaders().get(HttpHeaders.AUTHORIZATION);
         List<String> queryls = req.getQueryParams().get("access_token");
 
         if (ls == null && queryls == null) {
