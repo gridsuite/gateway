@@ -35,6 +35,7 @@ public class GatewayConfig {
             .route(p -> context.getBean(CaseServer.class).getRoute(p))
             .route(p -> context.getBean(StudyNotificationServer.class).getRoute(p))
             .route(p -> context.getBean(DirectoryNotificationServer.class).getRoute(p))
+            .route(p -> context.getBean(CaseImportServer.class).getRoute(p))
             .route(p -> context.getBean(ContingencyServer.class).getRoute(p))
             .route(p -> context.getBean(ConfigServer.class).getRoute(p))
             .route(p -> context.getBean(ConfigNotificationServer.class).getRoute(p))
