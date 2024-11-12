@@ -68,3 +68,6 @@ gridsuite:
       base-uri: http://localhost:5041
     spreadsheet-config-server:
       base-uri: http://localhost:5035
+    user-identity-server:
+      base-uri: http://localhost:5034
+    

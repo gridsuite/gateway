@@ -20,6 +20,7 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.gridsuite.gateway.GatewayService;
 import org.gridsuite.gateway.dto.TokenIntrospection;
+import org.gridsuite.gateway.services.UserIdentityService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -56,14 +57,19 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
     public static final String UNAUTHORIZED_THE_TOKEN_CANNOT_BE_TRUSTED = "{}: 401 Unauthorized, The token cannot be trusted";
     public static final String CACHE_OUTDATED = "{}: Bad JSON Object Signing and Encryption, cache outdated";
     private final GatewayService gatewayService;
+    private final UserIdentityService userIdentityService;
 
     @Value("${allowed-issuers}")
     private List<String> allowedIssuers;
 
+    @Value("${storeIdToken:false}")
+    private boolean storeIdTokens;
+
     private Map<String, JWKSet> jwkSetCache = new ConcurrentHashMap<>();
 
-    public TokenValidatorGlobalPreFilter(GatewayService gatewayService) {
+    public TokenValidatorGlobalPreFilter(GatewayService gatewayService, UserIdentityService userIdentityService) {
         this.gatewayService = gatewayService;
+        this.userIdentityService = userIdentityService;
     }
 
     @Override
@@ -158,6 +164,21 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
         validator.validate(filterInfos.getJwt(), null);
         // we can safely trust the JWT
         LOGGER.debug("JWT Token verified, it can be trusted");
+
+        // TODO how do we differentiate between JWT Access Token (no user information)
+        // and JWT ID tokens with little or no user information for which we use
+        // defaults like the sub. Do we need the storage server to always accumulate
+        // the data to guard against access token clearing data from a previous id token ?
+        // or do we need an explicit endpoint where our front sends idtoken (the frontend knows
+        // whether it has requested an access token or and id token) ? but then we maybe miss
+        // some tokens if for some reason the frontend doesn't send the token, whereas here
+        // we are guaranteed that we receive the token.
+        if (storeIdTokens) {
+            userIdentityService.storeToken(filterInfos.getJwtClaimsSet().getSubject(), filterInfos.getJwtClaimsSet())
+                    // send in the background and don't wait for the result. This is the hot path on
+                    // all requests !
+                    .subscribe();
+        }
 
         //we add the subject header
         filterInfos.getExchange().getRequest()
