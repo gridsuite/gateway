@@ -54,6 +54,7 @@ public class GatewayConfig {
             .route(p -> context.getBean(ShortCircuitServer.class).getRoute(p))
             .route(p -> context.getBean(StateEstimationOrchestratorServer.class).getRoute(p))
             .route(p -> context.getBean(SpreadsheetConfigServer.class).getRoute(p))
+            .route(p -> context.getBean(SpreadsheetConfigCollection.class).getRoute(p))
             .build();
     }
 }
