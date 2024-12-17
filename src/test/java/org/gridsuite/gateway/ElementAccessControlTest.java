@@ -207,8 +207,17 @@ class ElementAccessControlTest {
         stubFor(get(urlEqualTo(String.format("/v1/spreadsheet-configs/%s", uuid))).withHeader("userId", equalTo("user1"))
                 .willReturn(aResponse()));
 
+        stubFor(get(urlEqualTo(String.format("/v1/spreadsheet-config-collections/%s", uuid))).withHeader("userId", equalTo("user1"))
+                .willReturn(aResponse()));
+
         webClient
                 .get().uri(String.format("spreadsheet-config/v1/spreadsheet-configs/%s", uuid))
+                .header("Authorization", "Bearer " + tokenUser1)
+                .exchange()
+                .expectStatus().isOk();
+
+        webClient
+                .get().uri(String.format("spreadsheet-config/v1/spreadsheet-config-collections/%s", uuid))
                 .header("Authorization", "Bearer " + tokenUser1)
                 .exchange()
                 .expectStatus().isOk();
@@ -220,7 +229,19 @@ class ElementAccessControlTest {
                 .expectStatus().isNotFound();
 
         webClient
+                .get().uri(String.format("spreadsheet-config/v1/spreadsheet-config-collections/%s", uuid))
+                .header("Authorization", "Bearer " + tokenUser2)
+                .exchange()
+                .expectStatus().isNotFound();
+
+        webClient
                 .get().uri("spreadsheet-config/v1/spreadsheet-configs/invalid-uuid")
+                .header("Authorization", "Bearer " + tokenUser1)
+                .exchange()
+                .expectStatus().isNotFound();
+
+        webClient
+                .get().uri("spreadsheet-config/v1/spreadsheet-config-collections/invalid-uuid")
                 .header("Authorization", "Bearer " + tokenUser1)
                 .exchange()
                 .expectStatus().isNotFound();
