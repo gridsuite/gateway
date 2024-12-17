@@ -6,6 +6,8 @@ import reactor.netty.http.server.HttpServer;
 
 import java.util.function.Function;
 
+// As discussed here https://stackoverflow.com/questions/66028195/spring-webflux-actuator-netty-thread-metrics,
+// the metrics expose by reactor-netty are not enabled by default in spring boot. To enable them we add the following bean
 @Configuration
 public class NettyMetricsConfiguration implements NettyServerCustomizer {
     @Override
