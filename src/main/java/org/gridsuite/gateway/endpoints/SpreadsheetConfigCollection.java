@@ -23,7 +23,7 @@ public class SpreadsheetConfigCollection implements EndPointServer {
 
     @Override
     public String getEndpointBaseUri() {
-        return servicesURIsConfig.getSpreadsheetConfigServerBaseUri();
+        return servicesURIsConfig.getStudyConfigServerBaseUri();
     }
 
     @Override

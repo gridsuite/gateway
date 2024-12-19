@@ -111,8 +111,8 @@ public class ServiceURIsConfig {
     @Value("${gridsuite.services.state-estimation-orchestrator-server.base-uri:http://state-estimation-orchestrator-server/}")
     String stateEstimationOrchestratorServerBaseUri;
 
-    @Value("${gridsuite.services.spreadsheet-config-server.base-uri:http://spreadsheet-config-server/}")
-    String spreadsheetConfigServerBaseUri;
+    @Value("${gridsuite.services.study-config-server.base-uri:http://study-config-server/}")
+    String studyConfigServerBaseUri;
 
     @Value("${gridsuite.services.user-identity-server.base-uri:http://user-identity-server/}")
     String userIdentityServerBaseUri;
