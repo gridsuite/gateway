@@ -11,13 +11,13 @@ import org.gridsuite.gateway.ServiceURIsConfig;
 import org.springframework.stereotype.Component;
 
 /**
- * @author Ayoub LABIDI <ayoub.labidi at rte-france.com>
+ * @author David BRAQUART <david.braquart at rte-france.com>
  */
 @RequiredArgsConstructor
-@Component(value = SpreadsheetConfigCollection.ENDPOINT_NAME)
-public class SpreadsheetConfigCollection implements EndPointServer {
+@Component(value = StudyConfigServer.ENDPOINT_NAME)
+public class StudyConfigServer implements EndPointServer {
 
-    public static final String ENDPOINT_NAME = "spreadsheet-config-collections";
+    public static final String ENDPOINT_NAME = "study-config";
 
     private final ServiceURIsConfig servicesURIsConfig;
 
