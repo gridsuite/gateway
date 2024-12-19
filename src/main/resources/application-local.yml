@@ -63,7 +63,7 @@ gridsuite:
     shortcircuit-server:
       base-uri: http://localhost:5031
     state-estimation-server:
-      base-uri: http://localhost:5040
+      base-uri: http://localhost:6040
     state-estimation-orchestrator-server:
       base-uri: http://localhost:5041
     study-config-server:
