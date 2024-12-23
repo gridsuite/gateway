@@ -47,7 +47,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
         "gridsuite.services.filter-server.base-uri=http://localhost:${wiremock.server.port}",
         "gridsuite.services.user-admin-server.base-uri=http://localhost:${wiremock.server.port}",
         "gridsuite.services.sensitivity-analysis-server.base-uri=http://localhost:${wiremock.server.port}",
-        "gridsuite.services.spreadsheet-config-server.base-uri=http://localhost:${wiremock.server.port}",
+        "gridsuite.services.study-config-server.base-uri=http://localhost:${wiremock.server.port}",
     }
 )
 @AutoConfigureWireMock(port = 0)
@@ -211,37 +211,37 @@ class ElementAccessControlTest {
                 .willReturn(aResponse()));
 
         webClient
-                .get().uri(String.format("spreadsheet-config/v1/spreadsheet-configs/%s", uuid))
+                .get().uri(String.format("study-config/v1/spreadsheet-configs/%s", uuid))
                 .header("Authorization", "Bearer " + tokenUser1)
                 .exchange()
                 .expectStatus().isOk();
 
         webClient
-                .get().uri(String.format("spreadsheet-config/v1/spreadsheet-config-collections/%s", uuid))
+                .get().uri(String.format("study-config/v1/spreadsheet-config-collections/%s", uuid))
                 .header("Authorization", "Bearer " + tokenUser1)
                 .exchange()
                 .expectStatus().isOk();
 
         webClient
-                .get().uri(String.format("spreadsheet-config/v1/spreadsheet-configs/%s", uuid))
+                .get().uri(String.format("study-config/v1/spreadsheet-configs/%s", uuid))
                 .header("Authorization", "Bearer " + tokenUser2)
                 .exchange()
                 .expectStatus().isNotFound();
 
         webClient
-                .get().uri(String.format("spreadsheet-config/v1/spreadsheet-config-collections/%s", uuid))
+                .get().uri(String.format("study-config/v1/spreadsheet-config-collections/%s", uuid))
                 .header("Authorization", "Bearer " + tokenUser2)
                 .exchange()
                 .expectStatus().isNotFound();
 
         webClient
-                .get().uri("spreadsheet-config/v1/spreadsheet-configs/invalid-uuid")
+                .get().uri("study-config/v1/spreadsheet-configs/invalid-uuid")
                 .header("Authorization", "Bearer " + tokenUser1)
                 .exchange()
                 .expectStatus().isNotFound();
 
         webClient
-                .get().uri("spreadsheet-config/v1/spreadsheet-config-collections/invalid-uuid")
+                .get().uri("study-config/v1/spreadsheet-config-collections/invalid-uuid")
                 .header("Authorization", "Bearer " + tokenUser1)
                 .exchange()
                 .expectStatus().isNotFound();
