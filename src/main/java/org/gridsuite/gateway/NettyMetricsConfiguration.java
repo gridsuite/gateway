@@ -19,8 +19,7 @@ import java.util.function.Function;
  * @author Seddik Yengui <seddik.yengui_externe at rte-france.com>
  */
 
-// the metrics expose by reactor-netty are not enabled by default in spring boot.
-// To enable them we add the following bean to customise the Netty HttpServer.
+// Enable Netty metrics that are not enabled by default in Spring Boot.
 @Configuration
 public class NettyMetricsConfiguration implements NettyServerCustomizer {
     @Override
@@ -36,7 +35,9 @@ public class NettyMetricsConfiguration implements NettyServerCustomizer {
             if (!name.startsWith("reactor.netty")) {
                 return true;
             }
-            // Allow only the specific reactor metrics that we use
+            // Allow only the specific reactor metrics that we use.
+            // If additional metrics are added, ensure the URIs are provided in a template-like format.
+            // Without this, each unique URI generates a separate tag, which takes a lot of memory.
             return name.equals("reactor.netty.http.server.connections") ||
                     name.equals("reactor.netty.http.server.connections.active");
         });
