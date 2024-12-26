@@ -13,6 +13,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import reactor.netty.http.server.HttpServer;
 
+import java.util.List;
 import java.util.function.Function;
 
 /**
@@ -22,6 +23,15 @@ import java.util.function.Function;
 // Enable Netty metrics that are not enabled by default in Spring Boot.
 @Configuration
 public class NettyMetricsConfiguration implements NettyServerCustomizer {
+
+    private static final String REACTOR_NETTY_PREFIX = "reactor.netty";
+    // If additional metrics are added, ensure the URIs are provided in a template-like format.
+    // Without this, each unique URI generates a separate tag, which takes a lot of memory
+    private static final List<String> ALLOWED_REACTOR_NETTY_METRICS = List.of(
+            "reactor.netty.http.server.connections.total",
+            "reactor.netty.http.server.connections.active"
+    );
+
     @Override
     public HttpServer apply(HttpServer httpServer) {
         return httpServer.metrics(true, Function.identity());
@@ -32,14 +42,11 @@ public class NettyMetricsConfiguration implements NettyServerCustomizer {
         return MeterFilter.denyUnless(id -> {
             String name = id.getName();
             // Allow all non-reactor metrics
-            if (!name.startsWith("reactor.netty")) {
+            if (!name.startsWith(REACTOR_NETTY_PREFIX)) {
                 return true;
             }
-            // Allow only the specific reactor metrics that we use.
-            // If additional metrics are added, ensure the URIs are provided in a template-like format.
-            // Without this, each unique URI generates a separate tag, which takes a lot of memory.
-            return name.equals("reactor.netty.http.server.connections") ||
-                    name.equals("reactor.netty.http.server.connections.active");
+            // Allow only the specific reactor metrics that we use
+            return ALLOWED_REACTOR_NETTY_METRICS.contains(name);
         });
     }
 }
