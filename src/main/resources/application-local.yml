@@ -65,7 +65,7 @@ gridsuite:
     state-estimation-server:
       base-uri: http://localhost:6040
     state-estimation-orchestrator-server:
-      base-uri: http://localhost:5041
+      base-uri: http://localhost:6041
     study-config-server:
       base-uri: http://localhost:5035
     user-identity-server:
