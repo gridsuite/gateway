@@ -96,6 +96,9 @@ public class ServiceURIsConfig {
     @Value("${gridsuite.services.dynamic-simulation-server.base-uri:http://dynamic-simulation-server/}")
     String dynamicSimulationServerBaseUri;
 
+    @Value("${gridsuite.services.dynamic-security-analysis-server.base-uri:http://dynamic-security-analysis-server/}")
+    String dynamicSecurityAnalysisServerBaseUri;
+
     @Value("${gridsuite.services.case-import-server.base-uri:http://case-import-server/}")
     String caseImportServerBaseUri;
 
