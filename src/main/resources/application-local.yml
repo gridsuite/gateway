@@ -56,6 +56,8 @@ gridsuite:
       base-uri: http://localhost:5023
     dynamic-simulation-server:
       base-uri: http://localhost:5032
+    dynamic-security-analysis-server:
+      base-uri: http://localhost:5040
     case-import-server:
       base-uri: http://localhost:5039
     voltage-init-server:
