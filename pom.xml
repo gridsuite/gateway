@@ -46,6 +46,8 @@
 
         <nimbus-jose-jwt.version>8.14</nimbus-jose-jwt.version>
         <oauth2-oidc-sdk.version>7.3</oauth2-oidc-sdk.version>
+        <sonar.organization>gridsuite</sonar.organization>
+        <sonar.projectKey>org.gridsuite:gateway</sonar.projectKey>
     </properties>
 
     <build>
