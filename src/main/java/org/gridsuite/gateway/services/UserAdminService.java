@@ -23,22 +23,23 @@ public class UserAdminService {
 
     private static final String USER_ADMIN_SERVER_ROOT_PATH = DELIMITER + USER_ADMIN_SERVER_API_VERSION + DELIMITER + "users";
 
+    private static final String USER_ADMIN_RECORD_USER_CONNECTION_URL = USER_ADMIN_SERVER_ROOT_PATH + DELIMITER + "{sub}/record-connection";
+
     private final WebClient webClient;
 
     public UserAdminService(ServiceURIsConfig servicesURIsConfig, WebClient.Builder webClientBuilder) {
         this.webClient = webClientBuilder.baseUrl(servicesURIsConfig.getUserAdminServerBaseUri()).build();
     }
 
-    public Mono<Boolean> userExists(String sub) {
+    public Mono<Void> userRecordConnection(String sub, boolean isConnectionAccepted) {
         return webClient
-            .head()
-            .uri(uriBuilder -> uriBuilder
-                    .path(USER_ADMIN_SERVER_ROOT_PATH + DELIMITER + sub)
-                    .build()
-            )
-            .retrieve()
-            .toBodilessEntity()
-            .single()
-            .map(entity -> entity.getStatusCode().value() == 200);
+                .head()
+                .uri(uriBuilder -> uriBuilder
+                        .path(USER_ADMIN_RECORD_USER_CONNECTION_URL)
+                        .queryParam("isConnectionAccepted", isConnectionAccepted)
+                        .build(sub)  // Replace {sub} in the path with the actual value
+                )
+                .retrieve()
+                .bodyToMono(Void.class);
     }
 }

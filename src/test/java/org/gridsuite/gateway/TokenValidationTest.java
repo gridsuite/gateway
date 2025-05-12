@@ -71,7 +71,8 @@ import static org.junit.jupiter.api.Assertions.fail;
         "gridsuite.services.user-admin-server.base-uri=http://localhost:${wiremock.server.port}",
         "gridsuite.services.sensitivity-analysis-server.base-uri=http://localhost:${wiremock.server.port}",
         "gridsuite.services.user-identity-server.base-uri=http://localhost:${wiremock.server.port}",
-        "allowed-issuers=http://localhost:${wiremock.server.port}"
+        "allowed-issuers=http://localhost:${wiremock.server.port}",
+        "allowed-audiences=test.app,chmits",
     })
 @AutoConfigureWireMock(port = 0)
 class TokenValidationTest {
@@ -86,6 +87,7 @@ class TokenValidationTest {
     private String token2;
     private String expiredToken;
     private String tokenWithNotAllowedIssuer;
+    private String tokenWithNotAllowedAudience;
     private RSAKey rsaKey;
     private RSAKey rsaKey2;
 
@@ -120,6 +122,15 @@ class TokenValidationTest {
                 .expirationTime(new Date(new Date().getTime() + 60 * 1000))
                 .build();
 
+        // Prepare JWT with claims set for token with invalid audience
+        JWTClaimsSet claimsSetForInvalidAudience = new JWTClaimsSet.Builder()
+                .subject("chmits")
+                .audience("unauthorized.app")
+                .issuer("http://localhost:" + port)
+                .issueTime(new Date())
+                .expirationTime(new Date(new Date().getTime() + 60 * 1000))
+                .build();
+
         // Prepare JWT with claims set
         JWTClaimsSet claimsSetForExpiredToken = new JWTClaimsSet.Builder()
                 .subject("chmits")
@@ -142,17 +153,20 @@ class TokenValidationTest {
         SignedJWT signedJWT2 = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(rsaJWK2.getKeyID()).build(), claimsSet);
         SignedJWT signedJWTExpired = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(rsaJWK.getKeyID()).build(), claimsSetForExpiredToken);
         SignedJWT signedJWTWithIssuerNotAllowed = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(rsaJWK.getKeyID()).build(), claimsSetForTokenWithIssuerNotAllowed);
+        SignedJWT signedJWTWithInvalidAudience = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(rsaJWK.getKeyID()).build(), claimsSetForInvalidAudience);
 
         // Compute the RSA signature
         signedJWT.sign(signer);
         signedJWT2.sign(signer2);
         signedJWTExpired.sign(signer);
         signedJWTWithIssuerNotAllowed.sign(signer);
+        signedJWTWithInvalidAudience.sign(signer);
 
         token = signedJWT.serialize();
         token2 = signedJWT2.serialize();
         expiredToken = signedJWTExpired.serialize();
         tokenWithNotAllowedIssuer = signedJWTWithIssuerNotAllowed.serialize();
+        tokenWithNotAllowedAudience = signedJWTWithInvalidAudience.serialize();
     }
 
     private void testWebsocket(String name) throws Exception {
@@ -353,9 +367,54 @@ class TokenValidationTest {
         testWebsocket("directory-notification");
     }
 
-    private void initStubForJwk() {
-        stubFor(head(urlEqualTo(String.format("/v1/users/%s", "chmits"))).withPort(port)
+    @Test
+    void testAudienceValidation() {
+        initStubForJwk();
+
+        stubFor(get(urlEqualTo("/v1/cases"))
+                .willReturn(aResponse()
+                        .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                        .withBody("[{\"name\": \"testCase\", \"format\" :\"XIIDM\"}, {\"name\": \"testCase2\", \"format\" :\"CGMES\"}]")));
+
+        // Test with token having valid audience
+        webClient
+                .get().uri("case/v1/cases")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .exchange()
+                .expectStatus().isOk();
+
+        // Test with token having invalid audience
+        webClient
+                .get().uri("case/v1/cases")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenWithNotAllowedAudience)
+                .exchange()
+                .expectStatus().isUnauthorized();
+
+        // Test with opaque token having valid audience
+        webClient
+                .get().uri("case/v1/cases")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + "clientopaquetoken")
+                .exchange()
+                .expectStatus().isOk();
+
+        // Test with opaque token having invalid audience
+        webClient
+                .get().uri("case/v1/cases")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + "invalidAudienceOpaqueToken")
+                .exchange()
+                .expectStatus().isUnauthorized();
+    }
+
+    private void stubUserRecordConnection() {
+        // Stub for record-connection endpoint that handles both true and false values
+        stubFor(head(urlPathMatching(String.format("/v1/users/%s/record-connection", "chmits")))
+                .withQueryParam("isConnectionAccepted", matching("(true|false)"))
+                .withPort(port)
                 .willReturn(aResponse().withStatus(200)));
+    }
+
+    private void initStubForJwk() {
+        stubUserRecordConnection();
 
         stubFor(get(urlEqualTo("/.well-known/openid-configuration"))
             .willReturn(aResponse()
@@ -370,17 +429,24 @@ class TokenValidationTest {
                 .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .withBody("{\"keys\" : [ " + rsaKey.toJSONString() + " ] }")));
 
+        // Introspection endpoint for valid opaque token
         stubFor(post(urlEqualTo("/introspection"))
                 .withRequestBody(equalTo("client_id=gridsuite&client_secret=secret&token=clientopaquetoken"))
                 .willReturn(aResponse()
                     .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                     .withBody("{\"active\":true,\"token_type\":\"Bearer\",\"exp\":2673442276,\"client_id\":\"chmits\"}")));
+
+        // Introspection endpoint for invalid audience opaque token
+        stubFor(post(urlEqualTo("/introspection"))
+                .withRequestBody(equalTo("client_id=gridsuite&client_secret=secret&token=invalidAudienceOpaqueToken"))
+                .willReturn(aResponse()
+                        .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                        .withBody("{\"active\":true,\"token_type\":\"Bearer\",\"exp\":2673442276,\"client_id\":\"unauthorized.app\"}")));
     }
 
     @Test
     void testJwksUpdate() {
-        stubFor(head(urlEqualTo(String.format("/v1/users/%s", "chmits"))).withPort(port)
-                .willReturn(aResponse().withStatus(200)));
+        stubUserRecordConnection();
 
         stubFor(get(urlEqualTo("/v1/cases"))
                 .willReturn(aResponse()
@@ -447,8 +513,7 @@ class TokenValidationTest {
 
     @Test
     void invalidToken() {
-        stubFor(head(urlEqualTo(String.format("/v1/users/%s", "chmits"))).withPort(port)
-                .willReturn(aResponse().withStatus(200)));
+        stubUserRecordConnection();
 
         stubFor(get(urlEqualTo("/v1/cases"))
                 .willReturn(aResponse()
@@ -529,19 +594,6 @@ class TokenValidationTest {
         client.execute(URI.create("ws://localhost:" +
                 this.localServerPort + "/study-notification/notify"),
             ws -> ws.receive().then()).doOnSuccess(s -> fail("Should have thrown"));
-    }
-
-    @Test
-    void forbiddenUserTest() {
-        initStubForJwk();
-        stubFor(head(urlEqualTo(String.format("/v1/users/%s", "chmits"))).withPort(port)
-                .willReturn(aResponse().withStatus(204)));
-
-        webClient
-                .get().uri("case/v1/cases")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                .exchange()
-                .expectStatus().isForbidden();
     }
 
     @TestConfiguration

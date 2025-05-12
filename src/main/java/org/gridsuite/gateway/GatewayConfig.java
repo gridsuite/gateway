@@ -27,6 +27,7 @@ public class GatewayConfig {
 
     public static final String HEADER_USER_ID = "userId";
     public static final String HEADER_CLIENT_ID = "clientId";
+    public static final String HEADER_ROLES = "roles";
 
     @Bean
     public RouteLocator myRoutes(RouteLocatorBuilder builder, ApplicationContext context) {

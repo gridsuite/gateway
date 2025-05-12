@@ -30,10 +30,8 @@ import static org.gridsuite.gateway.GatewayConfig.HEADER_CLIENT_ID;
 public class UserAdminControlGlobalPreFilter extends AbstractGlobalPreFilter {
     private static final Logger LOGGER = LoggerFactory.getLogger(UserAdminControlGlobalPreFilter.class);
 
-    private UserAdminService userAdminService;
-
     public UserAdminControlGlobalPreFilter(UserAdminService userAdminService) {
-        this.userAdminService = userAdminService;
+        super(userAdminService);
     }
 
     @Override
@@ -46,7 +44,15 @@ public class UserAdminControlGlobalPreFilter extends AbstractGlobalPreFilter {
 
         if (maybeSubList != null) {
             String sub = maybeSubList.get(0);
-            return userAdminService.userExists(sub).flatMap(userExist -> Boolean.TRUE.equals(userExist) ? chain.filter(exchange) : completeWithCode(exchange, HttpStatus.FORBIDDEN));
+            // Record the connection with isConnectionAccepted=true
+            // and continue with the filter chain regardless of the result
+            return userAdminService.userRecordConnection(sub, true)
+                    .then(chain.filter(exchange))
+                    .onErrorResume(error -> {
+                        LOGGER.warn("Failed to record user connection for user {}: {}", sub, error.getMessage());
+                        // Continue anyway even if recording fails
+                        return chain.filter(exchange);
+                    });
         }
 
         if (maybeClientIdList != null) {
