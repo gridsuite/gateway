@@ -43,9 +43,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import static org.gridsuite.gateway.GatewayConfig.HEADER_ROLES;
 import static org.gridsuite.gateway.GatewayConfig.HEADER_USER_ID;
 
-//TODO add client_id
-//import static org.gridsuite.gateway.GatewayConfig.HEADER_CLIENT_ID;
-
 /**
  * @author Chamseddine Benhamed <chamseddine.benhamed at rte-france.com>
  */
@@ -132,9 +129,8 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
                 return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
             }
 
-            Mono<Void> validationResult = validateAudienceOrClientId(jwtClaimsSet, exchange);
-            if (validationResult != null) {
-                return validationResult;
+            if (!isValidAudienceOrClientId(jwtClaimsSet, exchange)) {
+                return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
             }
 
             Issuer iss = new Issuer(jwtClaimsSet.getIssuer());
@@ -168,9 +164,9 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
                 .flatMap((TokenIntrospection tokenIntrospection) -> {
                     // Check client ID against allowedClients
                     String clientId = tokenIntrospection.getClientId();
-                    Mono<Void> validationResult = validateClientId(clientId, exchange);
-                    if (validationResult != null) {
-                        return validationResult;
+                    if (!isValidClientId(clientId)) {
+                        LOGGER.info(UNAUTHORIZED_CLIENT_NOT_ALLOWED, exchange.getRequest().getPath(), clientId);
+                        return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
                     }
 
                     // TODO really add the client_id header instead of userid
@@ -203,9 +199,9 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
      *
      * @param jwtClaimsSet The JWT claims set
      * @param exchange The server web exchange
-     * @return Mono<Void> with unauthorized response if validation fails, null if validation passes
+     * @return true if validation passes, false otherwise
      */
-    private Mono<Void> validateAudienceOrClientId(JWTClaimsSet jwtClaimsSet, ServerWebExchange exchange) {
+    private boolean isValidAudienceOrClientId(JWTClaimsSet jwtClaimsSet, ServerWebExchange exchange) {
         LOGGER.debug("checking audience or client ID");
         List<String> tokenAudiences = jwtClaimsSet.getAudience();
 
@@ -217,13 +213,13 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
 
         if (audienceMatched) {
             LOGGER.debug("Audience validation successful");
-            return null;
+            return true;
         } else {
             LOGGER.debug("Audience validation failed for audiences: {}, trying client ID as fallback", tokenAudiences);
             String clientIdClaim = (String) jwtClaimsSet.getClaim("client_id");
-            if (clientIdClaim != null && allowedClients.contains(clientIdClaim)) {
+            if (isValidClientId(clientIdClaim)) {
                 LOGGER.debug("Client ID validation successful");
-                return null;
+                return true;
             }
         }
 
@@ -233,22 +229,17 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
             LOGGER.info(UNAUTHORIZED_CLIENT_NOT_ALLOWED, exchange.getRequest().getPath(), jwtClaimsSet.getClaim("client_id"));
         }
 
-        return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
+        return false;
     }
 
     /**
      * Validates whether a client ID is in the list of allowed clients.
      *
      * @param clientId The client ID to validate
-     * @param exchange The server web exchange
-     * @return Mono<Void> with unauthorized response if validation fails, null if validation passes
+     * @return true if validation passes, false otherwise
      */
-    private Mono<Void> validateClientId(String clientId, ServerWebExchange exchange) {
-        if (clientId == null || !allowedClients.contains(clientId)) {
-            LOGGER.info(UNAUTHORIZED_CLIENT_NOT_ALLOWED, exchange.getRequest().getPath(), clientId);
-            return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
-        }
-        return null;
+    private boolean isValidClientId(String clientId) {
+        return clientId != null && allowedClients.contains(clientId);
     }
 
     private Mono<Void> validate(FilterInfos filterInfos, JWKSet jwkset) throws BadJOSEException, JOSEException {

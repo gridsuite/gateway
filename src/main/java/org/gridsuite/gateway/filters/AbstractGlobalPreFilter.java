@@ -54,12 +54,7 @@ public abstract class AbstractGlobalPreFilter implements GlobalFilter, Ordered {
 
         if (maybeSubList != null && !maybeSubList.isEmpty()) {
             String sub = maybeSubList.getFirst();
-            return userAdminService.userRecordConnection(sub, false)
-                    .onErrorResume(error -> {
-                        LOGGER.warn("Failed to record failed connection for user {}: {}", sub, error.getMessage());
-                        return Mono.empty();
-                    })
-                    .then(exchange.getResponse().setComplete());
+            userAdminService.userRecordConnection(sub, false).subscribe();
         }
         return exchange.getResponse().setComplete();
     }
