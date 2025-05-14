@@ -7,8 +7,6 @@
 package org.gridsuite.gateway.filters;
 
 import org.gridsuite.gateway.services.UserAdminService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
 import org.springframework.http.HttpHeaders;
