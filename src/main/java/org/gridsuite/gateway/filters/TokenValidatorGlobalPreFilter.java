@@ -54,6 +54,7 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
 
     public static final String UNAUTHORIZED_INVALID_PLAIN_JOSE_OBJECT_ENCODING = "{}: 401 Unauthorized, Invalid plain JOSE object encoding or inactive opaque token";
     public static final String PARSING_ERROR = "{}: 500 Internal Server Error, error has been reached unexpectedly while parsing";
+    public static final String UNAUTHORIZED_AUDIENCE_NOT_ALLOWED = "{}: 401 Unauthorized, {} Audience is not in the audiences white list";
     public static final String UNAUTHORIZED_CLIENT_NOT_ALLOWED = "{}: 401 Unauthorized, {} Client ID is not in the allowed clients list";
 
     private static final Logger LOGGER = LoggerFactory.getLogger(TokenValidatorGlobalPreFilter.class);
@@ -209,30 +210,30 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
         List<String> tokenAudiences = jwtClaimsSet.getAudience();
 
         boolean audienceMatched = false;
-        if (tokenAudiences != null) {
+        if (tokenAudiences != null && !tokenAudiences.isEmpty()) {
             audienceMatched = tokenAudiences.stream()
                     .anyMatch(aud -> allowedAudiences.contains(aud));
         }
 
-        if (!audienceMatched) {
-            LOGGER.debug("audience not matched, checking client ID");
-            return validateJWTClientId(jwtClaimsSet, exchange);
+        if (audienceMatched) {
+            LOGGER.debug("Audience validation successful");
+            return null;
+        } else {
+            LOGGER.debug("Audience validation failed for audiences: {}, trying client ID as fallback", tokenAudiences);
+            String clientIdClaim = (String) jwtClaimsSet.getClaim("client_id");
+            if (clientIdClaim != null && allowedClients.contains(clientIdClaim)) {
+                LOGGER.debug("Client ID validation successful");
+                return null;
+            }
         }
 
-        return null;
-    }
+        if (tokenAudiences != null && !tokenAudiences.isEmpty()) {
+            LOGGER.info(UNAUTHORIZED_AUDIENCE_NOT_ALLOWED, exchange.getRequest().getPath(), tokenAudiences);
+        } else {
+            LOGGER.info(UNAUTHORIZED_CLIENT_NOT_ALLOWED, exchange.getRequest().getPath(), jwtClaimsSet.getClaim("client_id"));
+        }
 
-    /**
-     * Extracts and validates the client_id from JWT claims.
-     *
-     * @param jwtClaimsSet The JWT claims set
-     * @param exchange The server web exchange
-     * @return Mono<Void> with unauthorized response if validation fails, null if validation passes
-     */
-    private Mono<Void> validateJWTClientId(JWTClaimsSet jwtClaimsSet, ServerWebExchange exchange) {
-        LOGGER.debug("checking client ID from JWT claims");
-        String clientIdClaim = (String) jwtClaimsSet.getClaim("client_id");
-        return validateClientId(clientIdClaim, exchange);
+        return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
     }
 
     /**
