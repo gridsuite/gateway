@@ -54,7 +54,7 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
 
     public static final String UNAUTHORIZED_INVALID_PLAIN_JOSE_OBJECT_ENCODING = "{}: 401 Unauthorized, Invalid plain JOSE object encoding or inactive opaque token";
     public static final String PARSING_ERROR = "{}: 500 Internal Server Error, error has been reached unexpectedly while parsing";
-    public static final String UNAUTHORIZED_AUDIENCE_NOT_ALLOWED = "{}: 401 Unauthorized, {} Audience is not in the audiences white list";
+    public static final String UNAUTHORIZED_CLIENT_NOT_ALLOWED = "{}: 401 Unauthorized, {} Client ID is not in the allowed clients list";
 
     private static final Logger LOGGER = LoggerFactory.getLogger(TokenValidatorGlobalPreFilter.class);
     public static final String UNAUTHORIZED_THE_TOKEN_CANNOT_BE_TRUSTED = "{}: 401 Unauthorized, The token cannot be trusted";
@@ -65,8 +65,11 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
     @Value("${allowed-issuers}")
     private List<String> allowedIssuers;
 
-    @Value("${allowed-audiences:#{null}}")
+    @Value("${allowed-audiences}")
     private List<String> allowedAudiences;
+
+    @Value("${allowed-clients}")
+    private List<String> allowedClients;
 
     @Value("${storeIdToken:false}")
     private boolean storeIdTokens;
@@ -128,13 +131,21 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
                 return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
             }
 
-            Mono<Void> audienceValidationResult = validateAudience(jwtClaimsSet, exchange);
-            if (audienceValidationResult != null) {
-                return audienceValidationResult;
+            Mono<Void> validationResult = validateAudienceOrClientId(jwtClaimsSet, exchange);
+            if (validationResult != null) {
+                return validationResult;
             }
 
             Issuer iss = new Issuer(jwtClaimsSet.getIssuer());
-            ClientID clientID = new ClientID(jwtClaimsSet.getAudience().get(0));
+            ClientID clientID;
+            List<String> audiences = jwtClaimsSet.getAudience();
+            if (audiences != null && !audiences.isEmpty()) {
+                clientID = new ClientID(audiences.getFirst());
+            } else {
+                // Since audience validation failed but we're here, we must have a valid client_id
+                String clientIdClaim = (String) jwtClaimsSet.getClaim("client_id");
+                clientID = new ClientID(clientIdClaim);
+            }
 
             JWSAlgorithm jwsAlg = JWSAlgorithm.parse(jwt.getHeader().getAlgorithm().getName());
             return proceedFilter(new FilterInfos(exchange, chain, jwt, jwtClaimsSet, iss, clientID, jwsAlg));
@@ -154,14 +165,13 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
         return gatewayService.getOpaqueTokenIntrospectionUri(issBaseUri)
                 .flatMap(uri -> gatewayService.getOpaqueTokenIntrospection(uri, token))
                 .flatMap((TokenIntrospection tokenIntrospection) -> {
-                    // Check if audience validation is enabled and validate audience for opaque token
-                    if (allowedAudiences != null && !allowedAudiences.isEmpty()) {
-                        String clientId = tokenIntrospection.getClientId();
-                        if (clientId == null || !allowedAudiences.contains(clientId)) {
-                            LOGGER.info(UNAUTHORIZED_AUDIENCE_NOT_ALLOWED, exchange.getRequest().getPath(), clientId);
-                            return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
-                        }
+                    // Check client ID against allowedClients
+                    String clientId = tokenIntrospection.getClientId();
+                    Mono<Void> validationResult = validateClientId(clientId, exchange);
+                    if (validationResult != null) {
+                        return validationResult;
                     }
+
                     // TODO really add the client_id header instead of userid
                     exchange.getRequest().mutate()
                             .headers(h -> h.set(HEADER_USER_ID, tokenIntrospection.getClientId()));
@@ -176,49 +186,67 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
     }
 
     /**
-     * Validates that the token's audience matches one of the allowed audiences.
+     * Validates a token's audience or client ID depending on token type.
      *
-     * This method checks two different claims:
-     * 1. The 'aud' claim - standard JWT audience claim, used in id tokens
-     * 2. The 'client_id' claim - used in access tokens that are in JWT format
+     * JWT ID tokens (representing end users) typically contain an 'aud' claim that needs validation.
+     * JWT access tokens may not have an 'aud' claim but instead use a 'client_id' claim.
      *
-     * Access tokens in JWT format use a different structure than ID tokens. While
-     * ID tokens typically include the client_id in the 'aud' claim, access tokens
-     * might include it in a separate 'client_id' claim.
+     * We first try to validate the audience. Only if no valid audience is found, we fall back to
+     * client ID validation. This allows both token types to work with the gateway.
      *
-     * @param jwtClaimsSet The claims set from the JWT to validate
+     * IMPORTANT NOTES:
+     * - Currently, we only allow GridSuite audience tokens in the allowedAudiences configuration
+     * - If we want to allow other frontend applications to access this API:
+     *   a) This validation logic needs to be reviewed and possibly expanded
+     *   b) The CORS strategy would need to be modified accordingly to allow those origins
+     *
+     * @param jwtClaimsSet The JWT claims set
      * @param exchange The server web exchange
      * @return Mono<Void> with unauthorized response if validation fails, null if validation passes
      */
-    private Mono<Void> validateAudience(JWTClaimsSet jwtClaimsSet, ServerWebExchange exchange) {
-        if (allowedAudiences == null || allowedAudiences.isEmpty()) {
-            // Audience validation not configured, skip check
-            return null;
-        }
-
-        LOGGER.debug("checking audience");
+    private Mono<Void> validateAudienceOrClientId(JWTClaimsSet jwtClaimsSet, ServerWebExchange exchange) {
+        LOGGER.debug("checking audience or client ID");
         List<String> tokenAudiences = jwtClaimsSet.getAudience();
-        String clientIdClaim = (String) jwtClaimsSet.getClaim("client_id");
 
         boolean audienceMatched = false;
-
-        // Check aud claim (list) - standard JWT approach
         if (tokenAudiences != null) {
             audienceMatched = tokenAudiences.stream()
                     .anyMatch(aud -> allowedAudiences.contains(aud));
         }
 
-        // If no match in aud, check client_id claim - common in JWT access tokens
-        if (!audienceMatched && clientIdClaim != null) {
-            audienceMatched = allowedAudiences.contains(clientIdClaim);
+        if (!audienceMatched) {
+            LOGGER.debug("audience not matched, checking client ID");
+            return validateJWTClientId(jwtClaimsSet, exchange);
         }
 
-        if (!audienceMatched) {
-            LOGGER.info(UNAUTHORIZED_AUDIENCE_NOT_ALLOWED, exchange.getRequest().getPath(),
-                    tokenAudiences != null ? tokenAudiences : clientIdClaim);
+        return null;
+    }
+
+    /**
+     * Extracts and validates the client_id from JWT claims.
+     *
+     * @param jwtClaimsSet The JWT claims set
+     * @param exchange The server web exchange
+     * @return Mono<Void> with unauthorized response if validation fails, null if validation passes
+     */
+    private Mono<Void> validateJWTClientId(JWTClaimsSet jwtClaimsSet, ServerWebExchange exchange) {
+        LOGGER.debug("checking client ID from JWT claims");
+        String clientIdClaim = (String) jwtClaimsSet.getClaim("client_id");
+        return validateClientId(clientIdClaim, exchange);
+    }
+
+    /**
+     * Validates whether a client ID is in the list of allowed clients.
+     *
+     * @param clientId The client ID to validate
+     * @param exchange The server web exchange
+     * @return Mono<Void> with unauthorized response if validation fails, null if validation passes
+     */
+    private Mono<Void> validateClientId(String clientId, ServerWebExchange exchange) {
+        if (clientId == null || !allowedClients.contains(clientId)) {
+            LOGGER.info(UNAUTHORIZED_CLIENT_NOT_ALLOWED, exchange.getRequest().getPath(), clientId);
             return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
         }
-
         return null;
     }
 
