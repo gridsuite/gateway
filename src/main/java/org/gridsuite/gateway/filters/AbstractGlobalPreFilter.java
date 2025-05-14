@@ -24,7 +24,6 @@ import static org.gridsuite.gateway.GatewayConfig.HEADER_USER_ID;
  * @author Slimane Amar <slimane.amar at rte-france.com>
  */
 public abstract class AbstractGlobalPreFilter implements GlobalFilter, Ordered {
-    private static final Logger LOGGER = LoggerFactory.getLogger(AbstractGlobalPreFilter.class);
 
     protected final UserAdminService userAdminService;
 
