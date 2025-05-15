@@ -7,6 +7,8 @@
 package org.gridsuite.gateway.filters;
 
 import org.gridsuite.gateway.services.UserAdminService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
 import org.springframework.http.HttpHeaders;
@@ -22,6 +24,8 @@ import static org.gridsuite.gateway.GatewayConfig.HEADER_USER_ID;
  * @author Slimane Amar <slimane.amar at rte-france.com>
  */
 public abstract class AbstractGlobalPreFilter implements GlobalFilter, Ordered {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(AbstractGlobalPreFilter.class);
 
     protected final UserAdminService userAdminService;
 
@@ -45,7 +49,8 @@ public abstract class AbstractGlobalPreFilter implements GlobalFilter, Ordered {
     protected Mono<Void> completeWithError(ServerWebExchange exchange, HttpStatus status) {
         // Ensure we're only using this method with error status codes
         if (!status.isError()) {
-            throw new IllegalArgumentException("completeWithError should only be used with error status codes, received: " + status);
+            LOGGER.warn("completeWithError was called with a non-error status code: {}. " +
+                    "This method is intended for error responses only.", status);
         }
 
         exchange.getResponse().setStatusCode(status);
