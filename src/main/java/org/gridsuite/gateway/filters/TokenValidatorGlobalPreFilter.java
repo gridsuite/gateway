@@ -237,7 +237,17 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
     private Mono<Void> validate(FilterInfos filterInfos, JWKSet jwkset) throws BadJOSEException, JOSEException {
 
         // Create validator for signed ID tokens
-        // this works with jwt access tokens too (by chance ?) Do we need to modify this ?
+        // IMPORTANT: IDTokenValidator strictly enforces OpenID Connect standards including
+        // the mandatory presence of the 'aud' (audience) claim. Even though our code has a
+        // fallback mechanism in isValidAudienceOrClientId() to validate tokens with only
+        // client_id claims, the IDTokenValidator will still throw BadJOSEException with
+        // message "Missing JWT audience (aud) claim" for any token without an audience.
+        //
+        // This creates a behavior inconsistency: tokens with valid client_id but no audience
+        // will pass our custom validation (isValidAudienceOrClientId) but will be rejected here.
+        //
+        // Alternative approaches if client_id-only tokens must be fully supported:
+        // Use DefaultJWTClaimsVerifier instead of IDTokenValidator (https://connect2id.com/products/nimbus-jose-jwt/examples/validating-jwt-access-tokens)
         IDTokenValidator validator = new IDTokenValidator(filterInfos.getIss(), filterInfos.getClientID(), filterInfos.getJwsAlg(), jwkset);
 
         validator.validate(filterInfos.getJwt(), null);

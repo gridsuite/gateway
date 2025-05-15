@@ -42,6 +42,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.util.Base64;
+import java.util.Collections;
 import java.util.Date;
 import java.util.UUID;
 
@@ -89,6 +90,8 @@ class TokenValidationTest {
     private String expiredToken;
     private String tokenWithNotAllowedIssuer;
     private String tokenWithNotAllowedAudience;
+    private String tokenWithValidClientId;
+    private String tokenWithInvalidClientId;
     private RSAKey rsaKey;
     private RSAKey rsaKey2;
 
@@ -150,11 +153,31 @@ class TokenValidationTest {
                 .expirationTime(new Date(new Date().getTime() - 1000 * 60 * 60))
                 .build();
 
+        // Prepare JWT with claims set for token with valid client_id but no audience
+        JWTClaimsSet claimsSetValidClientId = new JWTClaimsSet.Builder()
+                .subject("chmits")
+                .issuer("http://localhost:" + port)
+                .claim("client_id", "chmits") // Valid client_id (in allowedClients)
+                .issueTime(new Date())
+                .expirationTime(new Date(new Date().getTime() + 60 * 1000))
+                .build();
+
+        // Prepare JWT with claims set for token with invalid client_id and no audience
+        JWTClaimsSet claimsSetInvalidClientId = new JWTClaimsSet.Builder()
+                .subject("chmits")
+                .issuer("http://localhost:" + port)
+                .claim("client_id", "invalid-client") // Invalid client_id (not in allowedClients)
+                .issueTime(new Date())
+                .expirationTime(new Date(new Date().getTime() + 60 * 1000))
+                .build();
+
         SignedJWT signedJWT = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(rsaJWK.getKeyID()).build(), claimsSet);
         SignedJWT signedJWT2 = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(rsaJWK2.getKeyID()).build(), claimsSet);
         SignedJWT signedJWTExpired = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(rsaJWK.getKeyID()).build(), claimsSetForExpiredToken);
         SignedJWT signedJWTWithIssuerNotAllowed = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(rsaJWK.getKeyID()).build(), claimsSetForTokenWithIssuerNotAllowed);
         SignedJWT signedJWTWithInvalidAudience = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(rsaJWK.getKeyID()).build(), claimsSetForInvalidAudience);
+        SignedJWT signedJWTValidClientId = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(rsaJWK.getKeyID()).build(), claimsSetValidClientId);
+        SignedJWT signedJWTInvalidClientId = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(rsaJWK.getKeyID()).build(), claimsSetInvalidClientId);
 
         // Compute the RSA signature
         signedJWT.sign(signer);
@@ -162,12 +185,16 @@ class TokenValidationTest {
         signedJWTExpired.sign(signer);
         signedJWTWithIssuerNotAllowed.sign(signer);
         signedJWTWithInvalidAudience.sign(signer);
+        signedJWTValidClientId.sign(signer);
+        signedJWTInvalidClientId.sign(signer);
 
         token = signedJWT.serialize();
         token2 = signedJWT2.serialize();
         expiredToken = signedJWTExpired.serialize();
         tokenWithNotAllowedIssuer = signedJWTWithIssuerNotAllowed.serialize();
         tokenWithNotAllowedAudience = signedJWTWithInvalidAudience.serialize();
+        tokenWithValidClientId = signedJWTValidClientId.serialize();
+        tokenWithInvalidClientId = signedJWTInvalidClientId.serialize();
     }
 
     private void testWebsocket(String name) throws Exception {
@@ -443,6 +470,31 @@ class TokenValidationTest {
                 .willReturn(aResponse()
                         .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                         .withBody("{\"active\":true,\"token_type\":\"Bearer\",\"exp\":2673442276,\"client_id\":\"unauthorized.app\"}")));
+    }
+
+    @Test
+    void testClientIdFallback() {
+        initStubForJwk();
+
+        stubFor(get(urlEqualTo("/v1/cases"))
+                .withHeader("userId", equalTo("chmits"))
+                .willReturn(aResponse()
+                        .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                        .withBody("[{\"name\": \"testCase\", \"format\" :\"XIIDM\"}]")));
+
+        // Test with token having valid client_id but no audience
+        webClient
+                .get().uri("case/v1/cases")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenWithValidClientId)
+                .exchange()
+                .expectStatus().isUnauthorized();
+
+        // Test with token having invalid client_id and no audience
+        webClient
+                .get().uri("case/v1/cases")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenWithInvalidClientId)
+                .exchange()
+                .expectStatus().isUnauthorized();
     }
 
     @Test
