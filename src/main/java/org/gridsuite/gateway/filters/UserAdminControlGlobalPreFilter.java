@@ -53,7 +53,7 @@ public class UserAdminControlGlobalPreFilter extends AbstractGlobalPreFilter {
             return chain.filter(exchange);
         }
 
-        return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
+        return completeWithError(exchange, HttpStatus.UNAUTHORIZED);
     }
 
     @Override

@@ -56,7 +56,7 @@ public class SupervisionAccessControlFilter extends AbstractGlobalPreFilter {
         if (SUPERVISION_PATTERN.matcher(path).matches()) {
             LOGGER.info(ACCESS_TO_SUPERVISION_ENDPOINT_IS_NOT_ALLOWED,
                     exchange.getRequest().getPath());
-            return completeWithCode(exchange, HttpStatus.FORBIDDEN);
+            return completeWithError(exchange, HttpStatus.FORBIDDEN);
         }
 
         return chain.filter(exchange);

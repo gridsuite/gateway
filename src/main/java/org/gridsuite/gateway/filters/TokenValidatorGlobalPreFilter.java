@@ -51,8 +51,8 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
 
     public static final String UNAUTHORIZED_INVALID_PLAIN_JOSE_OBJECT_ENCODING = "{}: 401 Unauthorized, Invalid plain JOSE object encoding or inactive opaque token";
     public static final String PARSING_ERROR = "{}: 500 Internal Server Error, error has been reached unexpectedly while parsing";
-    public static final String UNAUTHORIZED_AUDIENCE_NOT_ALLOWED = "{}: 401 Unauthorized, {} Audience is not in the audiences white list";
-    public static final String UNAUTHORIZED_CLIENT_NOT_ALLOWED = "{}: 401 Unauthorized, {} Client ID is not in the allowed clients list";
+    public static final String UNAUTHORIZED_AUDIENCE_NOT_ALLOWED = "401 Unauthorized, {} Audience is not in the audiences white list";
+    public static final String UNAUTHORIZED_CLIENT_NOT_ALLOWED = "401 Unauthorized, {} Client ID is not in the allowed clients list";
 
     private static final Logger LOGGER = LoggerFactory.getLogger(TokenValidatorGlobalPreFilter.class);
     public static final String UNAUTHORIZED_THE_TOKEN_CANNOT_BE_TRUSTED = "{}: 401 Unauthorized, The token cannot be trusted";
@@ -96,7 +96,7 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
         if (ls == null && queryls == null) {
             LOGGER.info("{}: 401 Unauthorized, Authorization header or access_token query parameter is required",
                 exchange.getRequest().getPath());
-            return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
+            return completeWithError(exchange, HttpStatus.UNAUTHORIZED);
         }
 
         // For now we only handle one token. If needed, we can adapt this code to check
@@ -109,7 +109,7 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
             if (arr.size() != 2 || !arr.get(0).equals("Bearer")) {
                 LOGGER.info("{}: 400 Bad Request, incorrect Authorization header value",
                     exchange.getRequest().getPath());
-                return completeWithCode(exchange, HttpStatus.BAD_REQUEST);
+                return completeWithError(exchange, HttpStatus.BAD_REQUEST);
             }
 
             token = arr.get(1);
@@ -126,11 +126,11 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
             LOGGER.debug("checking issuer");
             if (allowedIssuers.stream().noneMatch(iss -> jwtClaimsSet.getIssuer().startsWith(iss))) {
                 LOGGER.info("{}: 401 Unauthorized, {} Issuer is not in the issuers white list", exchange.getRequest().getPath(), jwtClaimsSet.getIssuer());
-                return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
+                return completeWithError(exchange, HttpStatus.UNAUTHORIZED);
             }
 
             if (!isValidAudienceOrClientId(jwtClaimsSet, exchange)) {
-                return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
+                return completeWithError(exchange, HttpStatus.UNAUTHORIZED);
             }
 
             Issuer iss = new Issuer(jwtClaimsSet.getIssuer());
@@ -165,8 +165,8 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
                     // Check client ID against allowedClients
                     String clientId = tokenIntrospection.getClientId();
                     if (!isValidClientId(clientId)) {
-                        LOGGER.info(UNAUTHORIZED_CLIENT_NOT_ALLOWED, exchange.getRequest().getPath(), clientId);
-                        return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
+                        LOGGER.info(UNAUTHORIZED_CLIENT_NOT_ALLOWED, clientId);
+                        return completeWithError(exchange, HttpStatus.UNAUTHORIZED);
                     }
 
                     // TODO really add the client_id header instead of userid
@@ -177,7 +177,7 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
                         return chain.filter(exchange);
                     } else {
                         LOGGER.info(UNAUTHORIZED_INVALID_PLAIN_JOSE_OBJECT_ENCODING, exchange.getRequest().getPath());
-                        return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
+                        return completeWithError(exchange, HttpStatus.UNAUTHORIZED);
                     }
                 });
     }
@@ -204,31 +204,23 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
     private boolean isValidAudienceOrClientId(JWTClaimsSet jwtClaimsSet, ServerWebExchange exchange) {
         LOGGER.debug("checking audience or client ID");
         List<String> tokenAudiences = jwtClaimsSet.getAudience();
-
-        boolean audienceMatched = false;
         if (tokenAudiences != null && !tokenAudiences.isEmpty()) {
-            audienceMatched = tokenAudiences.stream()
-                    .anyMatch(aud -> allowedAudiences.contains(aud));
-        }
-
-        if (audienceMatched) {
-            LOGGER.debug("Audience validation successful");
-            return true;
-        } else {
-            LOGGER.debug("Audience validation failed for audiences: {}, trying client ID as fallback", tokenAudiences);
-            String clientIdClaim = (String) jwtClaimsSet.getClaim("client_id");
-            if (isValidClientId(clientIdClaim)) {
-                LOGGER.debug("Client ID validation successful");
+            boolean audienceMatched = tokenAudiences.stream().anyMatch(aud -> allowedAudiences.contains(aud));
+            if (audienceMatched) {
+                LOGGER.debug("Audience validation successful");
                 return true;
             }
+            LOGGER.info(UNAUTHORIZED_AUDIENCE_NOT_ALLOWED, tokenAudiences);
+            return false;
         }
-
-        if (tokenAudiences != null && !tokenAudiences.isEmpty()) {
-            LOGGER.info(UNAUTHORIZED_AUDIENCE_NOT_ALLOWED, exchange.getRequest().getPath(), tokenAudiences);
-        } else {
-            LOGGER.info(UNAUTHORIZED_CLIENT_NOT_ALLOWED, exchange.getRequest().getPath(), jwtClaimsSet.getClaim("client_id"));
+        // If there is no audience at all in the token we can try a fallback
+        LOGGER.debug("Audience validation failed for audiences: {}, trying client ID as fallback", tokenAudiences);
+        String clientIdClaim = (String) jwtClaimsSet.getClaim("client_id");
+        if (isValidClientId(clientIdClaim)) {
+            LOGGER.debug("Client ID validation successful");
+            return true;
         }
-
+        LOGGER.info(UNAUTHORIZED_CLIENT_NOT_ALLOWED, jwtClaimsSet.getClaim("client_id"));
         return false;
     }
 
@@ -310,7 +302,7 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
                         jwkSetCache.put(filterInfos.getIss().getValue(), jwkSet);
                     } catch (ParseException e) {
                         LOGGER.info(PARSING_ERROR, filterInfos.getExchange().getRequest().getPath());
-                        return completeWithCode(filterInfos.getExchange(), HttpStatus.INTERNAL_SERVER_ERROR);
+                        return completeWithError(filterInfos.getExchange(), HttpStatus.INTERNAL_SERVER_ERROR);
                     }
                     return tryValidate(filterInfos, jwkSet, false);
                 })
@@ -328,7 +320,7 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
                 return this.proceedFilter(filterInfos);
             } else {
                 LOGGER.info(UNAUTHORIZED_THE_TOKEN_CANNOT_BE_TRUSTED, filterInfos.getExchange().getRequest().getPath());
-                return completeWithCode(filterInfos.getExchange(), HttpStatus.UNAUTHORIZED);
+                return completeWithError(filterInfos.getExchange(), HttpStatus.UNAUTHORIZED);
             }
         }
     }

@@ -30,15 +30,25 @@ public abstract class AbstractGlobalPreFilter implements GlobalFilter, Ordered {
     }
 
     /**
-     * Completes the exchange with the specified HTTP status code.
+     * Completes the exchange with the specified HTTP error status code and records failed connection attempts.
      *
-     * IMPORTANT NOTE: This method is currently called only when authentication or authorization fails
-     * in the filter chain. Therefore, we record a failed connection attempt (isConnectionAccepted=false)
-     * here to track unsuccessful login attempts. If the usage of this method changes in the future
-     * (e.g., if it's called for non-auth failures), this implementation should be reviewed.
+     * IMPORTANT NOTE: This method is intended only for authentication or authorization failures
+     * in the filter chain. It records a failed connection attempt (isConnectionAccepted=false)
+     * to track unsuccessful login attempts. If called with non-error status codes, an
+     * IllegalArgumentException will be thrown.
+     *
+     * @param exchange The server web exchange
+     * @param status The HTTP error status to return to the client
+     * @return A Mono that completes when the response has been sent
+     * @throws IllegalArgumentException if called with a non-error status code
      */
-    protected Mono<Void> completeWithCode(ServerWebExchange exchange, HttpStatus code) {
-        exchange.getResponse().setStatusCode(code);
+    protected Mono<Void> completeWithError(ServerWebExchange exchange, HttpStatus status) {
+        // Ensure we're only using this method with error status codes
+        if (!status.isError()) {
+            throw new IllegalArgumentException("completeWithError should only be used with error status codes, received: " + status);
+        }
+
+        exchange.getResponse().setStatusCode(status);
         if ("websocket".equalsIgnoreCase(exchange.getRequest().getHeaders().getUpgrade())) {
             // Force the connection to close for websockets handshakes to workaround apache
             // httpd reusing the connection for all subsequent requests in this connection.
