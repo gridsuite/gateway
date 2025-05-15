@@ -48,6 +48,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
         "gridsuite.services.user-admin-server.base-uri=http://localhost:${wiremock.server.port}",
         "gridsuite.services.sensitivity-analysis-server.base-uri=http://localhost:${wiremock.server.port}",
         "gridsuite.services.study-config-server.base-uri=http://localhost:${wiremock.server.port}",
+        "allowed-issuers=http://localhost:${wiremock.server.port}",
         "allowed-audiences=test.app,chmits",
         "allowed-clients=chmits",
     }
