@@ -72,4 +72,6 @@ gridsuite:
       base-uri: http://localhost:5035
     user-identity-server:
       base-uri: http://localhost:5034
-    
+
+allowed-issuers: http://172.17.0.1:9090
+allowed-audiences: gridexplore-client, gridadmin-client, griddyna-client, gridstudy-client, gridexplore-local, gridadmin-local, griddyna-local, gridstudy-local
