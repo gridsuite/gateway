@@ -73,5 +73,6 @@ gridsuite:
     user-identity-server:
       base-uri: http://localhost:5034
 
+# Note: The issuer configured in Docker Compose must match the one used here. Using localhost instead will not work.
 allowed-issuers: http://172.17.0.1:9090
 allowed-audiences: gridexplore-client, gridadmin-client, griddyna-client, gridstudy-client, gridexplore-local, gridadmin-local, griddyna-local, gridstudy-local
