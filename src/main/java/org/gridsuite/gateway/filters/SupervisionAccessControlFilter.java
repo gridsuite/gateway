@@ -6,6 +6,7 @@
  */
 package org.gridsuite.gateway.filters;
 
+import org.gridsuite.gateway.services.UserAdminService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
@@ -45,13 +46,17 @@ public class SupervisionAccessControlFilter extends AbstractGlobalPreFilter {
     private static final Pattern SUPERVISION_PATTERN = Pattern.compile("^/v\\d+/supervision(/.*)?$");
     public static final String ACCESS_TO_SUPERVISION_ENDPOINT_IS_NOT_ALLOWED = "{}: 403 Forbidden, Access to supervision endpoint is not allowed";
 
+    public SupervisionAccessControlFilter(UserAdminService userAdminService) {
+        super(userAdminService);
+    }
+
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         String path = exchange.getRequest().getURI().getPath();
         if (SUPERVISION_PATTERN.matcher(path).matches()) {
             LOGGER.info(ACCESS_TO_SUPERVISION_ENDPOINT_IS_NOT_ALLOWED,
                     exchange.getRequest().getPath());
-            return completeWithCode(exchange, HttpStatus.FORBIDDEN);
+            return completeWithError(exchange, HttpStatus.FORBIDDEN);
         }
 
         return chain.filter(exchange);

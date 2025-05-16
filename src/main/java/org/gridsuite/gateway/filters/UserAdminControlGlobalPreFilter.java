@@ -21,19 +21,21 @@ import reactor.core.publisher.Mono;
 import java.util.List;
 
 import static org.gridsuite.gateway.GatewayConfig.HEADER_USER_ID;
-import static org.gridsuite.gateway.GatewayConfig.HEADER_CLIENT_ID;
 
 /**
  * @author Etienne Homer <etienne.homer at rte-france.com>
+ *
+ *  This filter executes after other filters in the chain (as determined by its order),
+ *  allowing other filters to reject invalid requests before reaching this point.
+ *  The primary purpose of this filter is to record successful user connections rather than
+ *  to reject requests - except missing user ID which results in UNAUTHORIZED.
  */
 @Component
 public class UserAdminControlGlobalPreFilter extends AbstractGlobalPreFilter {
     private static final Logger LOGGER = LoggerFactory.getLogger(UserAdminControlGlobalPreFilter.class);
 
-    private UserAdminService userAdminService;
-
     public UserAdminControlGlobalPreFilter(UserAdminService userAdminService) {
-        this.userAdminService = userAdminService;
+        super(userAdminService);
     }
 
     @Override
@@ -42,21 +44,16 @@ public class UserAdminControlGlobalPreFilter extends AbstractGlobalPreFilter {
 
         HttpHeaders httpHeaders = exchange.getRequest().getHeaders();
         List<String> maybeSubList = httpHeaders.get(HEADER_USER_ID);
-        List<String> maybeClientIdList = httpHeaders.get(HEADER_CLIENT_ID);
 
         if (maybeSubList != null) {
             String sub = maybeSubList.get(0);
-            return userAdminService.userExists(sub).flatMap(userExist -> Boolean.TRUE.equals(userExist) ? chain.filter(exchange) : completeWithCode(exchange, HttpStatus.FORBIDDEN));
-        }
-
-        if (maybeClientIdList != null) {
-            // String clientId = maybeClientId.get(0);
-            // TODO do something with clientId
+            // Record the connection with isConnectionAccepted=true
+            // and continue with the filter chain regardless of the result
+            userAdminService.userRecordConnection(sub, true).subscribe();
             return chain.filter(exchange);
         }
 
-        // no sub or no clientid, can't control access
-        return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
+        return completeWithError(exchange, HttpStatus.UNAUTHORIZED);
     }
 
     @Override
