@@ -63,10 +63,10 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
     @Value("${allowed-issuers}")
     private List<String> allowedIssuers;
 
-    @Value("${allowed-audiences}")
+    @Value("${allowed-audiences:}")
     private List<String> allowedAudiences;
 
-    @Value("${allowed-clients}")
+    @Value("${allowed-clients:}")
     private List<String> allowedClients;
 
     @Value("${storeIdToken:false}")
@@ -129,7 +129,7 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
                 return completeWithError(exchange, HttpStatus.UNAUTHORIZED);
             }
 
-            if (!isValidAudienceOrClientId(jwtClaimsSet, exchange)) {
+            if (!isValidAudienceOrClientId(jwtClaimsSet)) {
                 return completeWithError(exchange, HttpStatus.UNAUTHORIZED);
             }
 
@@ -198,10 +198,14 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
      *   b) The CORS strategy would need to be modified accordingly to allow those origins
      *
      * @param jwtClaimsSet The JWT claims set
-     * @param exchange The server web exchange
      * @return true if validation passes, false otherwise
      */
-    private boolean isValidAudienceOrClientId(JWTClaimsSet jwtClaimsSet, ServerWebExchange exchange) {
+    private boolean isValidAudienceOrClientId(JWTClaimsSet jwtClaimsSet) {
+        if (allowedAudiences.isEmpty() && allowedClients.isEmpty()) {
+            LOGGER.debug("Bypassing audience and client ID validation as both allowed lists are empty");
+            return true;
+        }
+
         LOGGER.debug("checking audience or client ID");
         List<String> tokenAudiences = jwtClaimsSet.getAudience();
         if (tokenAudiences != null && !tokenAudiences.isEmpty()) {
@@ -231,6 +235,9 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
      * @return true if validation passes, false otherwise
      */
     private boolean isValidClientId(String clientId) {
+        if (allowedClients.isEmpty()) {
+            return true;
+        }
         return clientId != null && allowedClients.contains(clientId);
     }
 
