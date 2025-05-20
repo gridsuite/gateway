@@ -1,3 +1,5 @@
 allowed-issuers: #, #
+allowed-audiences:
+allowed-clients:
 client_id: #
 client_secret: #

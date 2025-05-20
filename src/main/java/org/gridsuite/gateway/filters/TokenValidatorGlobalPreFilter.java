@@ -20,6 +20,7 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.gridsuite.gateway.GatewayService;
 import org.gridsuite.gateway.dto.TokenIntrospection;
+import org.gridsuite.gateway.services.UserAdminService;
 import org.gridsuite.gateway.services.UserIdentityService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,10 +40,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static org.gridsuite.gateway.GatewayConfig.HEADER_ROLES;
 import static org.gridsuite.gateway.GatewayConfig.HEADER_USER_ID;
-
-//TODO add client_id
-//import static org.gridsuite.gateway.GatewayConfig.HEADER_CLIENT_ID;
 
 /**
  * @author Chamseddine Benhamed <chamseddine.benhamed at rte-france.com>
@@ -52,6 +51,8 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
 
     public static final String UNAUTHORIZED_INVALID_PLAIN_JOSE_OBJECT_ENCODING = "{}: 401 Unauthorized, Invalid plain JOSE object encoding or inactive opaque token";
     public static final String PARSING_ERROR = "{}: 500 Internal Server Error, error has been reached unexpectedly while parsing";
+    public static final String UNAUTHORIZED_AUDIENCE_NOT_ALLOWED = "401 Unauthorized, {} Audience is not in the audiences white list";
+    public static final String UNAUTHORIZED_CLIENT_NOT_ALLOWED = "401 Unauthorized, {} Client ID is not in the allowed clients list";
 
     private static final Logger LOGGER = LoggerFactory.getLogger(TokenValidatorGlobalPreFilter.class);
     public static final String UNAUTHORIZED_THE_TOKEN_CANNOT_BE_TRUSTED = "{}: 401 Unauthorized, The token cannot be trusted";
@@ -62,12 +63,19 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
     @Value("${allowed-issuers}")
     private List<String> allowedIssuers;
 
+    @Value("${allowed-audiences:}")
+    private List<String> allowedAudiences;
+
+    @Value("${allowed-clients:}")
+    private List<String> allowedClients;
+
     @Value("${storeIdToken:false}")
     private boolean storeIdTokens;
 
     private Map<String, JWKSet> jwkSetCache = new ConcurrentHashMap<>();
 
-    public TokenValidatorGlobalPreFilter(GatewayService gatewayService, UserIdentityService userIdentityService) {
+    public TokenValidatorGlobalPreFilter(GatewayService gatewayService, UserIdentityService userIdentityService, UserAdminService userAdminService) {
+        super(userAdminService);
         this.gatewayService = gatewayService;
         this.userIdentityService = userIdentityService;
     }
@@ -88,7 +96,7 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
         if (ls == null && queryls == null) {
             LOGGER.info("{}: 401 Unauthorized, Authorization header or access_token query parameter is required",
                 exchange.getRequest().getPath());
-            return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
+            return completeWithError(exchange, HttpStatus.UNAUTHORIZED);
         }
 
         // For now we only handle one token. If needed, we can adapt this code to check
@@ -101,7 +109,7 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
             if (arr.size() != 2 || !arr.get(0).equals("Bearer")) {
                 LOGGER.info("{}: 400 Bad Request, incorrect Authorization header value",
                     exchange.getRequest().getPath());
-                return completeWithCode(exchange, HttpStatus.BAD_REQUEST);
+                return completeWithError(exchange, HttpStatus.BAD_REQUEST);
             }
 
             token = arr.get(1);
@@ -118,11 +126,23 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
             LOGGER.debug("checking issuer");
             if (allowedIssuers.stream().noneMatch(iss -> jwtClaimsSet.getIssuer().startsWith(iss))) {
                 LOGGER.info("{}: 401 Unauthorized, {} Issuer is not in the issuers white list", exchange.getRequest().getPath(), jwtClaimsSet.getIssuer());
-                return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
+                return completeWithError(exchange, HttpStatus.UNAUTHORIZED);
+            }
+
+            if (!isValidAudienceOrClientId(jwtClaimsSet)) {
+                return completeWithError(exchange, HttpStatus.UNAUTHORIZED);
             }
 
             Issuer iss = new Issuer(jwtClaimsSet.getIssuer());
-            ClientID clientID = new ClientID(jwtClaimsSet.getAudience().get(0));
+            ClientID clientID;
+            List<String> audiences = jwtClaimsSet.getAudience();
+            if (audiences != null && !audiences.isEmpty()) {
+                clientID = new ClientID(audiences.getFirst());
+            } else {
+                // Since audience validation failed but we're here, we must have a valid client_id
+                String clientIdClaim = (String) jwtClaimsSet.getClaim("client_id");
+                clientID = new ClientID(clientIdClaim);
+            }
 
             JWSAlgorithm jwsAlg = JWSAlgorithm.parse(jwt.getHeader().getAlgorithm().getName());
             return proceedFilter(new FilterInfos(exchange, chain, jwt, jwtClaimsSet, iss, clientID, jwsAlg));
@@ -142,6 +162,13 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
         return gatewayService.getOpaqueTokenIntrospectionUri(issBaseUri)
                 .flatMap(uri -> gatewayService.getOpaqueTokenIntrospection(uri, token))
                 .flatMap((TokenIntrospection tokenIntrospection) -> {
+                    // Check client ID against allowedClients
+                    String clientId = tokenIntrospection.getClientId();
+                    if (!isValidClientId(clientId)) {
+                        LOGGER.info(UNAUTHORIZED_CLIENT_NOT_ALLOWED, clientId);
+                        return completeWithError(exchange, HttpStatus.UNAUTHORIZED);
+                    }
+
                     // TODO really add the client_id header instead of userid
                     exchange.getRequest().mutate()
                             .headers(h -> h.set(HEADER_USER_ID, tokenIntrospection.getClientId()));
@@ -150,15 +177,84 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
                         return chain.filter(exchange);
                     } else {
                         LOGGER.info(UNAUTHORIZED_INVALID_PLAIN_JOSE_OBJECT_ENCODING, exchange.getRequest().getPath());
-                        return completeWithCode(exchange, HttpStatus.UNAUTHORIZED);
+                        return completeWithError(exchange, HttpStatus.UNAUTHORIZED);
                     }
                 });
+    }
+
+    /**
+     * Validates a token's audience or client ID depending on token type.
+     *
+     * JWT ID tokens (representing end users) typically contain an 'aud' claim that needs validation.
+     * JWT access tokens may not have an 'aud' claim but instead use a 'client_id' claim.
+     *
+     * We first try to validate the audience. Only if no valid audience is found, we fall back to
+     * client ID validation. This allows both token types to work with the gateway.
+     *
+     * IMPORTANT NOTES:
+     * - Currently, we only allow GridSuite audience tokens in the allowedAudiences configuration
+     * - If we want to allow other frontend applications to access this API:
+     *   a) This validation logic needs to be reviewed and possibly expanded
+     *   b) The CORS strategy would need to be modified accordingly to allow those origins
+     *
+     * @param jwtClaimsSet The JWT claims set
+     * @return true if validation passes, false otherwise
+     */
+    private boolean isValidAudienceOrClientId(JWTClaimsSet jwtClaimsSet) {
+        if (allowedAudiences.isEmpty() && allowedClients.isEmpty()) {
+            LOGGER.debug("Bypassing audience and client ID validation as both allowed lists are empty");
+            return true;
+        }
+
+        LOGGER.debug("checking audience or client ID");
+        List<String> tokenAudiences = jwtClaimsSet.getAudience();
+        if (tokenAudiences != null && !tokenAudiences.isEmpty()) {
+            boolean audienceMatched = tokenAudiences.stream().anyMatch(aud -> allowedAudiences.contains(aud));
+            if (audienceMatched) {
+                LOGGER.debug("Audience validation successful");
+                return true;
+            }
+            LOGGER.info(UNAUTHORIZED_AUDIENCE_NOT_ALLOWED, tokenAudiences);
+            return false;
+        }
+        // If there is no audience at all in the token we can try a fallback
+        LOGGER.debug("Audience validation failed for audiences: {}, trying client ID as fallback", tokenAudiences);
+        String clientIdClaim = (String) jwtClaimsSet.getClaim("client_id");
+        if (isValidClientId(clientIdClaim)) {
+            LOGGER.debug("Client ID validation successful");
+            return true;
+        }
+        LOGGER.info(UNAUTHORIZED_CLIENT_NOT_ALLOWED, jwtClaimsSet.getClaim("client_id"));
+        return false;
+    }
+
+    /**
+     * Validates whether a client ID is in the list of allowed clients.
+     *
+     * @param clientId The client ID to validate
+     * @return true if validation passes, false otherwise
+     */
+    private boolean isValidClientId(String clientId) {
+        if (allowedClients.isEmpty()) {
+            return true;
+        }
+        return clientId != null && allowedClients.contains(clientId);
     }
 
     private Mono<Void> validate(FilterInfos filterInfos, JWKSet jwkset) throws BadJOSEException, JOSEException {
 
         // Create validator for signed ID tokens
-        // this works with jwt access tokens too (by chance ?) Do we need to modify this ?
+        // IMPORTANT: IDTokenValidator strictly enforces OpenID Connect standards including
+        // the mandatory presence of the 'aud' (audience) claim. Even though our code has a
+        // fallback mechanism in isValidAudienceOrClientId() to validate tokens with only
+        // client_id claims, the IDTokenValidator will still throw BadJOSEException with
+        // message "Missing JWT audience (aud) claim" for any token without an audience.
+        //
+        // This creates a behavior inconsistency: tokens with valid client_id but no audience
+        // will pass our custom validation (isValidAudienceOrClientId) but will be rejected here.
+        //
+        // Alternative approaches if client_id-only tokens must be fully supported:
+        // Use DefaultJWTClaimsVerifier instead of IDTokenValidator (https://connect2id.com/products/nimbus-jose-jwt/examples/validating-jwt-access-tokens)
         IDTokenValidator validator = new IDTokenValidator(filterInfos.getIss(), filterInfos.getClientID(), filterInfos.getJwsAlg(), jwkset);
 
         validator.validate(filterInfos.getJwt(), null);
@@ -183,7 +279,14 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
         //we add the subject header
         filterInfos.getExchange().getRequest()
                 .mutate()
-                .headers(h -> h.set(HEADER_USER_ID, filterInfos.getJwtClaimsSet().getSubject()));
+                .headers(h -> {
+                    h.set(HEADER_USER_ID, filterInfos.getJwtClaimsSet().getSubject());
+                    // Extract the profile claim if it exists and add it as roles header
+                    Object profileClaim = filterInfos.getJwtClaimsSet().getClaim("profile");
+                    if (profileClaim != null) {
+                        h.set(HEADER_ROLES, profileClaim.toString());
+                    }
+                });
 
         return filterInfos.getChain().filter(filterInfos.getExchange());
     }
@@ -216,7 +319,7 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
                         jwkSetCache.put(filterInfos.getIss().getValue(), jwkSet);
                     } catch (ParseException e) {
                         LOGGER.info(PARSING_ERROR, filterInfos.getExchange().getRequest().getPath());
-                        return completeWithCode(filterInfos.getExchange(), HttpStatus.INTERNAL_SERVER_ERROR);
+                        return completeWithError(filterInfos.getExchange(), HttpStatus.INTERNAL_SERVER_ERROR);
                     }
                     return tryValidate(filterInfos, jwkSet, false);
                 })
@@ -234,7 +337,7 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
                 return this.proceedFilter(filterInfos);
             } else {
                 LOGGER.info(UNAUTHORIZED_THE_TOKEN_CANNOT_BE_TRUSTED, filterInfos.getExchange().getRequest().getPath());
-                return completeWithCode(filterInfos.getExchange(), HttpStatus.UNAUTHORIZED);
+                return completeWithError(filterInfos.getExchange(), HttpStatus.UNAUTHORIZED);
             }
         }
     }
