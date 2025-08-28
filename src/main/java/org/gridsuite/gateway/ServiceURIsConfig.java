@@ -69,6 +69,9 @@ public class ServiceURIsConfig {
     @Value("${gridsuite.services.network-modification-server.base-uri:http://network-modification-server/}")
     String networkModificationServerBaseUri;
 
+    @Value("${gridsuite.services.network-map-server.base-uri:http://network-map-server/}")
+    String networkMapServerBaseUri;
+
     @Value("${powsybl.services.network-conversion-server.base-uri:http://network-conversion-server/}")
     String networkConversionServerBaseUri;
 
