@@ -44,6 +44,7 @@ public class GatewayConfig {
             .route(p -> context.getBean(DynamicMappingServer.class).getRoute(p))
             .route(p -> context.getBean(FilterServer.class).getRoute(p))
             .route(p -> context.getBean(NetworkModificationServer.class).getRoute(p))
+            .route(p -> context.getBean(NetworkMapServer.class).getRoute(p))
             .route(p -> context.getBean(NetworkConversionServer.class).getRoute(p))
             .route(p -> context.getBean(UserAdminServer.class).getRoute(p))
             .route(p -> context.getBean(SensitivityAnalysisServer.class).getRoute(p))
