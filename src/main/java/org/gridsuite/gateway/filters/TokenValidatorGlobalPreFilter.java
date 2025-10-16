@@ -169,12 +169,22 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
                         return completeWithError(exchange, HttpStatus.UNAUTHORIZED);
                     }
 
-                    // TODO really add the client_id header instead of userid
-                    exchange.getRequest().mutate()
-                            .headers(h -> h.set(HEADER_USER_ID, tokenIntrospection.getClientId()));
                     if (tokenIntrospection.getActive()) {
                         LOGGER.debug("Opaque Token verified, it can be trusted");
-                        return chain.filter(exchange);
+
+                        // TODO really add the client_id header instead of userid
+                        // Build mutated request with userId header
+                        ServerHttpRequest mutatedRequest = exchange.getRequest().mutate()
+                                .header(HEADER_USER_ID, tokenIntrospection.getClientId())
+                                .build();
+
+                        // Create new exchange with mutated request
+                        ServerWebExchange mutatedExchange = exchange.mutate()
+                                .request(mutatedRequest)
+                                .build();
+
+                        // Pass mutated exchange to chain
+                        return chain.filter(mutatedExchange);
                     } else {
                         LOGGER.info(UNAUTHORIZED_INVALID_PLAIN_JOSE_OBJECT_ENCODING, exchange.getRequest().getPath());
                         return completeWithError(exchange, HttpStatus.UNAUTHORIZED);
@@ -276,19 +286,23 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
                     .subscribe();
         }
 
+        ServerWebExchange exchange = filterInfos.getExchange();
         //we add the subject header
-        filterInfos.getExchange().getRequest()
-                .mutate()
-                .headers(h -> {
-                    h.set(HEADER_USER_ID, filterInfos.getJwtClaimsSet().getSubject());
-                    // Extract the profile claim if it exists and add it as roles header
-                    Object profileClaim = filterInfos.getJwtClaimsSet().getClaim("profile");
-                    if (profileClaim != null) {
-                        h.set(HEADER_ROLES, profileClaim.toString());
-                    }
-                });
+        ServerHttpRequest.Builder requestBuilder = exchange.getRequest().mutate()
+                .header(HEADER_USER_ID, filterInfos.getJwtClaimsSet().getSubject());
 
-        return filterInfos.getChain().filter(filterInfos.getExchange());
+        Object profileClaim = filterInfos.getJwtClaimsSet().getClaim("profile");
+        if (profileClaim != null) {
+            requestBuilder.header(HEADER_ROLES, profileClaim.toString());
+        }
+        ServerHttpRequest mutatedRequest = requestBuilder.build();
+
+        // Create a new exchange with the mutated request
+        ServerWebExchange mutatedExchange = exchange.mutate()
+                .request(mutatedRequest)
+                .build();
+
+        return filterInfos.getChain().filter(mutatedExchange);
     }
 
     /**
