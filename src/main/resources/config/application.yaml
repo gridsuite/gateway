@@ -7,3 +7,7 @@ server:
   netty:
     max-initial-line-length: 64000
     max-chunk-size: 64000
+powsybl-ws:
+  autoconfigure:
+    base-exception-handler:
+      enable: false
