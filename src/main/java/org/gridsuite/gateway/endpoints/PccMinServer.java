@@ -25,7 +25,7 @@ public class PccMinServer implements EndPointServer {
 
     @Override
     public String getEndpointBaseUri() {
-        return servicesURIsConfig.getGeoDataServerBaseUri();
+        return servicesURIsConfig.getPccMinServerBaseUri();
     }
 
     @Override
