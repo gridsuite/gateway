@@ -74,6 +74,8 @@ gridsuite:
       base-uri: http://localhost:5035
     user-identity-server:
       base-uri: http://localhost:5034
+    pcc-min-server:
+      base-uri: http://localhost:6042
 
 # Note: The issuer configured in Docker Compose must match the one used here. Using localhost instead will not work.
 allowed-issuers: http://172.17.0.1:9090
