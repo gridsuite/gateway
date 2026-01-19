@@ -57,6 +57,7 @@ public class GatewayConfig {
             .route(p -> context.getBean(StateEstimationOrchestratorServer.class).getRoute(p))
             .route(p -> context.getBean(StudyConfigServer.class).getRoute(p))
             .route(p -> context.getBean(GeoDataServer.class).getRoute(p))
+            .route(p -> context.getBean(PccMinServer.class).getRoute(p))
             .build();
     }
 }

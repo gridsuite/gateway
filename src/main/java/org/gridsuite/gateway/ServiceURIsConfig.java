@@ -122,4 +122,7 @@ public class ServiceURIsConfig {
 
     @Value("${gridsuite.services.user-identity-server.base-uri:http://user-identity-server/}")
     String userIdentityServerBaseUri;
+
+    @Value("${gridsuite.services.pcc-min-server.base-uri:http://pcc-min-server/}")
+    String pccMinServerBaseUri;
 }
