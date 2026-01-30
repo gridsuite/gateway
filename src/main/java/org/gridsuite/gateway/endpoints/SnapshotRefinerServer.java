@@ -12,20 +12,20 @@ import org.springframework.stereotype.Component;
 /**
  * @author Franck Lecuyer <franck.lecuyer at rte-france.com>
  */
-@Component(value = StateEstimationOrchestratorServer.ENDPOINT_NAME)
-public class StateEstimationOrchestratorServer implements EndPointServer {
+@Component(value = SnapshotRefinerServer.ENDPOINT_NAME)
+public class SnapshotRefinerServer implements EndPointServer {
 
-    public static final String ENDPOINT_NAME = "state-estimation-orchestrator";
+    public static final String ENDPOINT_NAME = "snapshot-refiner";
 
     private final ServiceURIsConfig servicesURIsConfig;
 
-    public StateEstimationOrchestratorServer(ServiceURIsConfig servicesURIsConfig) {
+    public SnapshotRefinerServer(ServiceURIsConfig servicesURIsConfig) {
         this.servicesURIsConfig = servicesURIsConfig;
     }
 
     @Override
     public String getEndpointBaseUri() {
-        return servicesURIsConfig.getStateEstimationOrchestratorServerBaseUri();
+        return servicesURIsConfig.getSnapshotRefinerServerBaseUri();
     }
 
     @Override
