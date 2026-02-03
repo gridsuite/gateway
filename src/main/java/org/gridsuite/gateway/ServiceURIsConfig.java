@@ -117,9 +117,6 @@ public class ServiceURIsConfig {
     @Value("${gridsuite.services.state-estimation-server.base-uri:http://state-estimation-server/}")
     String stateEstimationServerBaseUri;
 
-    @Value("${gridsuite.services.snapshot-refiner-server.base-uri:http://snapshot-refiner-server/}")
-    String snapshotRefinerServerBaseUri;
-
     @Value("${gridsuite.services.study-config-server.base-uri:http://study-config-server/}")
     String studyConfigServerBaseUri;
 
