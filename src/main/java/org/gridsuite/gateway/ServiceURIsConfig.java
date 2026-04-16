@@ -125,4 +125,7 @@ public class ServiceURIsConfig {
 
     @Value("${gridsuite.services.pcc-min-server.base-uri:http://pcc-min-server/}")
     String pccMinServerBaseUri;
+
+    @Value("${gridsuite.services.monitor-server.base-uri:http://monitor-server/}")
+    String monitorServerBaseUri;
 }
