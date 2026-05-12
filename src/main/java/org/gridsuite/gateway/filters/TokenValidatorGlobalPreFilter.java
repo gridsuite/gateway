@@ -358,7 +358,7 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
 
     @AllArgsConstructor
     @Getter
-    private static class FilterInfos {
+    private static final class FilterInfos {
         private final ServerWebExchange exchange;
         private final GatewayFilterChain chain;
         private final JWT jwt;
