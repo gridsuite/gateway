@@ -78,9 +78,6 @@ public class ServiceURIsConfig {
     @Value("${gridsuite.services.odre-server.base-uri:http://odre-server/}")
     String odreServerBaseUri;
 
-    @Value("${gridsuite.services.geo-data-server.base-uri:http://geo-data-server/}")
-    String geoDataServerBaseUri;
-
     @Value("${gridsuite.services.user-admin-server.base-uri:http://user-admin-server/}")
     String userAdminServerBaseUri;
 

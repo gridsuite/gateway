@@ -57,7 +57,6 @@ public class GatewayConfig {
             .route(p -> context.getBean(ShortCircuitServer.class).getRoute(p))
             .route(p -> context.getBean(StateEstimationServer.class).getRoute(p))
             .route(p -> context.getBean(StudyConfigServer.class).getRoute(p))
-            .route(p -> context.getBean(GeoDataServer.class).getRoute(p))
             .route(p -> context.getBean(PccMinServer.class).getRoute(p))
             .route(p -> context.getBean(MonitorServer.class).getRoute(p))
             .route(p -> context.getBean(MonitorNotificationServer.class).getRoute(p))
