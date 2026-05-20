@@ -43,8 +43,6 @@ gridsuite:
     network-map-server:
       base-uri: http://localhost:5006
     odre-server:
-      base-uri: http://localhost:8090
-    geo-data-server:
       base-uri: http://localhost:8087
     user-admin-server:
       base-uri: http://localhost:5033
