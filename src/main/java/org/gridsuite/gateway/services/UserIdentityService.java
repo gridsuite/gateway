@@ -6,13 +6,11 @@
  */
 package org.gridsuite.gateway.services;
 
+import com.nimbusds.jwt.JWTClaimsSet;
 import org.gridsuite.gateway.ServiceURIsConfig;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
-
-import com.nimbusds.jwt.JWTClaimsSet;
-
 import reactor.core.publisher.Mono;
 
 /**

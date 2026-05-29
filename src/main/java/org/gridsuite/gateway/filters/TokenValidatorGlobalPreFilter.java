@@ -157,6 +157,7 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
     }
 
     private Mono<Void> validateOpaqueReferenceToken(String issBaseUri, String token, ServerWebExchange exchange,
+            @SuppressWarnings("checkstyle:LambdaBodyLength")
             GatewayFilterChain chain) {
         // TODO CACHE the two requests
         return gatewayService.getOpaqueTokenIntrospectionUri(issBaseUri)

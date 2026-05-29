@@ -245,7 +245,8 @@ class TokenValidationTest {
         stubFor(get(urlEqualTo(String.format("/v1/explore/elements/metadata?ids=%s", elementUuid))).withHeader("userId", equalTo("chmits"))
             .willReturn(aResponse()
                 .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                .withBody(String.format("[{\"elementUuid\" : \"%s\", \"type\" : \"STUDY\", \"subdirectoriesCount\" : \"0\", \"specificMetadata\" : {\"id\" : \"%s\", \"caseFormat\" : \"IIDM\"}}]", elementUuid, elementUuid))));
+                .withBody(String.format("[{\"elementUuid\" : \"%s\", \"type\" : \"STUDY\", \"subdirectoriesCount\" : \"0\", \"specificMetadata\" : {\"id\" : \"%s\", \"caseFormat\" : \"IIDM\"}}]",
+                        elementUuid, elementUuid))));
 
         stubFor(get(urlEqualTo(String.format("/v1/studies/metadata?ids=%s", elementUuid))).withHeader("userId", equalTo("chmits"))
                 .willReturn(aResponse()
