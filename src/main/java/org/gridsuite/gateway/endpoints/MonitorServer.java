@@ -9,7 +9,6 @@ package org.gridsuite.gateway.endpoints;
 import org.gridsuite.gateway.ServiceURIsConfig;
 import org.springframework.stereotype.Component;
 
-
 /**
  * @author Kevin Le Saulnier <kevin.le-saulnier at rte-france.com>
  */

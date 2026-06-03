@@ -10,7 +10,7 @@ import org.gridsuite.gateway.ServiceURIsConfig;
 import org.springframework.stereotype.Component;
 
 /**
- * @author Florent MILLOT <florent.millot@rte-france.com>
+ * @author Florent MILLOT <florent.millot at rte-france.com>
  */
 @Component(value = ShortCircuitServer.ENDPOINT_NAME)
 public class ShortCircuitServer implements EndPointServer {
