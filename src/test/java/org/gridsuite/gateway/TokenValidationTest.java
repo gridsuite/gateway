@@ -642,6 +642,13 @@ class TokenValidationTest {
                 .exchange()
                 .expectStatus().isBadRequest();
 
+        // test with lowercase bearer scheme
+        webClient
+                .get().uri("case/v1/cases")
+                .header(HttpHeaders.AUTHORIZATION, "bearer " + token)
+                .exchange()
+                .expectStatus().isOk();
+
         // test without a token
         WebSocketClient client = new StandardWebSocketClient();
         client.execute(URI.create("ws://localhost:" +
