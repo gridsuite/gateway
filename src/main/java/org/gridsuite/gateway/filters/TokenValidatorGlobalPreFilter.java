@@ -106,7 +106,7 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
             String authorization = ls.get(0);
             List<String> arr = Arrays.asList(authorization.split(" "));
 
-            if (arr.size() != 2 || !arr.get(0).equals("Bearer")) {
+            if (arr.size() != 2 || !arr.get(0).equalsIgnoreCase("Bearer")) {
                 LOGGER.info("{}: 400 Bad Request, incorrect Authorization header value",
                     exchange.getRequest().getPath());
                 return completeWithError(exchange, HttpStatus.BAD_REQUEST);

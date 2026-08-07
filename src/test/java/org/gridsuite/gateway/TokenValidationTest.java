@@ -315,6 +315,18 @@ class TokenValidationTest {
                 .jsonPath("$[0].format").isEqualTo("XIIDM")
                 .jsonPath("$[1].format").isEqualTo("CGMES");
 
+        // test with lowercase bearer scheme
+        webClient
+                .get().uri("case/v1/cases")
+                .header(HttpHeaders.AUTHORIZATION, "bearer " + token)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$[0].name").isEqualTo("testCase")
+                .jsonPath("$[1].name").isEqualTo("testCase2")
+                .jsonPath("$[0].format").isEqualTo("XIIDM")
+                .jsonPath("$[1].format").isEqualTo("CGMES");
+
         webClient
                 .get().uri("study/v1/studies/metadata?ids=" + elementUuid)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
