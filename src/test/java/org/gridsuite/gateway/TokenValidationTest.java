@@ -473,6 +473,52 @@ class TokenValidationTest {
     }
 
     @Test
+    void testTokenInFormUrlEncodedBody() {
+        initStubForJwk();
+
+        stubFor(post(urlEqualTo("/v1/cases/download"))
+                .withHeader("userId", equalTo("chmits"))
+                .willReturn(aResponse()
+                        .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                        .withBody("[{\"name\": \"testCase\", \"format\" :\"XIIDM\"}]")));
+
+        // Test with a valid token sent as an access_token parameter in an
+        // application/x-www-form-urlencoded POST body (no Authorization header, no query parameter),
+        // mimicking the frontend's hidden form/iframe download flow.
+        webClient
+                .post().uri("case/v1/cases/download")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .bodyValue("access_token=" + token)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$[0].name").isEqualTo("testCase")
+                .jsonPath("$[0].format").isEqualTo("XIIDM");
+
+        // Test with an invalid token in the form body
+        webClient
+                .post().uri("case/v1/cases/download")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .bodyValue("access_token=" + tokenWithNotAllowedIssuer)
+                .exchange()
+                .expectStatus().isUnauthorized();
+
+        // Test with no access_token parameter at all in the form body
+        webClient
+                .post().uri("case/v1/cases/download")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .bodyValue("foo=bar")
+                .exchange()
+                .expectStatus().isUnauthorized();
+
+        // Test with a form body but on a GET request: not eligible for body-based token extraction
+        webClient
+                .get().uri("case/v1/cases/download")
+                .exchange()
+                .expectStatus().isUnauthorized();
+    }
+
+    @Test
     void testClientIdFallback() {
         initStubForJwk();
 

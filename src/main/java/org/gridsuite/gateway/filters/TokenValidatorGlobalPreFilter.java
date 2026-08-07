@@ -27,17 +27,28 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.core.Ordered;
+import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.server.reactive.ServerHttpRequest;
+import org.springframework.http.server.reactive.ServerHttpRequestDecorator;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.util.function.Tuple2;
+import reactor.util.function.Tuples;
 
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static org.gridsuite.gateway.GatewayConfig.HEADER_ROLES;
@@ -94,9 +105,24 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
         List<String> queryls = req.getQueryParams().get("access_token");
 
         if (ls == null && queryls == null) {
-            LOGGER.info("{}: 401 Unauthorized, Authorization header or access_token query parameter is required",
-                exchange.getRequest().getPath());
-            return completeWithError(exchange, HttpStatus.UNAUTHORIZED);
+            // No Authorization header nor access_token query parameter: as a last resort, try to
+            // read an access_token parameter from an application/x-www-form-urlencoded request body
+            // (used by the frontend for form-POST based downloads, where the token is sent as a
+            // hidden form field instead of appearing in the url).
+            // NB: extractTokenFromFormBody() completing empty (no token found) cannot be distinguished
+            // from processToken() completing "empty" (Mono<Void> never emits an item), so the "not
+            // found" case is wrapped into an Optional to unambiguously decide which Mono to run next.
+            return extractTokenFromFormBody(exchange)
+                .map(Optional::of)
+                .defaultIfEmpty(Optional.empty())
+                .flatMap(tokenAndExchange -> tokenAndExchange
+                    .map(t -> processToken(t.getT1(), t.getT2(), chain))
+                    .orElseGet(() -> {
+                        LOGGER.info(
+                            "{}: 401 Unauthorized, Authorization header, access_token query parameter or access_token form body parameter is required",
+                            exchange.getRequest().getPath());
+                        return completeWithError(exchange, HttpStatus.UNAUTHORIZED);
+                    }));
         }
 
         // For now we only handle one token. If needed, we can adapt this code to check
@@ -117,6 +143,77 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
             token = queryls.get(0);
         }
 
+        return processToken(token, exchange, chain);
+    }
+
+    /**
+     * Best-effort extraction of an "access_token" parameter from an application/x-www-form-urlencoded
+     * request body. Since the request body can only be consumed once, the body is cached and the
+     * exchange's request is decorated so that it can still be forwarded downstream with its body intact.
+     *
+     * @return a Mono emitting the extracted token together with the (possibly mutated) exchange, or an
+     *         empty Mono if no token could be found (wrong method/content-type, or missing parameter)
+     */
+    private Mono<Tuple2<String, ServerWebExchange>> extractTokenFromFormBody(ServerWebExchange exchange) {
+        ServerHttpRequest request = exchange.getRequest();
+        MediaType contentType = request.getHeaders().getContentType();
+
+        if (request.getMethod() != HttpMethod.POST
+            || contentType == null
+            || !MediaType.APPLICATION_FORM_URLENCODED.isCompatibleWith(contentType)) {
+            return Mono.empty();
+        }
+
+        return DataBufferUtils.join(request.getBody())
+            .flatMap(dataBuffer -> extractTokenFromJoinedBody(exchange, request, dataBuffer));
+    }
+
+    /**
+     * Extracts the "access_token" parameter from the joined request body buffer and, if found, builds
+     * a mutated exchange whose request body is re-injected so it can still be forwarded downstream.
+     */
+    private Mono<Tuple2<String, ServerWebExchange>> extractTokenFromJoinedBody(ServerWebExchange exchange,
+            ServerHttpRequest request, DataBuffer dataBuffer) {
+        byte[] bodyBytes = new byte[dataBuffer.readableByteCount()];
+        dataBuffer.read(bodyBytes);
+        DataBufferUtils.release(dataBuffer);
+
+        String accessToken = extractAccessTokenParam(new String(bodyBytes, StandardCharsets.UTF_8));
+        if (accessToken == null || accessToken.isEmpty()) {
+            return Mono.empty();
+        }
+
+        // Re-inject the already consumed body so the request can still be forwarded downstream.
+        ServerHttpRequest mutatedRequest = new ServerHttpRequestDecorator(request) {
+            @Override
+            public Flux<DataBuffer> getBody() {
+                return Flux.defer(() -> Flux.just(exchange.getResponse().bufferFactory().wrap(bodyBytes)));
+            }
+        };
+
+        return Mono.just(Tuples.of(accessToken, exchange.mutate().request(mutatedRequest).build()));
+    }
+
+    /**
+     * Parses an "access_token" parameter value out of an application/x-www-form-urlencoded body,
+     * without decoding/allocating the other parameters.
+     */
+    private static String extractAccessTokenParam(String formBody) {
+        if (formBody == null || formBody.isEmpty()) {
+            return null;
+        }
+        for (String pair : formBody.split("&")) {
+            int idx = pair.indexOf('=');
+            String key = idx >= 0 ? pair.substring(0, idx) : pair;
+            if ("access_token".equals(key)) {
+                String rawValue = idx >= 0 && idx < pair.length() - 1 ? pair.substring(idx + 1) : "";
+                return URLDecoder.decode(rawValue, StandardCharsets.UTF_8);
+            }
+        }
+        return null;
+    }
+
+    private Mono<Void> processToken(String token, ServerWebExchange exchange, GatewayFilterChain chain) {
         JWT jwt;
         JWTClaimsSet jwtClaimsSet;
         try {
