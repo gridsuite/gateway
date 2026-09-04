@@ -50,10 +50,14 @@ public class SupervisionAccessControlFilter extends AbstractGlobalPreFilter {
         super(userAdminService);
     }
 
+    public static boolean isSupervisionPath(String path) {
+        return SUPERVISION_PATTERN.matcher(path).matches();
+    }
+
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         String path = exchange.getRequest().getURI().getPath();
-        if (SUPERVISION_PATTERN.matcher(path).matches()) {
+        if (isSupervisionPath(path)) {
             LOGGER.info(ACCESS_TO_SUPERVISION_ENDPOINT_IS_NOT_ALLOWED,
                     exchange.getRequest().getPath());
             return completeWithError(exchange, HttpStatus.FORBIDDEN);

@@ -31,6 +31,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.web.reactive.socket.CloseStatus;
+import org.springframework.web.reactive.socket.WebSocketSession;
 import org.springframework.web.reactive.socket.client.StandardWebSocketClient;
 import org.springframework.web.reactive.socket.client.WebSocketClient;
 import reactor.core.publisher.Mono;
@@ -44,8 +46,12 @@ import java.time.Duration;
 import java.util.Base64;
 import java.util.Date;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
@@ -74,6 +80,7 @@ import static org.junit.jupiter.api.Assertions.fail;
         "allowed-issuers=http://localhost:${wiremock.server.port}",
         "allowed-audiences=test.app,chmits",
         "allowed-clients=chmits",
+        "websocket-first-message-token-timeout=1s",
     })
 @AutoConfigureWireMock(port = 0)
 class TokenValidationTest {
@@ -198,11 +205,23 @@ class TokenValidationTest {
 
     private void testWebsocket(String name) throws Exception {
         //Test a websocket with token in query parameters
+        testWebsocketConnection(URI.create("ws://localhost:" + this.localServerPort + "/" + name + "/notify?access_token=" + token),
+                ws -> ws.receive().then());
+    }
+
+    /**
+     * Connects a websocket without any token in the URL, then sends the given token as the very
+     * first websocket message, as expected by the gateway when no token was provided at handshake time.
+     */
+    private void testWebsocketWithTokenAsFirstMessage(String name, String tokenToSend) throws Exception {
+        testWebsocketConnection(URI.create("ws://localhost:" + this.localServerPort + "/" + name + "/notify"),
+                ws -> ws.send(Mono.just(ws.textMessage(tokenToSend))).thenMany(ws.receive()).then());
+    }
+
+    private void testWebsocketConnection(URI uri, Function<WebSocketSession, Mono<Void>> handler) throws Exception {
         WebSocketClient client = new StandardWebSocketClient();
         HttpHeaders headers = new HttpHeaders();
-        Mono<Void> wsconnection = client.execute(
-            URI.create("ws://localhost:" + this.localServerPort + "/" + name + "/notify?access_token=" + token), headers,
-            ws -> ws.receive().then());
+        Mono<Void> wsconnection = client.execute(uri, headers, handler::apply);
         wsconnection.subscribe();
 
         // Busy loop waiting to check that spring-gateway contacted our wiremock server
@@ -231,6 +250,29 @@ class TokenValidationTest {
         } catch (Exception ignored) {
             //should timeout
         }
+    }
+
+    /**
+     * Connects a websocket that the gateway is expected to reject: asserts that the gateway closes it
+     * with a POLICY_VIOLATION status and never contacts the backend.
+     */
+    private void testWebsocketConnectionIsRejected(URI uri, Function<WebSocketSession, Mono<Void>> handler) {
+        int notifyRequestsBefore = findAll(getRequestedFor(urlPathEqualTo("/notify"))).size();
+
+        WebSocketClient client = new StandardWebSocketClient();
+        AtomicReference<CloseStatus> closeStatus = new AtomicReference<>();
+        Mono<Void> wsconnection = client.execute(uri, new HttpHeaders(), ws -> {
+            ws.closeStatus().doOnNext(closeStatus::set).subscribe();
+            return handler.apply(ws);
+        });
+
+        // The gateway should close the connection: this should complete normally (not time out, not throw)
+        wsconnection.timeout(Duration.ofSeconds(5)).block();
+
+        assertNotNull(closeStatus.get(), "the gateway should have sent a close frame");
+        assertEquals(CloseStatus.POLICY_VIOLATION.getCode(), closeStatus.get().getCode());
+        // The backend should never have been contacted since no valid token was received.
+        assertEquals(notifyRequestsBefore, findAll(getRequestedFor(urlPathEqualTo("/notify"))).size());
     }
 
     @Test
@@ -393,6 +435,49 @@ class TokenValidationTest {
         testWebsocket("config-notification");
         testWebsocket("merge-notification");
         testWebsocket("directory-notification");
+    }
+
+    @Test
+    void testWebsocketWithGoodTokenAsFirstMessage() throws Exception {
+        initStubForJwk();
+
+        stubFor(get(urlPathEqualTo("/notify")).withHeader("userId", equalTo("chmits"))
+            .willReturn(aResponse()
+                .withHeader("Sec-WebSocket-Accept", "{{{sec-websocket-accept request.headers.Sec-WebSocket-Key}}}")
+                .withHeader(HttpHeaders.UPGRADE, "websocket")
+                .withHeader(HttpHeaders.CONNECTION, HttpHeaders.UPGRADE)
+                .withStatus(101)
+                .withStatusMessage("Switching Protocols")));
+
+        // No token in the URL: the gateway should accept the handshake and wait for the token
+        // as the first websocket message, then proceed normally once it is valid.
+        testWebsocketWithTokenAsFirstMessage("study-notification", token);
+    }
+
+    @Test
+    void testWebsocketWithBadTokenAsFirstMessageIsClosed() throws Exception {
+        initStubForJwk();
+
+        stubFor(post(urlEqualTo("/introspection"))
+                .withRequestBody(equalTo("client_id=gridsuite&client_secret=secret&token=notAValidToken"))
+                .willReturn(aResponse()
+                        .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                        .withBody("{\"active\":false}")));
+
+        // No token in the URL, and the first message sent is not a valid token: the gateway
+        // must close the websocket instead of proxying it to the backend.
+        testWebsocketConnectionIsRejected(URI.create("ws://localhost:" + this.localServerPort + "/study-notification/notify"),
+                ws -> ws.send(Mono.just(ws.textMessage("notAValidToken"))).thenMany(ws.receive()).then());
+    }
+
+    @Test
+    void testWebsocketWithoutAnyTokenIsClosedAfterTimeout() {
+        initStubForJwk();
+
+        // No token in the URL and the client stays silent: the gateway must close the websocket
+        // once the (short, see test properties) first message timeout is reached.
+        testWebsocketConnectionIsRejected(URI.create("ws://localhost:" + this.localServerPort + "/study-notification/notify"),
+                ws -> ws.receive().then());
     }
 
     @Test
@@ -642,11 +727,10 @@ class TokenValidationTest {
                 .exchange()
                 .expectStatus().isBadRequest();
 
-        // test without a token
-        WebSocketClient client = new StandardWebSocketClient();
-        client.execute(URI.create("ws://localhost:" +
-                this.localServerPort + "/study-notification/notify"),
-            ws -> ws.receive().then()).doOnSuccess(s -> fail("Should have thrown"));
+        // Websocket connections without a token in the URL are covered by
+        // testWebsocketWithGoodTokenAsFirstMessage() and testWebsocketWithBadTokenAsFirstMessageIsClosed():
+        // in that case, the gateway waits for the token as the first websocket message instead of
+        // rejecting the handshake outright.
     }
 
     @TestConfiguration
