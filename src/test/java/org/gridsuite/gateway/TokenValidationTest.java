@@ -31,6 +31,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.web.reactive.socket.CloseStatus;
 import org.springframework.web.reactive.socket.WebSocketSession;
 import org.springframework.web.reactive.socket.client.StandardWebSocketClient;
 import org.springframework.web.reactive.socket.client.WebSocketClient;
@@ -45,10 +46,12 @@ import java.time.Duration;
 import java.util.Base64;
 import java.util.Date;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
@@ -77,6 +80,7 @@ import static org.junit.jupiter.api.Assertions.fail;
         "allowed-issuers=http://localhost:${wiremock.server.port}",
         "allowed-audiences=test.app,chmits",
         "allowed-clients=chmits",
+        "websocket-first-message-token-timeout=1s",
     })
 @AutoConfigureWireMock(port = 0)
 class TokenValidationTest {
@@ -246,6 +250,29 @@ class TokenValidationTest {
         } catch (Exception ignored) {
             //should timeout
         }
+    }
+
+    /**
+     * Connects a websocket that the gateway is expected to reject: asserts that the gateway closes it
+     * with a POLICY_VIOLATION status and never contacts the backend.
+     */
+    private void testWebsocketConnectionIsRejected(URI uri, Function<WebSocketSession, Mono<Void>> handler) {
+        int notifyRequestsBefore = findAll(getRequestedFor(urlPathEqualTo("/notify"))).size();
+
+        WebSocketClient client = new StandardWebSocketClient();
+        AtomicReference<CloseStatus> closeStatus = new AtomicReference<>();
+        Mono<Void> wsconnection = client.execute(uri, new HttpHeaders(), ws -> {
+            ws.closeStatus().doOnNext(closeStatus::set).subscribe();
+            return handler.apply(ws);
+        });
+
+        // The gateway should close the connection: this should complete normally (not time out, not throw)
+        wsconnection.timeout(Duration.ofSeconds(5)).block();
+
+        assertNotNull(closeStatus.get(), "the gateway should have sent a close frame");
+        assertEquals(CloseStatus.POLICY_VIOLATION.getCode(), closeStatus.get().getCode());
+        // The backend should never have been contacted since no valid token was received.
+        assertEquals(notifyRequestsBefore, findAll(getRequestedFor(urlPathEqualTo("/notify"))).size());
     }
 
     @Test
@@ -439,21 +466,18 @@ class TokenValidationTest {
 
         // No token in the URL, and the first message sent is not a valid token: the gateway
         // must close the websocket instead of proxying it to the backend.
-        int notifyRequestsBefore = findAll(getRequestedFor(urlPathEqualTo("/notify"))).size();
+        testWebsocketConnectionIsRejected(URI.create("ws://localhost:" + this.localServerPort + "/study-notification/notify"),
+                ws -> ws.send(Mono.just(ws.textMessage("notAValidToken"))).thenMany(ws.receive()).then());
+    }
 
-        WebSocketClient client = new StandardWebSocketClient();
-        Mono<Void> wsconnection = client.execute(
-                URI.create("ws://localhost:" + this.localServerPort + "/study-notification/notify"), new HttpHeaders(),
-                ws -> ws.send(Mono.just(ws.textMessage("notAValidToken")))
-                        .thenMany(ws.receive())
-                        .then());
+    @Test
+    void testWebsocketWithoutAnyTokenIsClosedAfterTimeout() {
+        initStubForJwk();
 
-        // The gateway should close the connection right away: this should complete normally
-        // (not time out, and not throw), unlike a websocket that stays open.
-        wsconnection.timeout(Duration.ofSeconds(5)).block();
-
-        // The backend should never have been contacted since the token was rejected.
-        assertEquals(notifyRequestsBefore, findAll(getRequestedFor(urlPathEqualTo("/notify"))).size());
+        // No token in the URL and the client stays silent: the gateway must close the websocket
+        // once the (short, see test properties) first message timeout is reached.
+        testWebsocketConnectionIsRejected(URI.create("ws://localhost:" + this.localServerPort + "/study-notification/notify"),
+                ws -> ws.receive().then());
     }
 
     @Test

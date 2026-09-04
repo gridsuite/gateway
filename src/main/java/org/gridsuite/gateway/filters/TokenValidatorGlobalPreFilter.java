@@ -32,7 +32,9 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.socket.CloseStatus;
+import org.springframework.web.reactive.socket.WebSocketHandler;
 import org.springframework.web.reactive.socket.WebSocketMessage;
 import org.springframework.web.reactive.socket.WebSocketSession;
 import org.springframework.web.reactive.socket.client.WebSocketClient;
@@ -41,11 +43,14 @@ import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.util.UriComponentsBuilder;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.Sinks;
 
 import java.net.URI;
 import java.text.ParseException;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -70,7 +75,7 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
     public static final String UNAUTHORIZED_THE_TOKEN_CANNOT_BE_TRUSTED = "{}: 401 Unauthorized, The token cannot be trusted";
     public static final String CACHE_OUTDATED = "{}: Bad JSON Object Signing and Encryption, cache outdated";
 
-    private static final Duration FIRST_MESSAGE_TOKEN_TIMEOUT = Duration.ofSeconds(10);
+    private static final String SEC_WEBSOCKET_PROTOCOL = "Sec-WebSocket-Protocol";
 
     private final GatewayService gatewayService;
     private final UserIdentityService userIdentityService;
@@ -89,6 +94,13 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
     @Value("${storeIdToken:false}")
     private boolean storeIdTokens;
 
+    /**
+     * Maximum time to wait for the first websocket message (the token) when no token was provided
+     * at handshake time, before closing the websocket.
+     */
+    @Value("${websocket-first-message-token-timeout:10s}")
+    private Duration firstMessageTokenTimeout;
+
     private Map<String, JWKSet> jwkSetCache = new ConcurrentHashMap<>();
 
     public TokenValidatorGlobalPreFilter(GatewayService gatewayService, UserIdentityService userIdentityService, UserAdminService userAdminService,
@@ -102,7 +114,7 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
 
     @Override
     public int getOrder() {
-        // Before ElementAccessControllerGlobalPreFilter to enforce authentication
+        // Before UserAdminControlGlobalPreFilter and SupervisionAccessControlFilter to enforce authentication
         return Ordered.LOWEST_PRECEDENCE - 4;
     }
 
@@ -117,6 +129,12 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
             if (isWebSocketUpgrade(req)) {
                 // No token provided at handshake time: give the client a chance to authenticate
                 // by sending the token as the very first websocket message instead.
+                // This flow performs the handshake itself and so bypasses the rest of the filter chain:
+                // the auth-independent checks of the downstream filters must be applied before the handshake.
+                if (SupervisionAccessControlFilter.isSupervisionPath(req.getURI().getPath())) {
+                    LOGGER.info(SupervisionAccessControlFilter.ACCESS_TO_SUPERVISION_ENDPOINT_IS_NOT_ALLOWED, req.getPath());
+                    return completeWithError(exchange, HttpStatus.FORBIDDEN);
+                }
                 LOGGER.debug("{}: no token at handshake time, waiting for it as the first websocket message", req.getPath());
                 return authenticateWebSocketWithFirstMessageAsToken(exchange);
             }
@@ -164,45 +182,115 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
         String path = exchange.getRequest().getPath().toString();
         URI backendUri = toWebSocketUri(exchange.getRequiredAttribute(ServerWebExchangeUtils.GATEWAY_REQUEST_URL_ATTR));
         HttpHeaders backendHeaders = filterOutgoingHeaders(exchange.getRequest().getHeaders());
+        List<String> subProtocols = getSubProtocols(exchange.getRequest().getHeaders());
 
-        return webSocketService.handleRequest(exchange, session -> withFirstMessageTimeout(session.receive())
+        return webSocketService.handleRequest(exchange, new SubProtocolsWebSocketHandler(subProtocols,
+                session -> handleFirstMessageAsToken(session, path, backendUri, backendHeaders, subProtocols)));
+    }
+
+    private Mono<Void> handleFirstMessageAsToken(WebSocketSession session, String path, URI backendUri, HttpHeaders backendHeaders,
+                                                 List<String> subProtocols) {
+        Sinks.Empty<Void> firstSignalReceived = Sinks.empty();
+        Mono<Void> authenticateAndBridge = session.receive()
                 .switchOnFirst((firstSignal, messages) -> {
+                    firstSignalReceived.tryEmitEmpty();
+                    if (firstSignal.isOnError()) {
+                        return rejectWebSocket(session, path, firstSignal.getThrowable()).flux();
+                    }
                     if (!firstSignal.hasValue()) {
+                        // client went away before sending anything
                         return Flux.<Void>empty();
                     }
+                    // No need to release the token message: reactor-netty releases every inbound frame
+                    // once it has been handed to us, that's why forwarded frames need to be retained below.
                     String firstMessageAsToken = firstSignal.get().getPayloadAsText();
                     return authenticate(firstMessageAsToken, path)
-                            .flatMapMany(user -> bridgeToBackend(session, messages.skip(1), backendUri, addUserHeader(backendHeaders, user)));
+                            .onErrorResume(e -> rejectWebSocket(session, path, e).then(Mono.empty()))
+                            .flatMapMany(user -> proxyAuthenticatedWebSocket(session, messages.skip(1), user, backendUri, backendHeaders, subProtocols));
                 })
-                .onErrorResume(e -> {
-                    LOGGER.info("{}: closing websocket, no valid token received as first message ({})", path, e.toString());
-                    return session.isOpen() ? session.close(CloseStatus.POLICY_VIOLATION).thenMany(Flux.<Void>empty()) : Flux.empty();
-                })
-                .then());
+                .then();
+        return Mono.when(authenticateAndBridge, closeUnlessFirstMessageReceivedInTime(session, path, firstSignalReceived.asMono()));
     }
 
     /**
-     * Wraps the client's inbound message flux so that, if no message at all is received within
-     * {@link #FIRST_MESSAGE_TOKEN_TIMEOUT}, the sequence errors out. Once a first message has been
-     * received, this has no more effect on the rest of the sequence (unlike a plain {@code timeout()}
-     * operator, which would also apply between subsequent messages and could wrongly close
-     * long-lived, mostly-silent notification channels).
+     * Closes the websocket if the client's first message is not received within {@link #firstMessageTokenTimeout}.
+     * This is deliberately not implemented with a {@code timeout()} operator on the inbound flux: such operators
+     * cancel the inbound flux on timeout, which makes reactor-netty send its own (empty) close frame before we
+     * could send ours with the proper status. Once the first message has been received, this has no effect at all
+     * (unlike a plain {@code timeout()} operator, which would also apply between subsequent messages and could
+     * wrongly close long-lived, mostly-silent notification channels).
      */
-    private static Flux<WebSocketMessage> withFirstMessageTimeout(Flux<WebSocketMessage> messages) {
-        return Flux.firstWithSignal(messages,
-                Flux.<WebSocketMessage>error(new TimeoutException("No token received as first websocket message"))
-                        .delaySubscription(FIRST_MESSAGE_TOKEN_TIMEOUT));
+    private Mono<Void> closeUnlessFirstMessageReceivedInTime(WebSocketSession session, String path, Mono<Void> firstSignalReceived) {
+        // takeUntilOther is applied to the delay only: the close itself, once started, must never be cancelled
+        // (the inbound completing because of our own close would otherwise cancel it midway)
+        return Mono.delay(firstMessageTokenTimeout)
+                .takeUntilOther(firstSignalReceived)
+                .flatMap(tick -> rejectWebSocket(session, path, new TimeoutException("No token received as first websocket message")));
+    }
+
+    private static Mono<Void> rejectWebSocket(WebSocketSession session, String path, Throwable cause) {
+        LOGGER.info("{}: closing websocket, no valid token received as first message ({})", path, cause.toString());
+        return closeIfOpen(session, CloseStatus.POLICY_VIOLATION);
+    }
+
+    private Flux<Void> proxyAuthenticatedWebSocket(WebSocketSession session, Flux<WebSocketMessage> remainingClientMessages, AuthenticatedUser user,
+                                                   URI backendUri, HttpHeaders backendHeaders, List<String> subProtocols) {
+        String path = session.getHandshakeInfo().getUri().getPath();
+        // Same as UserAdminControlGlobalPreFilter, which is bypassed by this flow
+        userAdminService.userRecordConnection(user.getUserId(), true).subscribe();
+        return bridgeToBackend(session, remainingClientMessages, backendUri, addUserHeader(backendHeaders, user), subProtocols)
+                .onErrorResume(e -> {
+                    LOGGER.warn("{}: closing websocket, error while bridging to backend {}", path, backendUri, e);
+                    return closeIfOpen(session, CloseStatus.SERVER_ERROR).thenMany(Flux.<Void>empty());
+                });
+    }
+
+    private static Mono<Void> closeIfOpen(WebSocketSession session, CloseStatus status) {
+        return session.isOpen() ? session.close(status) : Mono.empty();
     }
 
     private Flux<Void> bridgeToBackend(WebSocketSession clientSession, Flux<WebSocketMessage> remainingClientMessages,
-                                        URI backendUri, HttpHeaders backendHeaders) {
-        return webSocketClient.execute(backendUri, backendHeaders, backendSession -> {
-            Mono<Void> forwardToBackend = backendSession.send(remainingClientMessages
-                    .map(message -> backendSession.textMessage(message.getPayloadAsText())));
-            Mono<Void> forwardToClient = clientSession.send(backendSession.receive()
-                    .map(message -> clientSession.textMessage(message.getPayloadAsText())));
+                                        URI backendUri, HttpHeaders backendHeaders, List<String> subProtocols) {
+        return webSocketClient.execute(backendUri, backendHeaders, new SubProtocolsWebSocketHandler(subProtocols, backendSession -> {
+            // Frames are forwarded unchanged (any type, any payload); retain() is needed for reactor-netty
+            // which releases inbound frames after they have been emitted (same as WebsocketRoutingFilter)
+            Mono<Void> forwardToBackend = backendSession.send(remainingClientMessages.doOnNext(WebSocketMessage::retain));
+            Mono<Void> forwardToClient = clientSession.send(backendSession.receive().doOnNext(WebSocketMessage::retain));
             return Mono.zip(forwardToBackend, forwardToClient).then();
-        }).flux();
+        })).flux();
+    }
+
+    /**
+     * Same as the standard websocket routing filter: sub-protocols requested by the client are not forwarded
+     * as a raw header (sec-websocket-* headers are regenerated by the websocket client) but through the
+     * handlers' {@link WebSocketHandler#getSubProtocols()}, on both the client and the backend side.
+     */
+    private static List<String> getSubProtocols(HttpHeaders headers) {
+        List<String> protocols = headers.get(SEC_WEBSOCKET_PROTOCOL);
+        if (protocols == null) {
+            return Collections.emptyList();
+        }
+        List<String> subProtocols = new ArrayList<>();
+        for (String protocol : protocols) {
+            subProtocols.addAll(Arrays.asList(StringUtils.tokenizeToStringArray(protocol, ",")));
+        }
+        return subProtocols;
+    }
+
+    @AllArgsConstructor
+    private static final class SubProtocolsWebSocketHandler implements WebSocketHandler {
+        private final List<String> subProtocols;
+        private final WebSocketHandler delegate;
+
+        @Override
+        public List<String> getSubProtocols() {
+            return subProtocols;
+        }
+
+        @Override
+        public Mono<Void> handle(WebSocketSession session) {
+            return delegate.handle(session);
+        }
     }
 
     private static URI toWebSocketUri(URI requestUrl) {
@@ -235,19 +323,25 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
     private static HttpHeaders addUserHeader(HttpHeaders headers, AuthenticatedUser user) {
         HttpHeaders withUser = new HttpHeaders();
         withUser.addAll(headers);
-        withUser.set(HEADER_USER_ID, user.getUserId());
-        if (user.getRoles() != null) {
-            withUser.set(HEADER_ROLES, user.getRoles());
-        }
+        setUserHeaders(withUser, user);
         return withUser;
     }
 
     private static ServerWebExchange mutateExchangeWithUser(ServerWebExchange exchange, AuthenticatedUser user) {
-        ServerHttpRequest.Builder requestBuilder = exchange.getRequest().mutate().header(HEADER_USER_ID, user.getUserId());
+        ServerHttpRequest request = exchange.getRequest().mutate().headers(headers -> setUserHeaders(headers, user)).build();
+        return exchange.mutate().request(request).build();
+    }
+
+    /**
+     * Always overwrites both identity headers, so that no client-supplied value can ever survive.
+     */
+    private static void setUserHeaders(HttpHeaders headers, AuthenticatedUser user) {
+        headers.set(HEADER_USER_ID, user.getUserId());
         if (user.getRoles() != null) {
-            requestBuilder.header(HEADER_ROLES, user.getRoles());
+            headers.set(HEADER_ROLES, user.getRoles());
+        } else {
+            headers.remove(HEADER_ROLES);
         }
-        return exchange.mutate().request(requestBuilder.build()).build();
     }
 
     /**
@@ -260,6 +354,15 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
      *         ({@link TokenAuthenticationException}) on failure
      */
     private Mono<AuthenticatedUser> authenticate(String token, String path) {
+        // defer so that any failure thrown while parsing/validating becomes an error signal instead of escaping to callers
+        return Mono.defer(() -> doAuthenticate(token, path))
+                .onErrorMap(e -> e instanceof IllegalArgumentException || e instanceof NullPointerException, e -> {
+                    LOGGER.info("{}: 401 Unauthorized, malformed token or claims ({})", path, e.toString());
+                    return new TokenAuthenticationException(HttpStatus.UNAUTHORIZED);
+                });
+    }
+
+    private Mono<AuthenticatedUser> doAuthenticate(String token, String path) {
         JWT jwt;
         JWTClaimsSet jwtClaimsSet;
         try {
@@ -267,6 +370,10 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
             jwtClaimsSet = jwt.getJWTClaimsSet();
 
             LOGGER.debug("checking issuer");
+            if (jwtClaimsSet.getIssuer() == null) {
+                LOGGER.info("{}: 401 Unauthorized, missing issuer claim", path);
+                return Mono.error(new TokenAuthenticationException(HttpStatus.UNAUTHORIZED));
+            }
             if (allowedIssuers.stream().noneMatch(iss -> jwtClaimsSet.getIssuer().startsWith(iss))) {
                 LOGGER.info("{}: 401 Unauthorized, {} Issuer is not in the issuers white list", path, jwtClaimsSet.getIssuer());
                 return Mono.error(new TokenAuthenticationException(HttpStatus.UNAUTHORIZED));
