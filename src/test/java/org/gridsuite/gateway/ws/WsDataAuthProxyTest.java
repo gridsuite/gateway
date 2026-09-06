@@ -9,8 +9,8 @@ package org.gridsuite.gateway.ws;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.LocalServerPort;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.HttpHeaders;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -52,12 +52,12 @@ class WsDataAuthProxyTest {
         upstream = HttpServer.create()
             .host("localhost")
             .port(0)
-            .route(routes -> routes.ws("/foo/bar", (in, out) -> {
-                UPSTREAM_AUTH_HEADERS.add(in.headers().get(HttpHeaders.AUTHORIZATION));
-                // echo every received text frame back, prefixed
-                return out.sendString(in.receive().asString()
-                        .doOnNext(UPSTREAM_RECEIVED::add)
-                        .map(s -> "echo:" + s));
+            .route(routes -> routes.route(request -> request.uri().startsWith("/foo/bar"), (request, response) -> {
+                UPSTREAM_AUTH_HEADERS.add(request.requestHeaders().get(HttpHeaders.AUTHORIZATION));
+                UPSTREAM_PATHS.add(request.uri());
+                return response.sendWebsocket((in, out) -> out.sendString(in.receive().asString()
+                    .doOnNext(UPSTREAM_RECEIVED::add)
+                    .map(s -> "echo:" + s)));
             }))
             .bindNow();
     }
@@ -77,7 +77,7 @@ class WsDataAuthProxyTest {
         ReactorNettyWebSocketClient client = new ReactorNettyWebSocketClient();
         List<String> received = new CopyOnWriteArrayList<>();
 
-        client.execute(URI.create("ws://localhost:" + gatewayPort + "/ws-dataauth/foo/bar"),
+        client.execute(URI.create("ws://localhost:" + gatewayPort + "/ws-dataauth/foo/bar?x=y"),
             session -> {
                 Mono<Void> send = session.send(Flux.just(
                         session.textMessage("my-secret-token"),   // frame #1: token
@@ -92,6 +92,7 @@ class WsDataAuthProxyTest {
             .block(Duration.ofSeconds(10));
 
         assertThat(UPSTREAM_AUTH_HEADERS).contains("Bearer my-secret-token");
+        assertThat(UPSTREAM_PATHS).contains("/foo/bar?x=y");
         assertThat(UPSTREAM_RECEIVED).contains("hello");
         assertThat(UPSTREAM_RECEIVED).doesNotContain("my-secret-token");
         assertThat(received).containsExactly("echo:hello");

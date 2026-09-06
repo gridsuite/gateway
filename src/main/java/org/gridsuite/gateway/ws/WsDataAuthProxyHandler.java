@@ -6,6 +6,7 @@
  */
 package org.gridsuite.gateway.ws;
 
+import io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.buffer.DataBufferUtils;
@@ -20,26 +21,16 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
 /**
- * WebSocket proxy implementing "first-message authentication" to work around the browser
- * limitation of not being able to set an {@code Authorization} header on WebSocket connections.
+ * WebSocket proxy implementing first-message authentication for browsers, which cannot set an
+ * authorization header during the WebSocket handshake.
  *
- * <p>Behavior:</p>
- * <ol>
- *   <li>Accepts the client WebSocket on {@code /ws-dataauth/**}.</li>
- *   <li>Reads the FIRST text frame and treats it as an opaque bearer token (no validation).
- *       The frame is consumed and never forwarded upstream. A timeout and size limit apply.</li>
- *   <li>Dials a NEW WebSocket to {@code ws://localhost:<upstream-port>} with the
- *       {@code /ws-dataauth} prefix stripped ({@code /ws-dataauth/foo/bar?x=y} →
- *       {@code /foo/bar?x=y}), setting {@code Authorization: Bearer <token>} on the handshake.</li>
- *   <li>Transparently relays all subsequent frames bidirectionally, preserving frame type.</li>
- *   <li>Propagates upstream handshake failures and close statuses to the client.</li>
- * </ol>
+ * <p>This handler bypasses the normal Spring Cloud Gateway route pipeline and its global
+ * pre-filters by design. The upstream service is responsible for authenticating the token.</p>
  *
  * @author Jon Harper <jon.harper at rte-france.com>
  */
@@ -62,84 +53,116 @@ public class WsDataAuthProxyHandler implements WebSocketHandler {
 
     @Override
     public Mono<Void> handle(WebSocketSession clientSession) {
-        return clientSession.receive()
-            .next() // frame #1: the token — consumed here, never forwarded upstream
-            .timeout(properties.getAuthTimeout())
-            .flatMap(frame -> proxy(clientSession, frame.getPayloadAsText()))
-            .onErrorResume(TimeoutException.class,
-                e -> clientSession.close(new CloseStatus(1008, "auth timeout")))
+        AtomicBoolean firstFrameReceived = new AtomicBoolean();
+        AtomicBoolean authTimeoutStarted = new AtomicBoolean();
+        Mono<Void> proxy = clientSession.receive()
+            .switchOnFirst((signal, frames) -> {
+                firstFrameReceived.set(true);
+                if (!signal.hasValue()) {
+                    if (signal.getThrowable() != null) {
+                        return Flux.error(signal.getThrowable());
+                    }
+                    return authTimeoutStarted.get() ? Flux.never() : Flux.empty();
+                }
+                WebSocketMessage tokenFrame = signal.get();
+                if (tokenFrame.getType() != WebSocketMessage.Type.TEXT) {
+                    return closeWithPolicyViolation(clientSession, "invalid token frame").thenMany(Flux.empty());
+                }
+                return proxy(clientSession, frames.skip(1), tokenFrame.getPayloadAsText()).thenMany(Flux.empty());
+            })
+            .then()
             .onErrorResume(e -> {
                 LOGGER.debug("ws-dataauth client session error", e);
-                return clientSession.close(new CloseStatus(1011, truncateReason("proxy error: " + e.getMessage())));
+                return closeWithServerError(clientSession, "proxy error");
             });
+        Mono<Void> authTimeout = Mono.delay(properties.getAuthTimeout())
+            .flatMap(ignored -> firstFrameReceived.get()
+                    ? Mono.never()
+                    : closeAfterAuthTimeout(clientSession, authTimeoutStarted));
+
+        return Mono.firstWithSignal(proxy, authTimeout);
     }
 
-    private Mono<Void> proxy(WebSocketSession clientSession, String token) {
+    private static Mono<Void> closeAfterAuthTimeout(WebSocketSession session, AtomicBoolean authTimeoutStarted) {
+        authTimeoutStarted.set(true);
+        return closeWithPolicyViolation(session, "auth timeout");
+    }
+
+    private Mono<Void> proxy(WebSocketSession clientSession, Flux<WebSocketMessage> clientFrames, String token) {
         if (token.isEmpty() || token.getBytes(StandardCharsets.UTF_8).length > properties.getMaxTokenBytes()
                 || !PRINTABLE_ASCII.matcher(token).matches()) {
-            // reject empty/oversized tokens and any characters outside printable ASCII
-            // to prevent HTTP header injection on the upstream handshake
-            return clientSession.close(new CloseStatus(1008, "invalid token frame"));
+            return closeWithPolicyViolation(clientSession, "invalid token frame");
         }
 
-        URI upstreamUri;
-        try {
-            upstreamUri = buildUpstreamUri(clientSession.getHandshakeInfo().getUri());
-        } catch (URISyntaxException e) {
-            return clientSession.close(new CloseStatus(1008, "invalid path"));
-        }
-
+        URI upstreamUri = buildUpstreamUri(clientSession.getHandshakeInfo().getUri());
         HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(token); // verbatim copy of frame #1, no validation by design
+        headers.setBearerAuth(token);
 
         LOGGER.debug("ws-dataauth proxying to {}", upstreamUri);
 
-        return client.execute(upstreamUri, headers, upstreamSession ->
-                Mono.zip(
-                    upstreamSession.send(retained(clientSession.receive())),
-                    clientSession.send(retained(upstreamSession.receive()))
-                ).then())
+        return client.execute(upstreamUri, headers,
+                upstreamSession -> relay(clientSession, clientFrames, upstreamSession))
+            .onErrorResume(WebSocketClientHandshakeException.class, e -> {
+                LOGGER.debug("ws-dataauth upstream handshake rejected for {}", upstreamUri, e);
+                return closeWithPolicyViolation(clientSession, "upstream handshake rejected");
+            })
             .onErrorResume(e -> {
                 LOGGER.debug("ws-dataauth upstream failure for {}", upstreamUri, e);
-                return clientSession.close(new CloseStatus(1008,
-                        truncateReason("upstream rejected/failed: " + e.getMessage())));
+                return closeWithServerError(clientSession, "upstream connection failed");
             });
+    }
+
+    private static Mono<Void> relay(WebSocketSession clientSession, Flux<WebSocketMessage> clientFrames,
+                                    WebSocketSession upstreamSession) {
+        return Mono.zip(
+                upstreamSession.send(retained(clientFrames)),
+                clientSession.send(retained(upstreamSession.receive())))
+            .then();
     }
 
     /**
      * Retains relayed frame payloads so they survive until the outbound write completes, and
-     * releases any frame discarded on cancellation (e.g. when {@code Mono.zip} cancels one relay
-     * direction because the other terminated) to avoid leaking pooled Netty buffers.
+     * releases any frame discarded on cancellation to avoid leaking pooled Netty buffers.
      */
     private static Flux<WebSocketMessage> retained(Flux<WebSocketMessage> in) {
-        return in.map(f -> new WebSocketMessage(f.getType(), f.getPayload().retain()))
+        return in.map(f -> new WebSocketMessage(f.getType(), DataBufferUtils.retain(f.getPayload())))
                  .doOnDiscard(WebSocketMessage.class, m -> DataBufferUtils.release(m.getPayload()));
     }
 
-    /**
-     * Maps {@code /ws-dataauth/foo/bar?x=y} to {@code ws://localhost:<upstream-port>/foo/bar?x=y}.
-     */
-    private URI buildUpstreamUri(URI clientUri) throws URISyntaxException {
-        String path = clientUri.getRawPath();
-        String stripped = path.startsWith(WsDataAuthProperties.PATH_PREFIX)
-                ? path.substring(WsDataAuthProperties.PATH_PREFIX.length())
-                : path;
-        if (stripped.isEmpty()) {
-            stripped = "/";
+    private URI buildUpstreamUri(URI clientUri) {
+        String strippedPath = clientUri.getRawPath().substring(WsDataAuthProperties.PATH_PREFIX.length());
+        if (strippedPath.isEmpty()) {
+            strippedPath = "/";
         }
         String query = clientUri.getRawQuery();
-        return new URI("ws", null, "localhost", properties.getUpstreamPort(),
-                stripped, null, null).resolve(query != null ? stripped + "?" + query : stripped)
-            .isAbsolute()
-                ? new URI("ws://localhost:" + properties.getUpstreamPort() + stripped + (query != null ? "?" + query : ""))
-                : new URI("ws://localhost:" + properties.getUpstreamPort() + stripped + (query != null ? "?" + query : ""));
+        return URI.create("ws://localhost:" + properties.getUpstreamPort() + strippedPath
+                + (query != null ? "?" + query : ""));
+    }
+
+    private static Mono<Void> closeWithPolicyViolation(WebSocketSession session, String reason) {
+        return session.close(new CloseStatus(1008, truncateReason(reason)));
+    }
+
+    private static Mono<Void> closeWithServerError(WebSocketSession session, String reason) {
+        return session.close(new CloseStatus(1011, truncateReason(reason)));
     }
 
     private static String truncateReason(String reason) {
-        byte[] bytes = reason.getBytes(StandardCharsets.UTF_8);
-        if (bytes.length <= MAX_CLOSE_REASON_BYTES) {
+        if (reason.getBytes(StandardCharsets.UTF_8).length <= MAX_CLOSE_REASON_BYTES) {
             return reason;
         }
-        return new String(bytes, 0, MAX_CLOSE_REASON_BYTES, StandardCharsets.UTF_8);
+        StringBuilder truncated = new StringBuilder();
+        int byteCount = 0;
+        for (int index = 0; index < reason.length();) {
+            int codePoint = reason.codePointAt(index);
+            int codePointBytes = new String(Character.toChars(codePoint)).getBytes(StandardCharsets.UTF_8).length;
+            if (byteCount + codePointBytes > MAX_CLOSE_REASON_BYTES) {
+                break;
+            }
+            truncated.appendCodePoint(codePoint);
+            byteCount += codePointBytes;
+            index += Character.charCount(codePoint);
+        }
+        return truncated.toString();
     }
 }
