@@ -28,9 +28,6 @@ public class WsDataAuthProperties {
     /** Whether the endpoint is enabled. */
     private boolean enabled = true;
 
-    /** Upstream port on localhost to which connections are proxied. */
-    private int upstreamPort = 80;
-
     /** Maximum time to wait for the first (token) frame from the client. */
     private Duration authTimeout = Duration.ofSeconds(5);
 

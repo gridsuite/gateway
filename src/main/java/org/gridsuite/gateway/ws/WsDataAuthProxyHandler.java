@@ -9,6 +9,7 @@ package org.gridsuite.gateway.ws;
 import io.netty.handler.codec.http.websocketx.WebSocketClientHandshakeException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.web.context.WebServerApplicationContext;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
@@ -45,10 +46,13 @@ public class WsDataAuthProxyHandler implements WebSocketHandler {
 
     private final WsDataAuthProperties properties;
 
+    private final WebServerApplicationContext applicationContext;
+
     private final ReactorNettyWebSocketClient client = new ReactorNettyWebSocketClient();
 
-    public WsDataAuthProxyHandler(WsDataAuthProperties properties) {
+    public WsDataAuthProxyHandler(WsDataAuthProperties properties, WebServerApplicationContext applicationContext) {
         this.properties = properties;
+        this.applicationContext = applicationContext;
     }
 
     @Override
@@ -135,7 +139,7 @@ public class WsDataAuthProxyHandler implements WebSocketHandler {
             strippedPath = "/";
         }
         String query = clientUri.getRawQuery();
-        return URI.create("ws://localhost:" + properties.getUpstreamPort() + strippedPath
+        return URI.create("ws://localhost:" + applicationContext.getWebServer().getPort() + strippedPath
                 + (query != null ? "?" + query : ""));
     }
 

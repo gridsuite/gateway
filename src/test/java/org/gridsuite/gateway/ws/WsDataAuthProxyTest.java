@@ -6,16 +6,22 @@
  */
 package org.gridsuite.gateway.ws;
 
+import org.gridsuite.gateway.filters.TokenValidatorGlobalPreFilter;
+import org.gridsuite.gateway.filters.UserAdminControlGlobalPreFilter;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.http.HttpHeaders;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.reactive.socket.WebSocketMessage;
 import org.springframework.web.reactive.socket.client.ReactorNettyWebSocketClient;
+import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.netty.DisposableServer;
@@ -28,6 +34,8 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 
 /**
  * Integration test for the /ws-dataauth first-frame authentication proxy.
@@ -35,7 +43,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * @author Jon Harper <jon.harper at rte-france.com>
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {"ws-dataauth.auth-timeout=2s"})
+        properties = {"ws-dataauth.auth-timeout=2s",
+            "gridsuite.services.study-server.base-uri=http://localhost:${test-upstream-port}"})
 class WsDataAuthProxyTest {
 
     private static DisposableServer upstream;
@@ -46,6 +55,12 @@ class WsDataAuthProxyTest {
 
     @LocalServerPort
     private int gatewayPort;
+
+    @MockitoBean
+    private TokenValidatorGlobalPreFilter tokenValidatorGlobalPreFilter;
+
+    @MockitoBean
+    private UserAdminControlGlobalPreFilter userAdminControlGlobalPreFilter;
 
     @BeforeAll
     static void startUpstream() {
@@ -69,7 +84,17 @@ class WsDataAuthProxyTest {
 
     @DynamicPropertySource
     static void wsProps(DynamicPropertyRegistry registry) {
-        registry.add("ws-dataauth.upstream-port", () -> upstream.port());
+        registry.add("test-upstream-port", () -> upstream.port());
+    }
+
+    @BeforeEach
+    void bypassTokenValidationForMockUpstream() {
+        doAnswer(invocation -> invocation.getArgument(1, GatewayFilterChain.class)
+                .filter(invocation.getArgument(0, ServerWebExchange.class)))
+            .when(tokenValidatorGlobalPreFilter).filter(any(), any());
+        doAnswer(invocation -> invocation.getArgument(1, GatewayFilterChain.class)
+                .filter(invocation.getArgument(0, ServerWebExchange.class)))
+            .when(userAdminControlGlobalPreFilter).filter(any(), any());
     }
 
     @Test
@@ -77,7 +102,7 @@ class WsDataAuthProxyTest {
         ReactorNettyWebSocketClient client = new ReactorNettyWebSocketClient();
         List<String> received = new CopyOnWriteArrayList<>();
 
-        client.execute(URI.create("ws://localhost:" + gatewayPort + "/ws-dataauth/foo/bar?x=y"),
+        client.execute(URI.create("ws://localhost:" + gatewayPort + "/ws-dataauth/study/foo/bar?x=y"),
             session -> {
                 Mono<Void> send = session.send(Flux.just(
                         session.textMessage("my-secret-token"),   // frame #1: token
@@ -102,7 +127,7 @@ class WsDataAuthProxyTest {
     void invalidTokenIsRejected() {
         ReactorNettyWebSocketClient client = new ReactorNettyWebSocketClient();
 
-        client.execute(URI.create("ws://localhost:" + gatewayPort + "/ws-dataauth/foo/bar"),
+        client.execute(URI.create("ws://localhost:" + gatewayPort + "/ws-dataauth/study/foo/bar"),
             session -> session.send(Flux.just(session.textMessage("bad\r\ntoken")))
                 .then(session.closeStatus()
                     .doOnNext(status -> assertThat(status.getCode()).isEqualTo(1008))
@@ -114,7 +139,7 @@ class WsDataAuthProxyTest {
     void authTimeoutClosesConnection() {
         ReactorNettyWebSocketClient client = new ReactorNettyWebSocketClient();
 
-        client.execute(URI.create("ws://localhost:" + gatewayPort + "/ws-dataauth/foo/bar"),
+        client.execute(URI.create("ws://localhost:" + gatewayPort + "/ws-dataauth/study/foo/bar"),
             session -> session.closeStatus()
                 .doOnNext(status -> assertThat(status.getCode()).isEqualTo(1008))
                 .then())
