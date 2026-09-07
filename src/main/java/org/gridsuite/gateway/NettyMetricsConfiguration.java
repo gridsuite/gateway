@@ -15,17 +15,19 @@ import org.springframework.context.annotation.Configuration;
 import reactor.netty.http.server.HttpServer;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 
 /**
  * @author Seddik Yengui <seddik.yengui_externe at rte-france.com>
  */
 
-// Enable safe and useful Netty metrics that are not enabled by default in Spring Boot.
+// Enable safe and useful global Netty metrics that are not enabled by default in Spring Boot.
 @Configuration
 public class NettyMetricsConfiguration implements NettyServerCustomizer {
 
     private static final String REACTOR_NETTY_PREFIX = "reactor.netty";
+
     // If additional metrics are added, ensure they don't have uri as a tag because we
     // don't map reactor-netty uris to a low cardinality space like fixed uri templates.
     // Otherwise we will get OOMs.
@@ -35,6 +37,8 @@ public class NettyMetricsConfiguration implements NettyServerCustomizer {
             "reactor.netty.http.server.connections.active"
     );
 
+    private static final AtomicBoolean GLOBAL_FILTER_REGISTERED = new AtomicBoolean();
+
     @Override
     public HttpServer apply(HttpServer httpServer) {
         // - The filter is registered here before metrics are enabled to easily
@@ -43,7 +47,10 @@ public class NettyMetricsConfiguration implements NettyServerCustomizer {
         //   static Metrics.globalRegistry so the filter must be set on the
         //   global registry itself (not the registry setup by spring-boot) otherwise
         //   we get OOM errors
-        denyHighCardinalityReactorNettyMetrics(Metrics.globalRegistry);
+        // - do it only once since it's all static and can't be removed
+        if (GLOBAL_FILTER_REGISTERED.compareAndSet(false, true)) {
+            denyHighCardinalityReactorNettyMetrics(Metrics.globalRegistry);
+        }
 
         // NOTE: here passing Function.identity() as the second argument to
         // httpServer.metrics(), we don't normalize/unify uris which is mandatory
