@@ -50,7 +50,7 @@ public class NettyMetricsConfiguration implements NettyServerCustomizer {
         // to use the metrics that add uri as a tag (otherwise this will cause
         // OOMs), hence the current need to filter and keep only metrics without uri.
         // The reason is that the gateway reverse proxies everything without
-        // having have a list of endpoints (= uri templates) to map to.
+        // having a list of endpoints (= uri templates) to map to.
         return httpServer.metrics(true, Function.identity());
     }
 
