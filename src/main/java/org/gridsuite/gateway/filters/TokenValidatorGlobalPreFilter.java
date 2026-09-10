@@ -57,6 +57,8 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
     private static final Logger LOGGER = LoggerFactory.getLogger(TokenValidatorGlobalPreFilter.class);
     public static final String UNAUTHORIZED_THE_TOKEN_CANNOT_BE_TRUSTED = "{}: 401 Unauthorized, The token cannot be trusted";
     public static final String CACHE_OUTDATED = "{}: Bad JSON Object Signing and Encryption, cache outdated";
+    public static final String WEBSOCKET_TOKEN_SUB_PROTOCOL = "token";
+    private static final String SEC_WEBSOCKET_PROTOCOL = "Sec-WebSocket-Protocol";
     private final GatewayService gatewayService;
     private final UserIdentityService userIdentityService;
 
@@ -87,17 +89,26 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
     }
 
     @Override
-    public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
+    public Mono<Void> filter(ServerWebExchange initialExchange, GatewayFilterChain chain) {
         LOGGER.debug("Filter : {}", getClass().getSimpleName());
-        ServerHttpRequest req = exchange.getRequest();
+        ServerHttpRequest req = initialExchange.getRequest();
         List<String> ls = req.getHeaders().get(HttpHeaders.AUTHORIZATION);
         List<String> queryls = req.getQueryParams().get("access_token");
+        // Websocket clients can't send custom headers, so the token can be passed as a
+        // second websocket subprotocol just after the "token" subprotocol :
+        // Sec-WebSocket-Protocol: token, <the token>
+        List<String> subProtocols = getWebSocketSubProtocols(req);
+        boolean useSubProtocolToken = ls == null && queryls == null && subProtocols.contains(WEBSOCKET_TOKEN_SUB_PROTOCOL);
 
-        if (ls == null && queryls == null) {
-            LOGGER.info("{}: 401 Unauthorized, Authorization header or access_token query parameter is required",
-                exchange.getRequest().getPath());
-            return completeWithError(exchange, HttpStatus.UNAUTHORIZED);
+        if (ls == null && queryls == null && !useSubProtocolToken) {
+            LOGGER.info("{}: 401 Unauthorized, Authorization header, access_token query parameter or \"{}\" websocket subprotocol is required",
+                req.getPath(), WEBSOCKET_TOKEN_SUB_PROTOCOL);
+            return completeWithError(initialExchange, HttpStatus.UNAUTHORIZED);
         }
+
+        // Only keep the "token" subprotocol, so that the token value is not forwarded to the
+        // backend service and that the negotiated subprotocol answered to the client is "token"
+        ServerWebExchange exchange = useSubProtocolToken ? withNegotiatedTokenSubProtocol(initialExchange) : initialExchange;
 
         // For now we only handle one token. If needed, we can adapt this code to check
         // multiple tokens and accept the connection if at least one of them is valid
@@ -113,8 +124,16 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
             }
 
             token = arr.get(1);
-        } else {
+        } else if (queryls != null) {
             token = queryls.get(0);
+        } else {
+            int tokenIndex = subProtocols.indexOf(WEBSOCKET_TOKEN_SUB_PROTOCOL);
+            if (tokenIndex + 1 >= subProtocols.size()) {
+                LOGGER.info("{}: 400 Bad Request, missing token value after the \"{}\" websocket subprotocol",
+                    req.getPath(), WEBSOCKET_TOKEN_SUB_PROTOCOL);
+                return completeWithError(exchange, HttpStatus.BAD_REQUEST);
+            }
+            token = subProtocols.get(tokenIndex + 1);
         }
 
         JWT jwt;
@@ -154,6 +173,33 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
             // TODO try more than just the first issuer here ? get the issuer from the client ?
             return validateOpaqueReferenceToken(allowedIssuers.get(0), token, exchange, chain);
         }
+    }
+
+    /**
+     * Returns the list of websocket subprotocols offered by the client, as declared in the
+     * (possibly repeated and/or comma separated) Sec-WebSocket-Protocol header. Returns an empty
+     * list when the request is not a websocket handshake.
+     */
+    private static List<String> getWebSocketSubProtocols(ServerHttpRequest req) {
+        if (!"websocket".equalsIgnoreCase(req.getHeaders().getUpgrade())) {
+            return List.of();
+        }
+        List<String> headerValues = req.getHeaders().get(SEC_WEBSOCKET_PROTOCOL);
+        if (headerValues == null) {
+            return List.of();
+        }
+        return headerValues.stream()
+                .flatMap(value -> Arrays.stream(value.split(",")))
+                .map(String::trim)
+                .filter(value -> !value.isEmpty())
+                .toList();
+    }
+
+    private static ServerWebExchange withNegotiatedTokenSubProtocol(ServerWebExchange exchange) {
+        ServerHttpRequest mutatedRequest = exchange.getRequest().mutate()
+                .headers(headers -> headers.set(SEC_WEBSOCKET_PROTOCOL, WEBSOCKET_TOKEN_SUB_PROTOCOL))
+                .build();
+        return exchange.mutate().request(mutatedRequest).build();
     }
 
     private Mono<Void> validateOpaqueReferenceToken(String issBaseUri, String token, ServerWebExchange exchange,

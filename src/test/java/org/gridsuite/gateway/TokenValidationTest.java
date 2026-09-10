@@ -9,6 +9,7 @@ package org.gridsuite.gateway;
 import com.github.tomakehurst.wiremock.client.VerificationException;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import com.github.tomakehurst.wiremock.extension.responsetemplating.ResponseTemplateTransformer;
+import com.github.tomakehurst.wiremock.matching.RequestPatternBuilder;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.JWSHeader;
@@ -31,6 +32,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.web.reactive.socket.WebSocketHandler;
+import org.springframework.web.reactive.socket.WebSocketSession;
 import org.springframework.web.reactive.socket.client.StandardWebSocketClient;
 import org.springframework.web.reactive.socket.client.WebSocketClient;
 import reactor.core.publisher.Mono;
@@ -43,6 +46,7 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.Date;
+import java.util.List;
 import java.util.UUID;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
@@ -203,6 +207,12 @@ class TokenValidationTest {
         Mono<Void> wsconnection = client.execute(
             URI.create("ws://localhost:" + this.localServerPort + "/" + name + "/notify?access_token=" + token), headers,
             ws -> ws.receive().then());
+        checkWebsocketConnected(wsconnection, getRequestedFor(urlPathEqualTo("/notify"))
+                .withHeader(HttpHeaders.CONNECTION, equalTo(HttpHeaders.UPGRADE))
+                .withHeader(HttpHeaders.UPGRADE, equalTo("websocket")));
+    }
+
+    private void checkWebsocketConnected(Mono<Void> wsconnection, RequestPatternBuilder expectedForwardedRequest) throws Exception {
         wsconnection.subscribe();
 
         // Busy loop waiting to check that spring-gateway contacted our wiremock server
@@ -211,9 +221,7 @@ class TokenValidationTest {
         for (int i = 0; i < 100; i++) {
             Thread.sleep(10);
             try {
-                verify(getRequestedFor(urlPathEqualTo("/notify"))
-                        .withHeader(HttpHeaders.CONNECTION, equalTo(HttpHeaders.UPGRADE))
-                        .withHeader(HttpHeaders.UPGRADE, equalTo("websocket")));
+                verify(expectedForwardedRequest);
                 done = true;
             } catch (VerificationException e) {
                 // nothing to do
@@ -405,6 +413,40 @@ class TokenValidationTest {
         testWebsocket("config-notification");
         testWebsocket("merge-notification");
         testWebsocket("directory-notification");
+    }
+
+    @Test
+    void testWebsocketWithSubProtocolToken() throws Exception {
+        initStubForJwk();
+
+        stubFor(get(urlPathEqualTo("/notify")).withHeader("userId", equalTo("chmits"))
+            .willReturn(aResponse()
+                .withHeader("Sec-WebSocket-Accept", "{{{sec-websocket-accept request.headers.Sec-WebSocket-Key}}}")
+                .withHeader("Sec-WebSocket-Protocol", "token")
+                .withHeader(HttpHeaders.UPGRADE, "websocket")
+                .withHeader(HttpHeaders.CONNECTION, HttpHeaders.UPGRADE)
+                .withStatus(101)
+                .withStatusMessage("Switching Protocols")));
+
+        //Test a websocket with the token passed in the "token" subprotocol
+        WebSocketClient client = new StandardWebSocketClient();
+        Mono<Void> wsconnection = client.execute(
+            URI.create("ws://localhost:" + this.localServerPort + "/study-notification/notify"), new HttpHeaders(),
+            new WebSocketHandler() {
+                @Override
+                public List<String> getSubProtocols() {
+                    return List.of("token", token);
+                }
+
+                @Override
+                public Mono<Void> handle(WebSocketSession session) {
+                    return session.receive().then();
+                }
+            });
+        // the token value must not be forwarded to the backend service, only the "token" subprotocol
+        checkWebsocketConnected(wsconnection, getRequestedFor(urlPathEqualTo("/notify"))
+                .withHeader(HttpHeaders.UPGRADE, equalTo("websocket"))
+                .withHeader("Sec-WebSocket-Protocol", equalTo("token")));
     }
 
     @Test

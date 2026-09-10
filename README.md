@@ -11,7 +11,7 @@ The **gateway** is the single entry point of the [GridSuite](https://github.com/
 It provides the following capabilities:
 
 - **Reverse proxy / routing**: exposes each backend microservice under a dedicated path prefix (e.g. `/study/**`, `/directory/**`) and rewrites/forwards the request to the corresponding service's base URI.
-- **Authentication**: validates the OIDC/OAuth2 token (JWT ID token/access token, or opaque reference token) present in the `Authorization: Bearer` header or `access_token` query parameter (the latter is required for WebSocket upgrade requests, which cannot carry custom headers).
+- **Authentication**: validates the OIDC/OAuth2 token (JWT ID token/access token, or opaque reference token) present in the `Authorization: Bearer` header, in the `access_token` query parameter, or in the `token` WebSocket subprotocol (the two latter are used for WebSocket upgrade requests, which cannot carry custom headers).
 - **Token validation strategies**:
   - **Signed JWT**: verified against the issuer's JWKS (fetched from `/.well-known/openid-configuration`, then cached in memory per issuer; the cache is evicted and refreshed on signature validation failure).
   - **Opaque token**: introspected against the issuer's introspection endpoint using the gateway's own `client_id`/`client_secret`.
@@ -99,5 +99,7 @@ JWT ID tokens (representing end users) carry an `aud` claim; JWT access tokens m
 **Header-based trust boundary:**
 Downstream services never see the original token; they only receive the `userId` (and optional `roles`) header set by the gateway after validation. This means downstream services must be unreachable from outside the cluster/network — they implicitly trust any request carrying these headers.
 
-**Access-token-in-query-parameter for WebSockets:**
-Since WebSocket upgrade requests cannot carry arbitrary custom headers from all browsers/clients, the token can alternatively be passed as an `access_token` query parameter, used by the `*-notification-server` routes.
+**Token passing for WebSockets:**
+Since WebSocket upgrade requests cannot carry arbitrary custom headers from all browsers/clients, the token can alternatively be passed:
+- as an `access_token` query parameter, used by the `*-notification-server` routes;
+- or with the standard subprotocol trick: the client offers two subprotocols `Sec-WebSocket-Protocol: token, <the token>`. The gateway extracts the value following `token`, validates it, and rewrites the header to `Sec-WebSocket-Protocol: token` before forwarding, so the raw token never reaches the downstream service and both the gateway (to the client) and the downstream service negotiate the `token` subprotocol.
