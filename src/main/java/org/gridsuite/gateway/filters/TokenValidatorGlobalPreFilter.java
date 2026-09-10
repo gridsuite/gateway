@@ -27,6 +27,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.core.Ordered;
+import org.springframework.http.HttpCookie;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
@@ -34,8 +35,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
+import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -57,6 +60,37 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
     private static final Logger LOGGER = LoggerFactory.getLogger(TokenValidatorGlobalPreFilter.class);
     public static final String UNAUTHORIZED_THE_TOKEN_CANNOT_BE_TRUSTED = "{}: 401 Unauthorized, The token cannot be trusted";
     public static final String CACHE_OUTDATED = "{}: Bad JSON Object Signing and Encryption, cache outdated";
+
+    /**
+     * Name of the query string parameter carrying a whole (unsplit) access token by itself - the
+     * original, simpler mechanism, kept as a fallback for requests that can't carry a custom
+     * Authorization header (e.g. WebSocket connections) but don't need XOR-splitting (see
+     * {@link #ACCESS_TOKEN_SHARE_COOKIE_NAME}).
+     */
+    public static final String ACCESS_TOKEN_QUERY_PARAM = "access_token";
+
+    /**
+     * For requests that can't carry a custom Authorization header (WebSocket connections), the
+     * frontend can instead split the access token in two shares via XOR: a cryptographically
+     * random share carried by this cookie, and the complementary share carried by the
+     * {@link #ACCESS_TOKEN_SHARE_QUERY_PARAM} query parameter. Neither channel alone reveals the
+     * token, and neither is ever usable by itself - the gateway only recombines them into a
+     * token when both are present together (see {@link #filter}) - so a lone copy of this
+     * cookie, automatically replayed by the browser on any request (including a cross-site one
+     * an attacker's page could trigger), can't be used to authenticate on its own.
+     *
+     * <p>Note: We could in the future also support a plain (unsplit) {@code AccessToken} cookie
+     * carrying a whole token by itself, for cases where CSRF isn't a concern - but that's not
+     * needed today.
+     */
+    public static final String ACCESS_TOKEN_SHARE_COOKIE_NAME = "AccessTokenShare";
+
+    /**
+     * Name of the query string parameter carrying the token's XOR-complement share (see
+     * {@link #ACCESS_TOKEN_SHARE_COOKIE_NAME}).
+     */
+    public static final String ACCESS_TOKEN_SHARE_QUERY_PARAM = "access_token_share";
+
     private final GatewayService gatewayService;
     private final UserIdentityService userIdentityService;
 
@@ -91,16 +125,22 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
         LOGGER.debug("Filter : {}", getClass().getSimpleName());
         ServerHttpRequest req = exchange.getRequest();
         List<String> ls = req.getHeaders().get(HttpHeaders.AUTHORIZATION);
-        List<String> queryls = req.getQueryParams().get("access_token");
+        List<String> queryls = req.getQueryParams().get(ACCESS_TOKEN_QUERY_PARAM);
+        List<HttpCookie> accessTokenShareCookieLs = req.getCookies().get(ACCESS_TOKEN_SHARE_COOKIE_NAME);
+        List<String> queryShareLs = req.getQueryParams().get(ACCESS_TOKEN_SHARE_QUERY_PARAM);
 
-        if (ls == null && queryls == null) {
-            LOGGER.info("{}: 401 Unauthorized, Authorization header or access_token query parameter is required",
-                exchange.getRequest().getPath());
-            return completeWithError(exchange, HttpStatus.UNAUTHORIZED);
-        }
-
+        // Priority: Authorization header first; then the access_token query parameter (a whole
+        // token by itself); then the AccessTokenShare cookie / access_token_share query
+        // parameter pair, XOR-recombined below - these last two exist for requests that can't
+        // carry a custom Authorization header (WebSocket connections). A lone share (cookie or
+        // query parameter alone, without its counterpart) is never usable by itself, even if it
+        // happens to be a whole valid token: the split scheme exists specifically to defeat CSRF
+        // (a lone cookie is automatically replayed by the browser on any request, including a
+        // cross-site one an attacker's page could trigger), so treating either share as usable
+        // alone would defeat that purpose.
+        //
         // For now we only handle one token. If needed, we can adapt this code to check
-        // multiple tokens and accept the connection if at least one of them is valid
+        // multiple tokens and accept the connection if at least one of them is valid.
         String token;
         if (ls != null) {
             String authorization = ls.get(0);
@@ -113,8 +153,19 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
             }
 
             token = arr.get(1);
-        } else {
+        } else if (queryls != null) {
             token = queryls.get(0);
+        } else if (accessTokenShareCookieLs != null && queryShareLs != null) {
+            token = recoverSplitToken(accessTokenShareCookieLs.get(0).getValue(), queryShareLs.get(0));
+            if (token == null) {
+                LOGGER.info("{}: 400 Bad Request, {} cookie and {} query parameter could not be recombined into a valid token",
+                    exchange.getRequest().getPath(), ACCESS_TOKEN_SHARE_COOKIE_NAME, ACCESS_TOKEN_SHARE_QUERY_PARAM);
+                return completeWithError(exchange, HttpStatus.BAD_REQUEST);
+            }
+        } else {
+            LOGGER.info("{}: 401 Unauthorized, Authorization header, {} query parameter, or {} cookie + {} query parameter pair is required",
+                exchange.getRequest().getPath(), ACCESS_TOKEN_QUERY_PARAM, ACCESS_TOKEN_SHARE_COOKIE_NAME, ACCESS_TOKEN_SHARE_QUERY_PARAM);
+            return completeWithError(exchange, HttpStatus.UNAUTHORIZED);
         }
 
         JWT jwt;
@@ -156,6 +207,41 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
         }
     }
 
+    /**
+     * Recombines the token's two XOR shares: the random share from the {@code AccessTokenShare}
+     * cookie, and the complementary share from the {@code access_token_share} query parameter
+     * (see {@link #filter}). Both shares are base64url-encoded (no padding required).
+     *
+     * @return the recovered token, or {@code null} if either share is malformed (invalid
+     * base64url) or the two shares' decoded lengths don't match.
+     */
+    private static String recoverSplitToken(String cookieShare, String queryShare) {
+        byte[] random;
+        byte[] xored;
+        try {
+            random = Base64.getUrlDecoder().decode(cookieShare);
+            xored = Base64.getUrlDecoder().decode(queryShare);
+        } catch (IllegalArgumentException e) {
+            // Swallow the exception (its message is not logged) and fall through to the same
+            // generic null every other rejection below returns: for security-sensitive code
+            // like this, surfacing exactly why recombination failed (e.g. malformed base64url)
+            // would give an attacker probing this endpoint an oracle to iteratively refine
+            // their input, for no legitimate benefit.
+            return null;
+        }
+        if (random.length == 0 || random.length != xored.length) {
+            // Same rationale as the catch block above: reject with the same generic null
+            // instead of distinguishing "empty" from "mismatched length" - don't give an
+            // attacker any more information than "this pair doesn't recombine into a token".
+            return null;
+        }
+        byte[] token = new byte[random.length];
+        for (int i = 0; i < token.length; i++) {
+            token[i] = (byte) (random[i] ^ xored[i]);
+        }
+        return new String(token, StandardCharsets.UTF_8);
+    }
+
     private Mono<Void> validateOpaqueReferenceToken(String issBaseUri, String token, ServerWebExchange exchange,
             @SuppressWarnings("checkstyle:LambdaBodyLength")
             GatewayFilterChain chain) {
@@ -175,6 +261,11 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
 
                         // TODO really add the client_id header instead of userid
                         // Build mutated request with userId header
+                        // Maybe in the future we could strip the already-checked auth carriers
+                        // (Authorization header, AccessTokenShare cookie, access_token /
+                        // access_token_share query parameters) here before forwarding
+                        // downstream, since no microservice needs them once the gateway has
+                        // authenticated the request.
                         ServerHttpRequest mutatedRequest = exchange.getRequest().mutate()
                                 .header(HEADER_USER_ID, tokenIntrospection.getClientId())
                                 .build();
@@ -289,6 +380,10 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
 
         ServerWebExchange exchange = filterInfos.getExchange();
         //we add the subject header
+        // Maybe in the future we could strip the already-checked auth carriers (Authorization
+        // header, AccessTokenShare cookie, access_token / access_token_share query parameters)
+        // here before forwarding downstream, since no microservice needs them once the gateway
+        // has authenticated the request.
         ServerHttpRequest.Builder requestBuilder = exchange.getRequest().mutate()
                 .header(HEADER_USER_ID, filterInfos.getJwtClaimsSet().getSubject());
 
