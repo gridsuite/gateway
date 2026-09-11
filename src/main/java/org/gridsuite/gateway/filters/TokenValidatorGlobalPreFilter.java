@@ -26,19 +26,36 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
+import org.springframework.cloud.gateway.support.ServerWebExchangeUtils;
 import org.springframework.core.Ordered;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+import org.springframework.web.reactive.socket.CloseStatus;
+import org.springframework.web.reactive.socket.WebSocketHandler;
+import org.springframework.web.reactive.socket.WebSocketMessage;
+import org.springframework.web.reactive.socket.WebSocketSession;
+import org.springframework.web.reactive.socket.client.WebSocketClient;
+import org.springframework.web.reactive.socket.server.WebSocketService;
 import org.springframework.web.server.ServerWebExchange;
+import org.springframework.web.util.UriComponentsBuilder;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.Sinks;
 
+import java.net.URI;
 import java.text.ParseException;
+import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeoutException;
 
 import static org.gridsuite.gateway.GatewayConfig.HEADER_ROLES;
 import static org.gridsuite.gateway.GatewayConfig.HEADER_USER_ID;
@@ -57,8 +74,13 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
     private static final Logger LOGGER = LoggerFactory.getLogger(TokenValidatorGlobalPreFilter.class);
     public static final String UNAUTHORIZED_THE_TOKEN_CANNOT_BE_TRUSTED = "{}: 401 Unauthorized, The token cannot be trusted";
     public static final String CACHE_OUTDATED = "{}: Bad JSON Object Signing and Encryption, cache outdated";
+
+    private static final String SEC_WEBSOCKET_PROTOCOL = "Sec-WebSocket-Protocol";
+
     private final GatewayService gatewayService;
     private final UserIdentityService userIdentityService;
+    private final WebSocketClient webSocketClient;
+    private final WebSocketService webSocketService;
 
     @Value("${allowed-issuers}")
     private List<String> allowedIssuers;
@@ -72,17 +94,27 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
     @Value("${storeIdToken:false}")
     private boolean storeIdTokens;
 
+    /**
+     * Maximum time to wait for the first websocket message (the token) when no token was provided
+     * at handshake time, before closing the websocket.
+     */
+    @Value("${websocket-first-message-token-timeout:10s}")
+    private Duration firstMessageTokenTimeout;
+
     private Map<String, JWKSet> jwkSetCache = new ConcurrentHashMap<>();
 
-    public TokenValidatorGlobalPreFilter(GatewayService gatewayService, UserIdentityService userIdentityService, UserAdminService userAdminService) {
+    public TokenValidatorGlobalPreFilter(GatewayService gatewayService, UserIdentityService userIdentityService, UserAdminService userAdminService,
+                                          WebSocketClient webSocketClient, WebSocketService webSocketService) {
         super(userAdminService);
         this.gatewayService = gatewayService;
         this.userIdentityService = userIdentityService;
+        this.webSocketClient = webSocketClient;
+        this.webSocketService = webSocketService;
     }
 
     @Override
     public int getOrder() {
-        // Before ElementAccessControllerGlobalPreFilter to enforce authentication
+        // Before UserAdminControlGlobalPreFilter and SupervisionAccessControlFilter to enforce authentication
         return Ordered.LOWEST_PRECEDENCE - 4;
     }
 
@@ -94,6 +126,18 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
         List<String> queryls = req.getQueryParams().get("access_token");
 
         if (ls == null && queryls == null) {
+            if (isWebSocketUpgrade(req)) {
+                // No token provided at handshake time: give the client a chance to authenticate
+                // by sending the token as the very first websocket message instead.
+                // This flow performs the handshake itself and so bypasses the rest of the filter chain:
+                // the auth-independent checks of the downstream filters must be applied before the handshake.
+                if (SupervisionAccessControlFilter.isSupervisionPath(req.getURI().getPath())) {
+                    LOGGER.info(SupervisionAccessControlFilter.ACCESS_TO_SUPERVISION_ENDPOINT_IS_NOT_ALLOWED, req.getPath());
+                    return completeWithError(exchange, HttpStatus.FORBIDDEN);
+                }
+                LOGGER.debug("{}: no token at handshake time, waiting for it as the first websocket message", req.getPath());
+                return authenticateWebSocketWithFirstMessageAsToken(exchange);
+            }
             LOGGER.info("{}: 401 Unauthorized, Authorization header or access_token query parameter is required",
                 exchange.getRequest().getPath());
             return completeWithError(exchange, HttpStatus.UNAUTHORIZED);
@@ -117,6 +161,208 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
             token = queryls.get(0);
         }
 
+        return authenticate(token, req.getPath().toString())
+                .flatMap(user -> chain.filter(mutateExchangeWithUser(exchange, user)))
+                .onErrorResume(TokenAuthenticationException.class, e -> completeWithError(exchange, e.getStatus()));
+    }
+
+    private static boolean isWebSocketUpgrade(ServerHttpRequest request) {
+        return "websocket".equalsIgnoreCase(request.getHeaders().getUpgrade());
+    }
+
+    /**
+     * Performs the websocket handshake with the client ourselves (instead of letting the standard
+     * routing proceed), waits for the first message sent by the client and consumes it as the
+     * authentication token. If the token is missing, invalid, or doesn't arrive in time, the
+     * websocket is simply closed. Otherwise, a new connection is opened to the real target backend
+     * and every subsequent message is transparently bridged both ways, exactly as the standard
+     * websocket routing filter would do.
+     */
+    private Mono<Void> authenticateWebSocketWithFirstMessageAsToken(ServerWebExchange exchange) {
+        String path = exchange.getRequest().getPath().toString();
+        URI backendUri = toWebSocketUri(exchange.getRequiredAttribute(ServerWebExchangeUtils.GATEWAY_REQUEST_URL_ATTR));
+        HttpHeaders backendHeaders = filterOutgoingHeaders(exchange.getRequest().getHeaders());
+        List<String> subProtocols = getSubProtocols(exchange.getRequest().getHeaders());
+
+        return webSocketService.handleRequest(exchange, new SubProtocolsWebSocketHandler(subProtocols,
+                session -> handleFirstMessageAsToken(session, path, backendUri, backendHeaders, subProtocols)));
+    }
+
+    private Mono<Void> handleFirstMessageAsToken(WebSocketSession session, String path, URI backendUri, HttpHeaders backendHeaders,
+                                                 List<String> subProtocols) {
+        Sinks.Empty<Void> firstSignalReceived = Sinks.empty();
+        Mono<Void> authenticateAndBridge = session.receive()
+                .switchOnFirst((firstSignal, messages) -> {
+                    firstSignalReceived.tryEmitEmpty();
+                    if (firstSignal.isOnError()) {
+                        return rejectWebSocket(session, path, firstSignal.getThrowable()).flux();
+                    }
+                    if (!firstSignal.hasValue()) {
+                        // client went away before sending anything
+                        return Flux.<Void>empty();
+                    }
+                    // No need to release the token message: reactor-netty releases every inbound frame
+                    // once it has been handed to us, that's why forwarded frames need to be retained below.
+                    String firstMessageAsToken = firstSignal.get().getPayloadAsText();
+                    return authenticate(firstMessageAsToken, path)
+                            .onErrorResume(e -> rejectWebSocket(session, path, e).then(Mono.empty()))
+                            .flatMapMany(user -> proxyAuthenticatedWebSocket(session, messages.skip(1), user, backendUri, backendHeaders, subProtocols));
+                })
+                .then();
+        return Mono.when(authenticateAndBridge, closeUnlessFirstMessageReceivedInTime(session, path, firstSignalReceived.asMono()));
+    }
+
+    /**
+     * Closes the websocket if the client's first message is not received within {@link #firstMessageTokenTimeout}.
+     * This is deliberately not implemented with a {@code timeout()} operator on the inbound flux: such operators
+     * cancel the inbound flux on timeout, which makes reactor-netty send its own (empty) close frame before we
+     * could send ours with the proper status. Once the first message has been received, this has no effect at all
+     * (unlike a plain {@code timeout()} operator, which would also apply between subsequent messages and could
+     * wrongly close long-lived, mostly-silent notification channels).
+     */
+    private Mono<Void> closeUnlessFirstMessageReceivedInTime(WebSocketSession session, String path, Mono<Void> firstSignalReceived) {
+        // takeUntilOther is applied to the delay only: the close itself, once started, must never be cancelled
+        // (the inbound completing because of our own close would otherwise cancel it midway)
+        return Mono.delay(firstMessageTokenTimeout)
+                .takeUntilOther(firstSignalReceived)
+                .flatMap(tick -> rejectWebSocket(session, path, new TimeoutException("No token received as first websocket message")));
+    }
+
+    private static Mono<Void> rejectWebSocket(WebSocketSession session, String path, Throwable cause) {
+        LOGGER.info("{}: closing websocket, no valid token received as first message ({})", path, cause.toString());
+        return closeIfOpen(session, CloseStatus.POLICY_VIOLATION);
+    }
+
+    private Flux<Void> proxyAuthenticatedWebSocket(WebSocketSession session, Flux<WebSocketMessage> remainingClientMessages, AuthenticatedUser user,
+                                                   URI backendUri, HttpHeaders backendHeaders, List<String> subProtocols) {
+        String path = session.getHandshakeInfo().getUri().getPath();
+        // Same as UserAdminControlGlobalPreFilter, which is bypassed by this flow
+        userAdminService.userRecordConnection(user.getUserId(), true).subscribe();
+        return bridgeToBackend(session, remainingClientMessages, backendUri, addUserHeader(backendHeaders, user), subProtocols)
+                .onErrorResume(e -> {
+                    LOGGER.warn("{}: closing websocket, error while bridging to backend {}", path, backendUri, e);
+                    return closeIfOpen(session, CloseStatus.SERVER_ERROR).thenMany(Flux.<Void>empty());
+                });
+    }
+
+    private static Mono<Void> closeIfOpen(WebSocketSession session, CloseStatus status) {
+        return session.isOpen() ? session.close(status) : Mono.empty();
+    }
+
+    private Flux<Void> bridgeToBackend(WebSocketSession clientSession, Flux<WebSocketMessage> remainingClientMessages,
+                                        URI backendUri, HttpHeaders backendHeaders, List<String> subProtocols) {
+        return webSocketClient.execute(backendUri, backendHeaders, new SubProtocolsWebSocketHandler(subProtocols, backendSession -> {
+            // Frames are forwarded unchanged (any type, any payload); retain() is needed for reactor-netty
+            // which releases inbound frames after they have been emitted (same as WebsocketRoutingFilter)
+            Mono<Void> forwardToBackend = backendSession.send(remainingClientMessages.doOnNext(WebSocketMessage::retain));
+            Mono<Void> forwardToClient = clientSession.send(backendSession.receive().doOnNext(WebSocketMessage::retain));
+            return Mono.zip(forwardToBackend, forwardToClient).then();
+        })).flux();
+    }
+
+    /**
+     * Same as the standard websocket routing filter: sub-protocols requested by the client are not forwarded
+     * as a raw header (sec-websocket-* headers are regenerated by the websocket client) but through the
+     * handlers' {@link WebSocketHandler#getSubProtocols()}, on both the client and the backend side.
+     */
+    private static List<String> getSubProtocols(HttpHeaders headers) {
+        List<String> protocols = headers.get(SEC_WEBSOCKET_PROTOCOL);
+        if (protocols == null) {
+            return Collections.emptyList();
+        }
+        List<String> subProtocols = new ArrayList<>();
+        for (String protocol : protocols) {
+            subProtocols.addAll(Arrays.asList(StringUtils.tokenizeToStringArray(protocol, ",")));
+        }
+        return subProtocols;
+    }
+
+    @AllArgsConstructor
+    private static final class SubProtocolsWebSocketHandler implements WebSocketHandler {
+        private final List<String> subProtocols;
+        private final WebSocketHandler delegate;
+
+        @Override
+        public List<String> getSubProtocols() {
+            return subProtocols;
+        }
+
+        @Override
+        public Mono<Void> handle(WebSocketSession session) {
+            return delegate.handle(session);
+        }
+    }
+
+    private static URI toWebSocketUri(URI requestUrl) {
+        String wsScheme = convertHttpToWs(requestUrl.getScheme());
+        boolean encoded = ServerWebExchangeUtils.containsEncodedParts(requestUrl);
+        return UriComponentsBuilder.fromUri(requestUrl).scheme(wsScheme).build(encoded).toUri();
+    }
+
+    private static String convertHttpToWs(String scheme) {
+        String lowerCaseScheme = scheme.toLowerCase(Locale.ROOT);
+        if ("http".equals(lowerCaseScheme)) {
+            return "ws";
+        } else if ("https".equals(lowerCaseScheme)) {
+            return "wss";
+        }
+        return lowerCaseScheme;
+    }
+
+    private static HttpHeaders filterOutgoingHeaders(HttpHeaders originalHeaders) {
+        HttpHeaders filtered = new HttpHeaders();
+        originalHeaders.forEach((name, values) -> {
+            String lowerCaseName = name.toLowerCase(Locale.ROOT);
+            if (!lowerCaseName.startsWith("sec-websocket") && !"host".equals(lowerCaseName)) {
+                filtered.addAll(name, values);
+            }
+        });
+        return filtered;
+    }
+
+    private static HttpHeaders addUserHeader(HttpHeaders headers, AuthenticatedUser user) {
+        HttpHeaders withUser = new HttpHeaders();
+        withUser.addAll(headers);
+        setUserHeaders(withUser, user);
+        return withUser;
+    }
+
+    private static ServerWebExchange mutateExchangeWithUser(ServerWebExchange exchange, AuthenticatedUser user) {
+        ServerHttpRequest request = exchange.getRequest().mutate().headers(headers -> setUserHeaders(headers, user)).build();
+        return exchange.mutate().request(request).build();
+    }
+
+    /**
+     * Always overwrites both identity headers, so that no client-supplied value can ever survive.
+     */
+    private static void setUserHeaders(HttpHeaders headers, AuthenticatedUser user) {
+        headers.set(HEADER_USER_ID, user.getUserId());
+        if (user.getRoles() != null) {
+            headers.set(HEADER_ROLES, user.getRoles());
+        } else {
+            headers.remove(HEADER_ROLES);
+        }
+    }
+
+    /**
+     * Authenticates a token (JWT or opaque reference token), regardless of how it was transmitted
+     * (Authorization header, access_token query parameter, or first websocket message).
+     *
+     * @param token the raw token value
+     * @param path the request path, used only for logging purposes
+     * @return a Mono emitting the authenticated user on success, or an error signal
+     *         ({@link TokenAuthenticationException}) on failure
+     */
+    private Mono<AuthenticatedUser> authenticate(String token, String path) {
+        // defer so that any failure thrown while parsing/validating becomes an error signal instead of escaping to callers
+        return Mono.defer(() -> doAuthenticate(token, path))
+                .onErrorMap(e -> e instanceof IllegalArgumentException || e instanceof NullPointerException, e -> {
+                    LOGGER.info("{}: 401 Unauthorized, malformed token or claims ({})", path, e.toString());
+                    return new TokenAuthenticationException(HttpStatus.UNAUTHORIZED);
+                });
+    }
+
+    private Mono<AuthenticatedUser> doAuthenticate(String token, String path) {
         JWT jwt;
         JWTClaimsSet jwtClaimsSet;
         try {
@@ -124,13 +370,17 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
             jwtClaimsSet = jwt.getJWTClaimsSet();
 
             LOGGER.debug("checking issuer");
+            if (jwtClaimsSet.getIssuer() == null) {
+                LOGGER.info("{}: 401 Unauthorized, missing issuer claim", path);
+                return Mono.error(new TokenAuthenticationException(HttpStatus.UNAUTHORIZED));
+            }
             if (allowedIssuers.stream().noneMatch(iss -> jwtClaimsSet.getIssuer().startsWith(iss))) {
-                LOGGER.info("{}: 401 Unauthorized, {} Issuer is not in the issuers white list", exchange.getRequest().getPath(), jwtClaimsSet.getIssuer());
-                return completeWithError(exchange, HttpStatus.UNAUTHORIZED);
+                LOGGER.info("{}: 401 Unauthorized, {} Issuer is not in the issuers white list", path, jwtClaimsSet.getIssuer());
+                return Mono.error(new TokenAuthenticationException(HttpStatus.UNAUTHORIZED));
             }
 
             if (!isValidAudienceOrClientId(jwtClaimsSet)) {
-                return completeWithError(exchange, HttpStatus.UNAUTHORIZED);
+                return Mono.error(new TokenAuthenticationException(HttpStatus.UNAUTHORIZED));
             }
 
             Issuer iss = new Issuer(jwtClaimsSet.getIssuer());
@@ -145,20 +395,18 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
             }
 
             JWSAlgorithm jwsAlg = JWSAlgorithm.parse(jwt.getHeader().getAlgorithm().getName());
-            return proceedFilter(new FilterInfos(exchange, chain, jwt, jwtClaimsSet, iss, clientID, jwsAlg));
+            return proceedJwtAuthentication(new JwtContext(jwt, jwtClaimsSet, iss, clientID, jwsAlg, path));
         } catch (java.text.ParseException e) {
             // Invalid plain JOSE object encoding
             // Don't print the full stacktrace here for less verbose logs,
             // we have enough context with just the message
             LOGGER.debug("JWTParser.parse ParseException, will attempt to use as opaque token: ({})", e.getMessage());
             // TODO try more than just the first issuer here ? get the issuer from the client ?
-            return validateOpaqueReferenceToken(allowedIssuers.get(0), token, exchange, chain);
+            return authenticateOpaqueReferenceToken(allowedIssuers.get(0), token);
         }
     }
 
-    private Mono<Void> validateOpaqueReferenceToken(String issBaseUri, String token, ServerWebExchange exchange,
-            @SuppressWarnings("checkstyle:LambdaBodyLength")
-            GatewayFilterChain chain) {
+    private Mono<AuthenticatedUser> authenticateOpaqueReferenceToken(String issBaseUri, String token) {
         // TODO CACHE the two requests
         return gatewayService.getOpaqueTokenIntrospectionUri(issBaseUri)
                 .flatMap(uri -> gatewayService.getOpaqueTokenIntrospection(uri, token))
@@ -167,28 +415,16 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
                     String clientId = tokenIntrospection.getClientId();
                     if (!isValidClientId(clientId)) {
                         LOGGER.info(UNAUTHORIZED_CLIENT_NOT_ALLOWED, clientId);
-                        return completeWithError(exchange, HttpStatus.UNAUTHORIZED);
+                        return Mono.<AuthenticatedUser>error(new TokenAuthenticationException(HttpStatus.UNAUTHORIZED));
                     }
 
                     if (tokenIntrospection.getActive()) {
                         LOGGER.debug("Opaque Token verified, it can be trusted");
-
                         // TODO really add the client_id header instead of userid
-                        // Build mutated request with userId header
-                        ServerHttpRequest mutatedRequest = exchange.getRequest().mutate()
-                                .header(HEADER_USER_ID, tokenIntrospection.getClientId())
-                                .build();
-
-                        // Create new exchange with mutated request
-                        ServerWebExchange mutatedExchange = exchange.mutate()
-                                .request(mutatedRequest)
-                                .build();
-
-                        // Pass mutated exchange to chain
-                        return chain.filter(mutatedExchange);
+                        return Mono.just(new AuthenticatedUser(tokenIntrospection.getClientId(), null));
                     } else {
-                        LOGGER.info(UNAUTHORIZED_INVALID_PLAIN_JOSE_OBJECT_ENCODING, exchange.getRequest().getPath());
-                        return completeWithError(exchange, HttpStatus.UNAUTHORIZED);
+                        LOGGER.info(UNAUTHORIZED_INVALID_PLAIN_JOSE_OBJECT_ENCODING, "opaque token");
+                        return Mono.<AuthenticatedUser>error(new TokenAuthenticationException(HttpStatus.UNAUTHORIZED));
                     }
                 });
     }
@@ -252,7 +488,7 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
         return clientId != null && allowedClients.contains(clientId);
     }
 
-    private Mono<Void> validate(FilterInfos filterInfos, JWKSet jwkset) throws BadJOSEException, JOSEException {
+    private AuthenticatedUser validate(JwtContext jwtContext, JWKSet jwkset) throws BadJOSEException, JOSEException {
 
         // Create validator for signed ID tokens
         // IMPORTANT: IDTokenValidator strictly enforces OpenID Connect standards including
@@ -266,9 +502,9 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
         //
         // Alternative approaches if client_id-only tokens must be fully supported:
         // Use DefaultJWTClaimsVerifier instead of IDTokenValidator (https://connect2id.com/products/nimbus-jose-jwt/examples/validating-jwt-access-tokens)
-        IDTokenValidator validator = new IDTokenValidator(filterInfos.getIss(), filterInfos.getClientID(), filterInfos.getJwsAlg(), jwkset);
+        IDTokenValidator validator = new IDTokenValidator(jwtContext.getIss(), jwtContext.getClientID(), jwtContext.getJwsAlg(), jwkset);
 
-        validator.validate(filterInfos.getJwt(), null);
+        validator.validate(jwtContext.getJwt(), null);
         // we can safely trust the JWT
         LOGGER.debug("JWT Token verified, it can be trusted");
 
@@ -281,29 +517,14 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
         // some tokens if for some reason the frontend doesn't send the token, whereas here
         // we are guaranteed that we receive the token.
         if (storeIdTokens) {
-            userIdentityService.storeToken(filterInfos.getJwtClaimsSet().getSubject(), filterInfos.getJwtClaimsSet())
+            userIdentityService.storeToken(jwtContext.getJwtClaimsSet().getSubject(), jwtContext.getJwtClaimsSet())
                     // send in the background and don't wait for the result. This is the hot path on
                     // all requests !
                     .subscribe();
         }
 
-        ServerWebExchange exchange = filterInfos.getExchange();
-        //we add the subject header
-        ServerHttpRequest.Builder requestBuilder = exchange.getRequest().mutate()
-                .header(HEADER_USER_ID, filterInfos.getJwtClaimsSet().getSubject());
-
-        Object profileClaim = filterInfos.getJwtClaimsSet().getClaim("profile");
-        if (profileClaim != null) {
-            requestBuilder.header(HEADER_ROLES, profileClaim.toString());
-        }
-        ServerHttpRequest mutatedRequest = requestBuilder.build();
-
-        // Create a new exchange with the mutated request
-        ServerWebExchange mutatedExchange = exchange.mutate()
-                .request(mutatedRequest)
-                .build();
-
-        return filterInfos.getChain().filter(mutatedExchange);
+        Object profileClaim = jwtContext.getJwtClaimsSet().getClaim("profile");
+        return new AuthenticatedUser(jwtContext.getJwtClaimsSet().getSubject(), profileClaim != null ? profileClaim.toString() : null);
     }
 
     /**
@@ -314,58 +535,74 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
      *  <li>BadJWSException (Subclass of BadJOSEException) : Bad JSON Web Signature (JWS) exception. Used to indicate an invalid signature or hash-based message authentication code (HMAC).</li>
      *  <li>JOSEException: Javascript Object Signing and Encryption (JOSE) exception. Used to indicate an invalid jwt type.</li>
      * </ul>
-     * @param  filterInfos
-     * @return Mono<Void>
+     * @param  jwtContext
+     * @return Mono<AuthenticatedUser>
      */
-    Mono<Void> proceedFilter(FilterInfos filterInfos) {
+    Mono<AuthenticatedUser> proceedJwtAuthentication(JwtContext jwtContext) {
 
-        JWKSet jwksCache = jwkSetCache.get(filterInfos.getIss().getValue());
+        JWKSet jwksCache = jwkSetCache.get(jwtContext.getIss().getValue());
         // check if jwkset exists in cache
         if (jwksCache != null) {
-            return tryValidate(filterInfos, jwksCache, true);
+            return tryValidate(jwtContext, jwksCache, true);
         } else {
             // get Jwks Url
-            return gatewayService.getJwksUrl(filterInfos.getIss().getValue()).flatMap(uri ->
+            return gatewayService.getJwksUrl(jwtContext.getIss().getValue()).flatMap(uri ->
                 // download public keys and cache it into ConcurrentHashMap
                 gatewayService.getJwkSet(uri).flatMap(jwksString -> {
-                    JWKSet jwkSet = null;
+                    JWKSet jwkSet;
                     try {
                         jwkSet = JWKSet.parse(jwksString);
-                        jwkSetCache.put(filterInfos.getIss().getValue(), jwkSet);
+                        jwkSetCache.put(jwtContext.getIss().getValue(), jwkSet);
                     } catch (ParseException e) {
-                        LOGGER.info(PARSING_ERROR, filterInfos.getExchange().getRequest().getPath());
-                        return completeWithError(filterInfos.getExchange(), HttpStatus.INTERNAL_SERVER_ERROR);
+                        LOGGER.info(PARSING_ERROR, jwtContext.getPath());
+                        return Mono.<AuthenticatedUser>error(new TokenAuthenticationException(HttpStatus.INTERNAL_SERVER_ERROR));
                     }
-                    return tryValidate(filterInfos, jwkSet, false);
+                    return tryValidate(jwtContext, jwkSet, false);
                 })
             );
         }
     }
 
-    private Mono<Void> tryValidate(FilterInfos filterInfos, JWKSet jwksCache, boolean evict) {
+    private Mono<AuthenticatedUser> tryValidate(JwtContext jwtContext, JWKSet jwksCache, boolean evict) {
         try {
-            return validate(filterInfos, jwksCache);
+            return Mono.just(validate(jwtContext, jwksCache));
         } catch (JOSEException | BadJOSEException e) {
             if (evict && e instanceof BadJOSEException) {
-                LOGGER.info(CACHE_OUTDATED, filterInfos.getExchange().getRequest().getPath());
-                jwkSetCache.remove(filterInfos.getIss().getValue());
-                return this.proceedFilter(filterInfos);
+                LOGGER.info(CACHE_OUTDATED, jwtContext.getPath());
+                jwkSetCache.remove(jwtContext.getIss().getValue());
+                return this.proceedJwtAuthentication(jwtContext);
             } else {
-                LOGGER.info(UNAUTHORIZED_THE_TOKEN_CANNOT_BE_TRUSTED, filterInfos.getExchange().getRequest().getPath());
-                return completeWithError(filterInfos.getExchange(), HttpStatus.UNAUTHORIZED);
+                LOGGER.info(UNAUTHORIZED_THE_TOKEN_CANNOT_BE_TRUSTED, jwtContext.getPath());
+                return Mono.error(new TokenAuthenticationException(HttpStatus.UNAUTHORIZED));
             }
         }
     }
 
     @AllArgsConstructor
     @Getter
-    private static final class FilterInfos {
-        private final ServerWebExchange exchange;
-        private final GatewayFilterChain chain;
+    private static final class JwtContext {
         private final JWT jwt;
         private final JWTClaimsSet jwtClaimsSet;
         private final Issuer iss;
         private final ClientID clientID;
         private final JWSAlgorithm jwsAlg;
+        private final String path;
+    }
+
+    @AllArgsConstructor
+    @Getter
+    private static final class AuthenticatedUser {
+        private final String userId;
+        private final String roles;
+    }
+
+    private static final class TokenAuthenticationException extends RuntimeException {
+        @Getter
+        private final HttpStatus status;
+
+        TokenAuthenticationException(HttpStatus status) {
+            super("Token authentication failed with status " + status);
+            this.status = status;
+        }
     }
 }
