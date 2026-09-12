@@ -303,6 +303,27 @@ class TokenValidationTest {
         testToken(elementUuid, "clientopaquetoken");
     }
 
+    @Test
+    void testSupervisionEndpointsAccess() {
+        initStubForJwk();
+
+        // Access to supervision endpoints is blocked.
+        webClient.get().uri("study/v1/supervision/studies")
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+            .exchange()
+            .expectStatus().isForbidden();
+
+        // A non-supervision endpoint whose name contains "supervision" is allowed.
+        stubFor(get(urlEqualTo("/v1/studies/supervision-report"))
+            .withHeader("userId", equalTo("chmits"))
+            .willReturn(aResponse()));
+
+        webClient.get().uri("study/v1/studies/supervision-report")
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+            .exchange()
+            .expectStatus().isOk();
+    }
+
     private void testToken(UUID elementUuid, String token) {
         webClient
                 .get().uri("case/v1/cases")
