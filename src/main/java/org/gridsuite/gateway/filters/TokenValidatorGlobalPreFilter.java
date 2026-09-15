@@ -106,8 +106,12 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
             return completeWithError(initialExchange, HttpStatus.UNAUTHORIZED);
         }
 
-        // Only keep the "token" subprotocol, so that the token value is not forwarded to the
-        // backend service and that the negotiated subprotocol answered to the client is "token"
+        // Only keep the "token" subprotocol (drop the token value) so that the gateway still answers
+        // the client's handshake with the negotiated "token" subprotocol, as required by browsers like
+        // Chrome (RFC 6455 requires a Sec-WebSocket-Protocol response whenever the client sent one).
+        // The raw token value itself must never reach the backend service. The subprotocol is also
+        // stripped from the outgoing connection to the backend service (see SubProtocolStrippingWebSocketClient),
+        // since backend services generally don't support/answer websocket subprotocol negotiation at all.
         ServerWebExchange exchange = useSubProtocolToken ? withNegotiatedTokenSubProtocol(initialExchange) : initialExchange;
 
         // For now we only handle one token. If needed, we can adapt this code to check

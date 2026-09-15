@@ -48,8 +48,10 @@ import java.util.Base64;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
@@ -419,10 +421,11 @@ class TokenValidationTest {
     void testWebsocketWithSubProtocolToken() throws Exception {
         initStubForJwk();
 
+        // Backend services don't support websocket subprotocol negotiation at all, so the stub
+        // must not echo back any Sec-WebSocket-Protocol header, just like a real backend would.
         stubFor(get(urlPathEqualTo("/notify")).withHeader("userId", equalTo("chmits"))
             .willReturn(aResponse()
                 .withHeader("Sec-WebSocket-Accept", "{{{sec-websocket-accept request.headers.Sec-WebSocket-Key}}}")
-                .withHeader("Sec-WebSocket-Protocol", "token")
                 .withHeader(HttpHeaders.UPGRADE, "websocket")
                 .withHeader(HttpHeaders.CONNECTION, HttpHeaders.UPGRADE)
                 .withStatus(101)
@@ -430,6 +433,7 @@ class TokenValidationTest {
 
         //Test a websocket with the token passed in the "token" subprotocol
         WebSocketClient client = new StandardWebSocketClient();
+        AtomicReference<String> negotiatedSubProtocol = new AtomicReference<>();
         Mono<Void> wsconnection = client.execute(
             URI.create("ws://localhost:" + this.localServerPort + "/study-notification/notify"), new HttpHeaders(),
             new WebSocketHandler() {
@@ -440,13 +444,19 @@ class TokenValidationTest {
 
                 @Override
                 public Mono<Void> handle(WebSocketSession session) {
+                    negotiatedSubProtocol.set(session.getHandshakeInfo().getSubProtocol());
                     return session.receive().then();
                 }
             });
-        // the token value must not be forwarded to the backend service, only the "token" subprotocol
+        // neither the token value nor the "token" subprotocol itself must be forwarded to the
+        // backend service, since it doesn't support websocket subprotocol negotiation
         checkWebsocketConnected(wsconnection, getRequestedFor(urlPathEqualTo("/notify"))
                 .withHeader(HttpHeaders.UPGRADE, equalTo("websocket"))
-                .withHeader("Sec-WebSocket-Protocol", equalTo("token")));
+                .withoutHeader("Sec-WebSocket-Protocol"));
+        // the gateway must still answer the client's handshake with the negotiated "token"
+        // subprotocol, as required by the websocket protocol (e.g. Chrome rejects the handshake
+        // otherwise) even though it isn't forwarded to the backend service
+        assertEquals("token", negotiatedSubProtocol.get());
     }
 
     @Test
