@@ -58,7 +58,7 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
     public static final String UNAUTHORIZED_THE_TOKEN_CANNOT_BE_TRUSTED = "{}: 401 Unauthorized, The token cannot be trusted";
     public static final String CACHE_OUTDATED = "{}: Bad JSON Object Signing and Encryption, cache outdated";
     public static final String WEBSOCKET_TOKEN_SUB_PROTOCOL = "token";
-    private static final String SEC_WEBSOCKET_PROTOCOL = "Sec-WebSocket-Protocol";
+    private static final String SEC_WEBSOCKET_PROTOCOL = "Sec-WebSocket-Protocol"; //note: constant not defined in webflux, only webmvc...
     private final GatewayService gatewayService;
     private final UserIdentityService userIdentityService;
 
