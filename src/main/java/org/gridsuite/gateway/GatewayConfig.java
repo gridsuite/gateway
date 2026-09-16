@@ -7,16 +7,12 @@
 package org.gridsuite.gateway;
 
 import org.gridsuite.gateway.endpoints.*;
-import org.gridsuite.gateway.filters.SubProtocolStrippingWebSocketClient;
 import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.PropertySource;
-import org.springframework.web.reactive.socket.client.ReactorNettyWebSocketClient;
-import org.springframework.web.reactive.socket.client.WebSocketClient;
 
 /**
  * @author Chamseddine Benhamed <chamseddine.benhamed at rte-france.com>
@@ -65,16 +61,5 @@ public class GatewayConfig {
             .route(p -> context.getBean(MonitorServer.class).getRoute(p))
             .route(p -> context.getBean(MonitorNotificationServer.class).getRoute(p))
             .build();
-    }
-
-    /**
-     * Overrides Spring Cloud Gateway's default websocket client bean so that no
-     * {@code Sec-WebSocket-Protocol} subprotocol is ever forwarded to backend services when
-     * proxying websocket connections (see {@link SubProtocolStrippingWebSocketClient}).
-     */
-    @Bean
-    @Primary
-    public WebSocketClient subProtocolStrippingWebSocketClient(ReactorNettyWebSocketClient reactorNettyWebSocketClient) {
-        return new SubProtocolStrippingWebSocketClient(reactorNettyWebSocketClient);
     }
 }

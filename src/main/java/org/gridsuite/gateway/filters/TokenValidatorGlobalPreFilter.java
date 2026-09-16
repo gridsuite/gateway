@@ -89,9 +89,9 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
     }
 
     @Override
-    public Mono<Void> filter(ServerWebExchange initialExchange, GatewayFilterChain chain) {
+    public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         LOGGER.debug("Filter : {}", getClass().getSimpleName());
-        ServerHttpRequest req = initialExchange.getRequest();
+        ServerHttpRequest req = exchange.getRequest();
         List<String> ls = req.getHeaders().get(HttpHeaders.AUTHORIZATION);
         List<String> queryls = req.getQueryParams().get("access_token");
         // Websocket clients can't send custom headers, so the token can be passed as a
@@ -103,16 +103,8 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
         if (ls == null && queryls == null && !useSubProtocolToken) {
             LOGGER.info("{}: 401 Unauthorized, Authorization header, access_token query parameter or \"{}\" websocket subprotocol is required",
                 req.getPath(), WEBSOCKET_TOKEN_SUB_PROTOCOL);
-            return completeWithError(initialExchange, HttpStatus.UNAUTHORIZED);
+            return completeWithError(exchange, HttpStatus.UNAUTHORIZED);
         }
-
-        // Only keep the "token" subprotocol (drop the token value) so that the gateway still answers
-        // the client's handshake with the negotiated "token" subprotocol, as required by browsers like
-        // Chrome (RFC 6455 requires a Sec-WebSocket-Protocol response whenever the client sent one).
-        // The raw token value itself must never reach the backend service. The subprotocol is also
-        // stripped from the outgoing connection to the backend service (see SubProtocolStrippingWebSocketClient),
-        // since backend services generally don't support/answer websocket subprotocol negotiation at all.
-        ServerWebExchange exchange = useSubProtocolToken ? withNegotiatedTokenSubProtocol(initialExchange) : initialExchange;
 
         // For now we only handle one token. If needed, we can adapt this code to check
         // multiple tokens and accept the connection if at least one of them is valid
@@ -200,10 +192,15 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
     }
 
     private static ServerWebExchange withNegotiatedTokenSubProtocol(ServerWebExchange exchange) {
-        ServerHttpRequest mutatedRequest = exchange.getRequest().mutate()
-                .headers(headers -> headers.set(SEC_WEBSOCKET_PROTOCOL, WEBSOCKET_TOKEN_SUB_PROTOCOL))
+        if (!getWebSocketSubProtocols(exchange.getRequest()).contains(WEBSOCKET_TOKEN_SUB_PROTOCOL)) {
+            return exchange;
+        }
+
+        // Answer the client's handshake without advertising subprotocols to the backend.
+        exchange.getResponse().getHeaders().set(SEC_WEBSOCKET_PROTOCOL, WEBSOCKET_TOKEN_SUB_PROTOCOL);
+        return exchange.mutate()
+                .request(request -> request.headers(headers -> headers.remove(SEC_WEBSOCKET_PROTOCOL)))
                 .build();
-        return exchange.mutate().request(mutatedRequest).build();
     }
 
     private Mono<Void> validateOpaqueReferenceToken(String issBaseUri, String token, ServerWebExchange exchange,
@@ -235,7 +232,7 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
                                 .build();
 
                         // Pass mutated exchange to chain
-                        return chain.filter(mutatedExchange);
+                        return chain.filter(withNegotiatedTokenSubProtocol(mutatedExchange));
                     } else {
                         LOGGER.info(UNAUTHORIZED_INVALID_PLAIN_JOSE_OBJECT_ENCODING, exchange.getRequest().getPath());
                         return completeWithError(exchange, HttpStatus.UNAUTHORIZED);
@@ -353,7 +350,7 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
                 .request(mutatedRequest)
                 .build();
 
-        return filterInfos.getChain().filter(mutatedExchange);
+        return filterInfos.getChain().filter(withNegotiatedTokenSubProtocol(mutatedExchange));
     }
 
     /**
