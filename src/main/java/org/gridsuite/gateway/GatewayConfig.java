@@ -60,6 +60,7 @@ public class GatewayConfig {
             .route(p -> context.getBean(PccMinServer.class).getRoute(p))
             .route(p -> context.getBean(MonitorServer.class).getRoute(p))
             .route(p -> context.getBean(MonitorNotificationServer.class).getRoute(p))
+            .route(p -> context.getBean(SnapshotRefinerServer.class).getRoute(p))
             .build();
     }
 }

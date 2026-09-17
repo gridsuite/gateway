@@ -40,7 +40,8 @@ public class LoggingFilter extends AbstractGlobalPreFilter {
         "/dynamic-mapping/",
         "/user-admin/",
         "/monitor/",
-        "/monitor-notification/"
+        "/monitor-notification/",
+        "/snapshot-refiner/"
     };
 
     protected LoggingFilter(UserAdminService userAdminService) {
