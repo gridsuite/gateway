@@ -31,6 +31,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.web.reactive.socket.WebSocketHandler;
+import org.springframework.web.reactive.socket.WebSocketSession;
 import org.springframework.web.reactive.socket.client.StandardWebSocketClient;
 import org.springframework.web.reactive.socket.client.WebSocketClient;
 import reactor.core.publisher.Mono;
@@ -43,9 +45,12 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.Date;
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
@@ -196,13 +201,25 @@ class TokenValidationTest {
         tokenWithInvalidClientId = signedJWTInvalidClientId.serialize();
     }
 
-    private void testWebsocket(String name) throws Exception {
-        //Test a websocket with token in query parameters
+    private void testWebsocket(String name, boolean useSubProtocolToken) throws Exception {
         WebSocketClient client = new StandardWebSocketClient();
-        HttpHeaders headers = new HttpHeaders();
+        AtomicReference<String> negotiatedSubProtocol = new AtomicReference<>();
+        String query = useSubProtocolToken ? "" : "?access_token=" + token;
         Mono<Void> wsconnection = client.execute(
-            URI.create("ws://localhost:" + this.localServerPort + "/" + name + "/notify?access_token=" + token), headers,
-            ws -> ws.receive().then());
+            URI.create("ws://localhost:" + this.localServerPort + "/" + name + "/notify" + query), new HttpHeaders(),
+            new WebSocketHandler() {
+                @Override
+                public List<String> getSubProtocols() {
+                    return useSubProtocolToken ? List.of("token", token) : List.of();
+                }
+
+                @Override
+                public Mono<Void> handle(WebSocketSession session) {
+                    negotiatedSubProtocol.set(session.getHandshakeInfo().getSubProtocol());
+                    return session.receive().then();
+                }
+            });
+
         wsconnection.subscribe();
 
         // Busy loop waiting to check that spring-gateway contacted our wiremock server
@@ -213,7 +230,8 @@ class TokenValidationTest {
             try {
                 verify(getRequestedFor(urlPathEqualTo("/notify"))
                         .withHeader(HttpHeaders.CONNECTION, equalTo(HttpHeaders.UPGRADE))
-                        .withHeader(HttpHeaders.UPGRADE, equalTo("websocket")));
+                        .withHeader(HttpHeaders.UPGRADE, equalTo("websocket"))
+                        .withoutHeader("Sec-WebSocket-Protocol")); // always verifying this but doesn't hurt
                 done = true;
             } catch (VerificationException e) {
                 // nothing to do
@@ -231,6 +249,14 @@ class TokenValidationTest {
         } catch (Exception ignored) {
             //should timeout
         }
+
+        if (useSubProtocolToken) {
+            // the gateway must still answer the client's handshake with the negotiated "token"
+            // subprotocol, as required by the websocket protocol (e.g. Chrome rejects the handshake
+            // otherwise) even though it isn't forwarded to the backend service
+            assertEquals("token", negotiatedSubProtocol.get());
+        }
+
     }
 
     @Test
@@ -393,6 +419,8 @@ class TokenValidationTest {
     void testWebsockets() throws Exception {
         initStubForJwk();
 
+        // Backend services don't support websocket subprotocol negotiation at all, so the stub
+        // never echoes back any Sec-WebSocket-Protocol header, just like a real backend would.
         stubFor(get(urlPathEqualTo("/notify")).withHeader("userId", equalTo("chmits"))
             .willReturn(aResponse()
                 .withHeader("Sec-WebSocket-Accept", "{{{sec-websocket-accept request.headers.Sec-WebSocket-Key}}}")
@@ -401,10 +429,13 @@ class TokenValidationTest {
                 .withStatus(101)
                 .withStatusMessage("Switching Protocols")));
 
-        testWebsocket("study-notification");
-        testWebsocket("config-notification");
-        testWebsocket("merge-notification");
-        testWebsocket("directory-notification");
+        testWebsocket("study-notification", false);
+        testWebsocket("config-notification", false);
+        testWebsocket("merge-notification", false); // TODO should not work, but does because of missing wiremock reset
+        testWebsocket("directory-notification", false);
+        testWebsocket("study-notification", true);
+        testWebsocket("config-notification", true);
+        testWebsocket("directory-notification", true);
     }
 
     @Test
