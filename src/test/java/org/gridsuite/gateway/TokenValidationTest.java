@@ -202,6 +202,7 @@ class TokenValidationTest {
     }
 
     private void testWebsocket(String name, boolean useSubProtocolToken) throws Exception {
+        resetAllRequests();
         WebSocketClient client = new StandardWebSocketClient();
         AtomicReference<String> negotiatedSubProtocol = new AtomicReference<>();
         String query = useSubProtocolToken ? "" : "?access_token=" + token;
@@ -431,7 +432,6 @@ class TokenValidationTest {
 
         testWebsocket("study-notification", false);
         testWebsocket("config-notification", false);
-        testWebsocket("merge-notification", false); // TODO should not work, but does because of missing wiremock reset
         testWebsocket("directory-notification", false);
         testWebsocket("study-notification", true);
         testWebsocket("config-notification", true);
