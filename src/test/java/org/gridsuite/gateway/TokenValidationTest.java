@@ -219,7 +219,7 @@ class TokenValidationTest {
                     negotiatedSubProtocol.set(session.getHandshakeInfo().getSubProtocol());
                     return session.receive().then();
                 }
-            });
+            }).cache();
 
         wsconnection.subscribe();
 
