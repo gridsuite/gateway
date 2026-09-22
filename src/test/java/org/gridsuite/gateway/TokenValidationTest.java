@@ -154,7 +154,7 @@ class TokenValidationTest {
                 .audience("test.app")
                 .issuer("http://notAllowedissuer")
                 .issueTime(new Date())
-                .expirationTime(new Date(new Date().getTime() - 1000 * 60 * 60))
+                .expirationTime(new Date(new Date().getTime() + 60 * 1000))
                 .build();
 
         // Prepare JWT with claims set for token with valid client_id but no audience
