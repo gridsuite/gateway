@@ -47,6 +47,7 @@ import java.util.Base64;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
@@ -247,8 +248,11 @@ class TokenValidationTest {
         try {
             wsconnection.timeout(Duration.ofMillis(100)).block();
             fail("websocket client was closed but should remain open");
-        } catch (Exception ignored) {
+        } catch (Exception e) {
             //should timeout
+            if (!(e.getCause() instanceof TimeoutException)) {
+                throw e;
+            }
         }
 
         if (useSubProtocolToken) {
