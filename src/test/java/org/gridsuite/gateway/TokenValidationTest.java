@@ -35,6 +35,7 @@ import org.springframework.web.reactive.socket.WebSocketHandler;
 import org.springframework.web.reactive.socket.WebSocketSession;
 import org.springframework.web.reactive.socket.client.StandardWebSocketClient;
 import org.springframework.web.reactive.socket.client.WebSocketClient;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import wiremock.com.github.jknack.handlebars.Helper;
 
@@ -638,6 +639,14 @@ class TokenValidationTest {
                         .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                         .withBody("{\"keys\" : [ " + rsaKey.toJSONString() + " ] }")));
 
+        stubFor(get(urlPathEqualTo("/notify")).withHeader("userId", equalTo("chmits"))
+                .willReturn(aResponse()
+                        .withHeader("Sec-WebSocket-Accept", "{{{sec-websocket-accept request.headers.Sec-WebSocket-Key}}}")
+                        .withHeader(HttpHeaders.UPGRADE, "websocket")
+                        .withHeader(HttpHeaders.CONNECTION, HttpHeaders.UPGRADE)
+                        .withStatus(101)
+                        .withStatusMessage("Switching Protocols")));
+
         // test with no token
         webClient
                 .get().uri("case/v1/cases")
@@ -691,9 +700,16 @@ class TokenValidationTest {
 
         // test without a token
         WebSocketClient client = new StandardWebSocketClient();
-        client.execute(URI.create("ws://localhost:" +
-                this.localServerPort + "/study-notification/notify"),
-            ws -> ws.receive().then()).doOnSuccess(s -> fail("Should have thrown"));
+        try {
+            client.execute(URI.create("ws://localhost:" +
+                    this.localServerPort + "/study-notification/notify"),
+                ws -> Flux.firstWithSignal(ws.receive(), Mono.delay(Duration.ofMillis(500))).then())
+                .doOnSuccess(s -> fail("Should have thrown")).block();
+        } catch (Exception e) {
+            if (e.getCause() instanceof AssertionError) {
+                throw e;
+            }
+        }
     }
 
     @TestConfiguration
