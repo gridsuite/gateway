@@ -658,8 +658,8 @@ class TokenValidationTest {
                 .exchange()
                 .expectStatus().isUnauthorized();
 
-        String tokenWithFakeAlgorithm = token.replaceFirst("U", "Q");
-        String tokenWithFakeAudience = token.replaceFirst("X", "L");
+        String tokenWithFakeAlgorithm = token.replaceFirst("U", "Q"); // RS256 -> RC256
+        String tokenWithFakeSub = token.replaceFirst("p", "h"); // chmits -> chmats
 
         //test with token with a fake algorithm
         webClient
@@ -671,7 +671,7 @@ class TokenValidationTest {
         //test with token with fake audience
         webClient
                 .get().uri("case/v1/cases")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenWithFakeAudience)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenWithFakeSub)
                 .exchange()
                 .expectStatus().isUnauthorized();
 
