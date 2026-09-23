@@ -84,7 +84,7 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
 
     @Override
     public int getOrder() {
-        // Before ElementAccessControllerGlobalPreFilter to enforce authentication
+        // Before other global pre-filters to enforce authentication first
         return Ordered.LOWEST_PRECEDENCE - 4;
     }
 
