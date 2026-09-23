@@ -47,6 +47,7 @@ import java.util.Base64;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
@@ -154,7 +155,7 @@ class TokenValidationTest {
                 .audience("test.app")
                 .issuer("http://notAllowedissuer")
                 .issueTime(new Date())
-                .expirationTime(new Date(new Date().getTime() - 1000 * 60 * 60))
+                .expirationTime(new Date(new Date().getTime() + 60 * 1000))
                 .build();
 
         // Prepare JWT with claims set for token with valid client_id but no audience
@@ -202,6 +203,7 @@ class TokenValidationTest {
     }
 
     private void testWebsocket(String name, boolean useSubProtocolToken) throws Exception {
+        resetAllRequests();
         WebSocketClient client = new StandardWebSocketClient();
         AtomicReference<String> negotiatedSubProtocol = new AtomicReference<>();
         String query = useSubProtocolToken ? "" : "?access_token=" + token;
@@ -246,8 +248,11 @@ class TokenValidationTest {
         try {
             wsconnection.timeout(Duration.ofMillis(100)).block();
             fail("websocket client was closed but should remain open");
-        } catch (Exception ignored) {
+        } catch (Exception e) {
             //should timeout
+            if (!(e.getCause() instanceof TimeoutException)) {
+                throw e;
+            }
         }
 
         if (useSubProtocolToken) {
@@ -431,7 +436,6 @@ class TokenValidationTest {
 
         testWebsocket("study-notification", false);
         testWebsocket("config-notification", false);
-        testWebsocket("merge-notification", false); // TODO should not work, but does because of missing wiremock reset
         testWebsocket("directory-notification", false);
         testWebsocket("study-notification", true);
         testWebsocket("config-notification", true);
