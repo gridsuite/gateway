@@ -9,8 +9,6 @@ package org.gridsuite.gateway.endpoints;
 import org.gridsuite.gateway.ServiceURIsConfig;
 import org.springframework.stereotype.Component;
 
-import java.util.Set;
-
 /**
  * @author Slimane Amar <slimane.amar at rte-france.com>
  */
@@ -33,13 +31,5 @@ public class StudyServer implements EndPointElementServer {
     @Override
     public String getEndpointName() {
         return ENDPOINT_NAME;
-    }
-
-    @Override
-    public Set<String> getUncontrolledRootPaths() {
-        return Set.of("search", "svg-component-libraries", "export-network-formats", "loadflow-default-provider",
-                "security-analysis-default-provider", "sensitivity-analysis-default-provider",
-                "dynamic-simulation-default-provider", "dynamic-security-analysis-default-provider", "dynamic-margin-calculation-default-provider",
-                "optional-services", "servers");
     }
 }

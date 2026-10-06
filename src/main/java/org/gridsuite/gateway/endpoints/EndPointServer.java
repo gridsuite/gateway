@@ -32,8 +32,4 @@ public interface EndPointServer {
             .metadata(END_POINT_SERVICE_NAME, getEndpointName())
             .uri(getEndpointBaseUri());
     }
-
-    default boolean hasElementsAccessControl() {
-        return false;
-    }
 }
