@@ -13,12 +13,9 @@ import org.springframework.stereotype.Component;
  * @author Slimane Amar <slimane.amar at rte-france.com>
  */
 @Component(value = ExploreServer.ENDPOINT_NAME)
-public class ExploreServer implements EndPointElementServer {
+public class ExploreServer implements EndPointServer {
 
     public static final String ENDPOINT_NAME = "explore";
-
-    public static final String QUERY_PARAM_PARENT_DIRECTORY_ID = "parentDirectoryUuid";
-    public static final String QUERY_PARAM_DUPLICATE_FROM_ID = "duplicateFrom";
 
     private final ServiceURIsConfig servicesURIsConfig;
 
