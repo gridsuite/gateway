@@ -6,9 +6,10 @@
  */
 package org.gridsuite.gateway;
 
+import com.github.jknack.handlebars.Helper;
 import com.github.tomakehurst.wiremock.client.VerificationException;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
-import com.github.tomakehurst.wiremock.extension.responsetemplating.ResponseTemplateTransformer;
+import com.github.tomakehurst.wiremock.extension.TemplateHelperProviderExtension;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.JWSHeader;
@@ -23,11 +24,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.cloud.contract.wiremock.AutoConfigureWireMock;
-import org.springframework.cloud.contract.wiremock.WireMockConfigurationCustomizer;
-import org.springframework.context.annotation.Bean;
+import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTestClient;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
@@ -35,10 +33,11 @@ import org.springframework.web.reactive.socket.WebSocketHandler;
 import org.springframework.web.reactive.socket.WebSocketSession;
 import org.springframework.web.reactive.socket.client.StandardWebSocketClient;
 import org.springframework.web.reactive.socket.client.WebSocketClient;
+import org.wiremock.spring.ConfigureWireMock;
+import org.wiremock.spring.EnableWireMock;
+import org.wiremock.spring.WireMockConfigurationCustomizer;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import wiremock.com.github.jknack.handlebars.Helper;
-
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -47,6 +46,7 @@ import java.time.Duration;
 import java.util.Base64;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
@@ -82,7 +82,9 @@ import static org.junit.jupiter.api.Assertions.fail;
         "allowed-audiences=test.app,chmits",
         "allowed-clients=chmits",
     })
-@AutoConfigureWireMock(port = 0)
+@AutoConfigureWebTestClient
+@EnableWireMock(@ConfigureWireMock(port = 0, globalTemplating = true,
+        configurationCustomizers = TokenValidationTest.ResponseTemplateCustomizer.class))
 class TokenValidationTest {
 
     @Value("${wiremock.server.port}")
@@ -593,7 +595,7 @@ class TokenValidationTest {
                 .exchange()
                 .expectStatus().isUnauthorized();
 
-        stubFor(get(urlEqualTo("/jwks"))
+        editStub(get(urlEqualTo("/jwks"))
                 .withId(stubId)
                 .willReturn(aResponse()
                         .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
@@ -712,28 +714,32 @@ class TokenValidationTest {
         }
     }
 
-    @TestConfiguration
-    static class MyTestConfiguration {
-        @Bean
-        WireMockConfigurationCustomizer optionsCustomizer() {
-            return new WireMockConfigurationCustomizer() {
-                private static final String SEC_WEBSOCKET_MAGIC = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
-                @Override
-                public void customize(WireMockConfiguration options) {
-                    Helper<Object> secWebsocketAcceptHelper = (context, options1) -> {
-                        String in = context.toString() + SEC_WEBSOCKET_MAGIC;
-                        byte[] hashed;
-                        try {
-                            hashed = MessageDigest.getInstance("SHA-1").digest(in.getBytes(StandardCharsets.UTF_8));
-                        } catch (NoSuchAlgorithmException e) {
-                            throw new RuntimeException(e);
-                        }
-                        return Base64.getEncoder().encodeToString(hashed);
-                    };
-                    options.extensions(
-                            new ResponseTemplateTransformer(true, "sec-websocket-accept", secWebsocketAcceptHelper));
+    public static class ResponseTemplateCustomizer implements WireMockConfigurationCustomizer {
+        private static final String SEC_WEBSOCKET_MAGIC = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+
+        @Override
+        public void customize(WireMockConfiguration options, ConfigureWireMock wireMockOptions) {
+            Helper<Object> secWebsocketAcceptHelper = (context, options1) -> {
+                String in = context.toString() + SEC_WEBSOCKET_MAGIC;
+                byte[] hashed;
+                try {
+                    hashed = MessageDigest.getInstance("SHA-1").digest(in.getBytes(StandardCharsets.UTF_8));
+                } catch (NoSuchAlgorithmException e) {
+                    throw new RuntimeException(e);
                 }
+                return Base64.getEncoder().encodeToString(hashed);
             };
+            options.extensions(new TemplateHelperProviderExtension() {
+                @Override
+                public String getName() {
+                    return "sec-websocket-accept";
+                }
+
+                @Override
+                public Map<String, Helper<?>> provideTemplateHelpers() {
+                    return Map.of("sec-websocket-accept", secWebsocketAcceptHelper);
+                }
+            });
         }
     }
 }

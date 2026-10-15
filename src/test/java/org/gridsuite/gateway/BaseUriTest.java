@@ -11,12 +11,15 @@ import org.gridsuite.gateway.filters.UserAdminControlGlobalPreFilter;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.cloud.contract.wiremock.AutoConfigureWireMock;
+import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTestClient;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.web.server.ServerWebExchange;
+import org.wiremock.spring.ConfigureWireMock;
+import org.wiremock.spring.EnableWireMock;
+
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.stubFor;
@@ -27,7 +30,8 @@ import static org.mockito.Mockito.when;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         // case-server chosen without reason for this test, just to use a prefix
         properties = {"powsybl.services.case-server.base-uri=http://localhost:${wiremock.server.port}/prefix"})
-@AutoConfigureWireMock(port = 0)
+@AutoConfigureWebTestClient
+@EnableWireMock(@ConfigureWireMock(port = 0))
 class BaseUriTest {
 
     // Mock the filters that require setup and just get in the way of this test

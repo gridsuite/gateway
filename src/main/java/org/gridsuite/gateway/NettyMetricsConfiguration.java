@@ -10,7 +10,7 @@ package org.gridsuite.gateway;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.config.MeterFilter;
-import org.springframework.boot.web.embedded.netty.NettyServerCustomizer;
+import org.springframework.boot.reactor.netty.NettyServerCustomizer;
 import org.springframework.context.annotation.Configuration;
 import reactor.netty.http.server.HttpServer;
 

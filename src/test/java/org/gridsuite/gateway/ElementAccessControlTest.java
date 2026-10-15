@@ -22,10 +22,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.cloud.contract.wiremock.AutoConfigureWireMock;
+import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTestClient;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import org.wiremock.spring.ConfigureWireMock;
+import org.wiremock.spring.EnableWireMock;
 
 import java.util.Date;
 import java.util.List;
@@ -53,7 +55,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
         "allowed-clients=chmits",
     }
 )
-@AutoConfigureWireMock(port = 0)
+@AutoConfigureWebTestClient
+@EnableWireMock(@ConfigureWireMock(port = 0))
 class ElementAccessControlTest {
 
     @Value("${wiremock.server.port}")
