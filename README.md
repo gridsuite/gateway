@@ -49,7 +49,6 @@ Each proxied microservice is represented by a Spring bean implementing `EndPoint
 2. Rewrites the path by stripping the `/{endpointName}` prefix and re-prepending the downstream service's own base path.
 3. Forwards the request to the service's configured `base-uri`.
 
-`EndPointElementServer` is a specialization for services exposing **directory elements** (studies, filters, contingency lists, etc.), used to identify which routes carry element-level semantics. It is currently just a marker interface applied to some historic servers but is not used anymore.
 ---
 
 ## Authentication & Filter Chain
