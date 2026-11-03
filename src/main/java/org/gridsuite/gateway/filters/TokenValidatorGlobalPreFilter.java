@@ -222,6 +222,7 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
 
                         ServerWebExchange sanitizedExchange = removeTokenFromForwardedRequest(exchange);
                         // TODO really add the client_id header instead of userid
+                        // Build mutated request with userId header
                         ServerHttpRequest mutatedRequest = sanitizedExchange.getRequest().mutate()
                                 .header(HEADER_USER_ID, tokenIntrospection.getClientId())
                                 .build();
