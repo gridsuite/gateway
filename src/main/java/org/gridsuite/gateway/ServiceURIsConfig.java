@@ -21,23 +21,11 @@ import org.springframework.context.annotation.Configuration;
 @Setter
 @ConfigurationProperties(prefix = "gateway")
 public class ServiceURIsConfig {
-    @Value("${powsybl.services.case-server.base-uri:http://case-server/}")
-    String caseServerBaseUri;
-
     @Value("${gridsuite.services.study-server.base-uri:http://study-server/}")
     String studyServerBaseUri;
 
-    @Value("${gridsuite.services.merge-orchestrator-server.base-uri:http://merge-orchestrator-server/}")
-    String mergeOrchestratorServerBaseUri;
-
     @Value("${gridsuite.services.study-notification-server.base-uri:http://study-notification-server/}")
     String studyNotificationServerBaseUri;
-
-    @Value("${gridsuite.services.merge-notification-server.base-uri:http://merge-notification-server/}")
-    String mergeNotificationServerBaseUri;
-
-    @Value("${gridsuite.services.actions-server.base-uri:http://actions-server/}")
-    String actionsServerBaseUri;
 
     @Value("${gridsuite.services.config-server.base-uri:http://config-server/}")
     String configServerBaseUri;
@@ -45,90 +33,27 @@ public class ServiceURIsConfig {
     @Value("${gridsuite.services.config-notification-server.base-uri:http://config-notification-server/}")
     String configNotificationServerBaseUri;
 
-    @Value("${gridsuite.services.directory-server.base-uri:http://directory-server/}")
-    String directoryServerBaseUri;
-
     @Value("${gridsuite.services.explore-server.base-uri:http://explore-server/}")
     String exploreServerBaseUri;
-
-    @Value("${gridsuite.services.cgmes-boundary-server.base-uri:http://cgmes-boundary-server/}")
-    String boundaryServerBaseUri;
 
     @Value("${gridsuite.services.dynamic-mapping-server.base-uri:http://dynamic-mapping-server/}")
     String dynamicMappingServerBaseUri;
 
-    @Value("${gridsuite.services.filter-server.base-uri:http://filter-server/}")
-    String filterServerBaseUri;
-
-    @Value("${gridsuite.services.report-server.base-uri:http://report-server/}")
-    String reportServerBaseUri;
-
     @Value("${gridsuite.services.directory-notification-server.base-uri:http://directory-notification-server/}")
     String directoryNotificationServerBaseUri;
-
-    @Value("${gridsuite.services.network-modification-server.base-uri:http://network-modification-server/}")
-    String networkModificationServerBaseUri;
-
-    @Value("${gridsuite.services.network-map-server.base-uri:http://network-map-server/}")
-    String networkMapServerBaseUri;
-
-    @Value("${powsybl.services.network-conversion-server.base-uri:http://network-conversion-server/}")
-    String networkConversionServerBaseUri;
-
-    @Value("${gridsuite.services.odre-server.base-uri:http://odre-server/}")
-    String odreServerBaseUri;
 
     @Value("${gridsuite.services.user-admin-server.base-uri:http://user-admin-server/}")
     String userAdminServerBaseUri;
 
-    @Value("${gridsuite.services.cgmes-gl-server.base-uri:http://cgmes-gl-server/}")
-    String cgmesGlServerBaseUri;
-
-    @Value("${gridsuite.services.sensitivity-analysis-server.base-uri:http://sensitivity-analysis-server/}")
-    String sensitivityAnalysisServerBaseUri;
-
-    @Value("${gridsuite.services.loadflow-server.base-uri:http://loadflow-server/}")
-    String loadFlowServerBaseUri;
-
-    @Value("${gridsuite.services.security-analysis-server.base-uri:http://security-analysis-server/}")
-    String securityAnalysisServerBaseUri;
-
-    @Value("${gridsuite.services.dynamic-simulation-server.base-uri:http://dynamic-simulation-server/}")
-    String dynamicSimulationServerBaseUri;
-
-    @Value("${gridsuite.services.dynamic-security-analysis-server.base-uri:http://dynamic-security-analysis-server/}")
-    String dynamicSecurityAnalysisServerBaseUri;
-
-    @Value("${gridsuite.services.dynamic-margin-calculation-server.base-uri:http://dynamic-margin-calculation-server/}")
-    String dynamicMarginCalculationServerBaseUri;
-
     @Value("${gridsuite.services.case-import-server.base-uri:http://case-import-server/}")
     String caseImportServerBaseUri;
 
-    @Value("${gridsuite.services.voltage-init-server.base-uri:http://voltage-init-server/}")
-    String voltageInitServerBaseUri;
-
-    @Value("${gridsuite.services.shortcircuit-server.base-uri:http://shortcircuit-server/}")
-    String shortCircuitServerBaseUri;
-
-    @Value("${gridsuite.services.state-estimation-server.base-uri:http://state-estimation-server/}")
-    String stateEstimationServerBaseUri;
-
-    @Value("${gridsuite.services.study-config-server.base-uri:http://study-config-server/}")
-    String studyConfigServerBaseUri;
-
     @Value("${gridsuite.services.user-identity-server.base-uri:http://user-identity-server/}")
     String userIdentityServerBaseUri;
-
-    @Value("${gridsuite.services.pcc-min-server.base-uri:http://pcc-min-server/}")
-    String pccMinServerBaseUri;
 
     @Value("${gridsuite.services.monitor-server.base-uri:http://monitor-server/}")
     String monitorServerBaseUri;
 
     @Value("${gridsuite.services.monitor-notification-server.base-uri:http://monitor-notification-server/}")
     String monitorNotificationServerBaseUri;
-
-    @Value("${gridsuite.services.snapshot-refiner-server.base-uri:http://snapshot-refiner-server/}")
-    String snapshotRefinerServerBaseUri;
 }
