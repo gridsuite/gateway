@@ -80,7 +80,7 @@ gridsuite:
       base-uri: http://localhost:5010
     snapshot-refiner-server:
       base-uri: http://localhost:6041
-    real-time-notification-server:
+    rt-notification-server:
       base-uri: http://localhost:6043
 
 # Note: The issuer configured in Docker Compose must match the one used here. Using localhost instead will not work.

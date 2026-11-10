@@ -12,20 +12,20 @@ import org.springframework.stereotype.Component;
 /**
  * @author Mohamed Ben Rejeb <mohamed.benrejeb at rte-france.com>
  */
-@Component(value = RealTimeNotificationServer.ENDPOINT_NAME)
-public class RealTimeNotificationServer implements EndPointServer {
+@Component(value = RtNotificationServer.ENDPOINT_NAME)
+public class RtNotificationServer implements EndPointServer {
 
-    public static final String ENDPOINT_NAME = "real-time-notification";
+    public static final String ENDPOINT_NAME = "rt-notification";
 
     private final ServiceURIsConfig servicesURIsConfig;
 
-    public RealTimeNotificationServer(ServiceURIsConfig servicesURIsConfig) {
+    public RtNotificationServer(ServiceURIsConfig servicesURIsConfig) {
         this.servicesURIsConfig = servicesURIsConfig;
     }
 
     @Override
     public String getEndpointBaseUri() {
-        return servicesURIsConfig.getRealTimeNotificationServerBaseUri();
+        return servicesURIsConfig.getRtNotificationServerBaseUri();
     }
 
     @Override

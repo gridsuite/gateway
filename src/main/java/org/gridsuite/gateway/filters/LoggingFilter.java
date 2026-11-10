@@ -42,7 +42,7 @@ public class LoggingFilter extends AbstractGlobalPreFilter {
         "/monitor/",
         "/monitor-notification/",
         "/snapshot-refiner/",
-        "/real-time-notification/"
+        "/rt-notification/"
     };
 
     protected LoggingFilter(UserAdminService userAdminService) {
