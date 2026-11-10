@@ -126,6 +126,7 @@ class TokenValidationTest {
         // Prepare JWT with claims set
         JWTClaimsSet claimsSet = new JWTClaimsSet.Builder()
                 .subject("chmits")
+                .claim("profile", "myRole")
                 .audience("test.app")
                 .issuer("http://localhost:" + port)
                 .issueTime(new Date())
@@ -204,12 +205,20 @@ class TokenValidationTest {
     }
 
     private void testWebsocket(String name, boolean useSubProtocolToken) throws Exception {
+        testWebsocket(name, useSubProtocolToken, false);
+    }
+
+    private void testWebsocket(String name, boolean useSubProtocolToken, boolean useAuthorizationHeader) throws Exception {
         resetAllRequests();
         WebSocketClient client = new StandardWebSocketClient();
         AtomicReference<String> negotiatedSubProtocol = new AtomicReference<>();
-        String query = useSubProtocolToken ? "" : "?access_token=" + token;
+        String query = useSubProtocolToken || useAuthorizationHeader ? "" : "?access_token=" + token;
+        HttpHeaders headers = new HttpHeaders();
+        if (useAuthorizationHeader) {
+            headers.setBearerAuth(token);
+        }
         Mono<Void> wsconnection = client.execute(
-            URI.create("ws://localhost:" + this.localServerPort + "/" + name + "/notify" + query), new HttpHeaders(),
+            URI.create("ws://localhost:" + this.localServerPort + "/" + name + "/notify" + query), headers,
             new WebSocketHandler() {
                 @Override
                 public List<String> getSubProtocols() {
@@ -357,6 +366,8 @@ class TokenValidationTest {
     }
 
     private void testToken(UUID elementUuid, String token) {
+        resetAllRequests();
+
         webClient
                 .get().uri("case/v1/cases")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
@@ -462,6 +473,90 @@ class TokenValidationTest {
         testWebsocket("study-notification", true);
         testWebsocket("config-notification", true);
         testWebsocket("directory-notification", true);
+    }
+
+    @Test
+    void testAccessTokenQueryParameterIsRemovedFromForwardedRequest() throws Exception {
+        initStubForJwk();
+        stubFor(get(urlPathEqualTo("/v1/cases"))
+                .willReturn(aResponse()));
+        stubFor(get(urlPathEqualTo("/notify"))
+                .willReturn(aResponse()
+                        .withHeader("Sec-WebSocket-Accept", "{{{sec-websocket-accept request.headers.Sec-WebSocket-Key}}}")
+                        .withHeader(HttpHeaders.UPGRADE, "websocket")
+                        .withHeader(HttpHeaders.CONNECTION, HttpHeaders.UPGRADE)
+                        .withStatus(101)
+                        .withStatusMessage("Switching Protocols")));
+
+        webClient.get().uri("case/v1/cases?access_token=" + token + "&keep=value")
+                .exchange()
+                .expectStatus().isOk();
+        verify(1, getRequestedFor(urlPathEqualTo("/v1/cases"))
+                .withQueryParam("access_token", absent())
+                .withQueryParam("keep", equalTo("value"))
+                .withoutHeader(HttpHeaders.AUTHORIZATION));
+
+        resetAllRequests();
+        webClient.get().uri("case/v1/cases?access_token=clientopaquetoken")
+                .exchange()
+                .expectStatus().isOk();
+        verify(1, getRequestedFor(urlPathEqualTo("/v1/cases"))
+                .withQueryParam("access_token", absent())
+                .withoutHeader(HttpHeaders.AUTHORIZATION));
+
+        resetAllRequests();
+        webClient.get().uri("case/v1/cases?access_token=" + token + "&keep=value")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .exchange()
+                .expectStatus().isOk();
+        verify(1, getRequestedFor(urlPathEqualTo("/v1/cases"))
+                .withQueryParam("access_token", absent())
+                .withQueryParam("keep", equalTo("value"))
+                .withoutHeader(HttpHeaders.AUTHORIZATION));
+
+        testWebsocket("study-notification", false);
+        verify(1, getRequestedFor(urlPathEqualTo("/notify"))
+                .withQueryParam("access_token", absent())
+                .withoutHeader(HttpHeaders.AUTHORIZATION)
+                .withoutHeader("Sec-WebSocket-Protocol"));
+
+        testWebsocket("study-notification", true);
+        verify(1, getRequestedFor(urlPathEqualTo("/notify"))
+                .withQueryParam("access_token", absent())
+                .withoutHeader(HttpHeaders.AUTHORIZATION)
+                .withoutHeader("Sec-WebSocket-Protocol"));
+
+        testWebsocket("study-notification", false, true);
+        verify(1, getRequestedFor(urlPathEqualTo("/notify"))
+                .withQueryParam("access_token", absent())
+                .withoutHeader(HttpHeaders.AUTHORIZATION)
+                .withoutHeader("Sec-WebSocket-Protocol"));
+
+    }
+
+    @Test
+    void testUserIdAndRolesHeadersAreForwarded() {
+        initStubForJwk();
+        stubFor(get(urlEqualTo("/v1/cases")).willReturn(aResponse()));
+
+        webClient.get().uri("case/v1/cases")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .exchange()
+                .expectStatus().isOk();
+
+        verify(1, getRequestedFor(urlEqualTo("/v1/cases"))
+                .withHeader("userId", equalTo("chmits"))
+                .withHeader("roles", equalTo("myRole")));
+
+        resetAllRequests();
+        webClient.get().uri("case/v1/cases")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer clientopaquetoken")
+                .exchange()
+                .expectStatus().isOk();
+
+        verify(1, getRequestedFor(urlEqualTo("/v1/cases"))
+                .withHeader("userId", equalTo("chmits"))
+                .withoutHeader("roles"));
     }
 
     @Test
