@@ -26,8 +26,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
-import org.springframework.cloud.gateway.support.ServerWebExchangeUtils;
-import org.springframework.core.Ordered;
+import org.springframework.cloud.gateway.filter.RouteToRequestUrlFilter;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
@@ -87,8 +86,8 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
 
     @Override
     public int getOrder() {
-        // Before other global pre-filters to enforce authentication first
-        return Ordered.LOWEST_PRECEDENCE - 4;
+        // Remove credentials before the downstream URL is built.
+        return RouteToRequestUrlFilter.ROUTE_TO_URL_FILTER_ORDER - 1;
     }
 
     @Override
@@ -149,6 +148,15 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
         } else {
             token = subProtocolToken;
         }
+
+        URI uri = UriComponentsBuilder.fromUri(req.getURI())
+                .replaceQueryParam("access_token")
+                .build(true)
+                .toUri();
+        exchange = exchange.mutate()
+                .request(request -> request.uri(uri)
+                        .headers(headers -> headers.remove(HttpHeaders.AUTHORIZATION)))
+                .build();
 
         JWT jwt;
         JWTClaimsSet jwtClaimsSet;
@@ -220,15 +228,14 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
                     if (tokenIntrospection.getActive()) {
                         LOGGER.debug("Opaque Token verified, it can be trusted");
 
-                        ServerWebExchange sanitizedExchange = removeTokenFromForwardedRequest(exchange);
                         // TODO really add the client_id header instead of userid
                         // Build mutated request with userId header
-                        ServerHttpRequest mutatedRequest = sanitizedExchange.getRequest().mutate()
+                        ServerHttpRequest mutatedRequest = exchange.getRequest().mutate()
                                 .header(HEADER_USER_ID, tokenIntrospection.getClientId())
                                 .build();
 
                         // Create new exchange with mutated request
-                        ServerWebExchange mutatedExchange = sanitizedExchange.mutate()
+                        ServerWebExchange mutatedExchange = exchange.mutate()
                                 .request(mutatedRequest)
                                 .build();
 
@@ -300,27 +307,6 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
         return clientId != null && allowedClients.contains(clientId);
     }
 
-    private ServerWebExchange removeTokenFromForwardedRequest(ServerWebExchange exchange) {
-        ServerHttpRequest request = exchange.getRequest();
-        URI sanitizedRequestUri = removeAccessTokenQueryParameter(request.getURI());
-        ServerHttpRequest sanitizedRequest = request.mutate()
-                .uri(sanitizedRequestUri)
-                .headers(headers -> headers.remove(HttpHeaders.AUTHORIZATION))
-                .build();
-        URI gatewayRequestUrl = exchange.getAttribute(ServerWebExchangeUtils.GATEWAY_REQUEST_URL_ATTR);
-        if (gatewayRequestUrl != null) {
-            exchange.getAttributes().put(ServerWebExchangeUtils.GATEWAY_REQUEST_URL_ATTR, removeAccessTokenQueryParameter(gatewayRequestUrl));
-        }
-        return exchange.mutate().request(sanitizedRequest).build();
-    }
-
-    private URI removeAccessTokenQueryParameter(URI uri) {
-        return UriComponentsBuilder.fromUri(uri)
-                .replaceQueryParam("access_token")
-                .build(true)
-                .toUri();
-    }
-
     private Mono<Void> validate(FilterInfos filterInfos, JWKSet jwkset) throws BadJOSEException, JOSEException {
 
         // Create validator for signed ID tokens
@@ -356,7 +342,7 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
                     .subscribe();
         }
 
-        ServerWebExchange exchange = removeTokenFromForwardedRequest(filterInfos.getExchange());
+        ServerWebExchange exchange = filterInfos.getExchange();
         //we add the subject header
         ServerHttpRequest.Builder requestBuilder = exchange.getRequest().mutate()
                 .header(HEADER_USER_ID, filterInfos.getJwtClaimsSet().getSubject());
