@@ -25,8 +25,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        // case-server chosen without reason for this test, just to use a prefix
-        properties = {"powsybl.services.case-server.base-uri=http://localhost:${wiremock.server.port}/prefix"})
+        // study-server chosen without reason for this test, just to use a prefix
+        properties = {"gridsuite.services.study-server.base-uri=http://localhost:${wiremock.server.port}/prefix"})
 @AutoConfigureWireMock(port = 0)
 class BaseUriTest {
 
@@ -48,7 +48,7 @@ class BaseUriTest {
         stubFor(get(urlEqualTo("/prefix/test")).willReturn(aResponse().withBody("prefixtest")));
 
         webClient.get()
-                .uri("/case/test")
+                .uri("/study/test")
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody(String.class).isEqualTo("prefixtest");

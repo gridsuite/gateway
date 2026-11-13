@@ -59,24 +59,14 @@ import static org.junit.jupiter.api.Assertions.fail;
  * @author Chamseddine Benhamed <chamseddine.benhamed at rte-france.com>
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-    properties = {"powsybl.services.case-server.base-uri=http://localhost:${wiremock.server.port}",
-        "gridsuite.services.study-server.base-uri=http://localhost:${wiremock.server.port}",
-        "gridsuite.services.merge-orchestrator-server.base-uri=http://localhost:${wiremock.server.port}",
-        "gridsuite.services.merge-notification-server.base-uri=http://localhost:${wiremock.server.port}",
+    properties = {"gridsuite.services.study-server.base-uri=http://localhost:${wiremock.server.port}",
         "gridsuite.services.directory-notification-server.base-uri=http://localhost:${wiremock.server.port}",
-        "gridsuite.services.actions-server.base-uri=http://localhost:${wiremock.server.port}",
         "gridsuite.services.study-notification-server.base-uri=http://localhost:${wiremock.server.port}",
         "gridsuite.services.config-server.base-uri=http://localhost:${wiremock.server.port}",
         "gridsuite.services.config-notification-server.base-uri=http://localhost:${wiremock.server.port}",
-        "gridsuite.services.directory-server.base-uri=http://localhost:${wiremock.server.port}",
         "gridsuite.services.explore-server.base-uri=http://localhost:${wiremock.server.port}",
-        "gridsuite.services.cgmes-boundary-server.base-uri=http://localhost:${wiremock.server.port}",
         "gridsuite.services.dynamic-mapping-server.base-uri=http://localhost:${wiremock.server.port}",
-        "gridsuite.services.filter-server.base-uri=http://localhost:${wiremock.server.port}",
-        "gridsuite.services.report-server.base-uri=http://localhost:${wiremock.server.port}",
-        "gridsuite.services.network-modification-server.base-uri=http://localhost:${wiremock.server.port}",
         "gridsuite.services.user-admin-server.base-uri=http://localhost:${wiremock.server.port}",
-        "gridsuite.services.sensitivity-analysis-server.base-uri=http://localhost:${wiremock.server.port}",
         "gridsuite.services.user-identity-server.base-uri=http://localhost:${wiremock.server.port}",
         "allowed-issuers=http://localhost:${wiremock.server.port}",
         "allowed-audiences=test.app,chmits",
@@ -300,7 +290,7 @@ class TokenValidationTest {
                         .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                         .withBody("[{\"name\": \"test\"}]")));
 
-        stubFor(get(urlEqualTo("/v1/cases")).withHeader("userId", equalTo("chmits"))
+        stubFor(get(urlEqualTo("/v1/studies")).withHeader("userId", equalTo("chmits"))
                 .willReturn(aResponse()
                         .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                         .withBody("[{\"name\": \"testCase\", \"format\" :\"XIIDM\"}, {\"name\": \"testCase2\", \"format\" :\"CGMES\"}]")));
@@ -358,29 +348,6 @@ class TokenValidationTest {
 
     private void testToken(UUID elementUuid, String token) {
         webClient
-                .get().uri("case/v1/cases")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                .exchange()
-                .expectStatus().isOk()
-                .expectBody()
-                .jsonPath("$[0].name").isEqualTo("testCase")
-                .jsonPath("$[1].name").isEqualTo("testCase2")
-                .jsonPath("$[0].format").isEqualTo("XIIDM")
-                .jsonPath("$[1].format").isEqualTo("CGMES");
-
-        // test with lowercase bearer scheme
-        webClient
-                .get().uri("case/v1/cases")
-                .header(HttpHeaders.AUTHORIZATION, "bearer " + token)
-                .exchange()
-                .expectStatus().isOk()
-                .expectBody()
-                .jsonPath("$[0].name").isEqualTo("testCase")
-                .jsonPath("$[1].name").isEqualTo("testCase2")
-                .jsonPath("$[0].format").isEqualTo("XIIDM")
-                .jsonPath("$[1].format").isEqualTo("CGMES");
-
-        webClient
                 .get().uri("study/v1/studies/metadata?ids=" + elementUuid)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .exchange()
@@ -389,14 +356,15 @@ class TokenValidationTest {
                 .jsonPath("$[0].id").isEqualTo(elementUuid.toString())
                 .jsonPath("$[0].caseFormat").isEqualTo("IIDM");
 
+        // test with lowercase bearer scheme
         webClient
-                .get().uri("actions/v1/contingency-lists/metadata?ids=" + elementUuid)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .get().uri("study/v1/studies/metadata?ids=" + elementUuid)
+                .header(HttpHeaders.AUTHORIZATION, "bearer " + token)
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$[0].id").isEqualTo(elementUuid.toString())
-                .jsonPath("$[0].type").isEqualTo("SCRIPT");
+                .jsonPath("$[0].caseFormat").isEqualTo("IIDM");
 
         webClient
                 .get().uri("config/v1/parameters")
@@ -407,29 +375,12 @@ class TokenValidationTest {
                 .jsonPath("$[0].theme").isEqualTo("dark");
 
         webClient
-                .get().uri("directory/v1/root_directories")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                .exchange()
-                .expectStatus().isOk()
-                .expectBody()
-                .jsonPath("$[0].name").isEqualTo("test");
-
-        webClient
                 .get().uri("dynamic-mapping/mappings")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$[0].name").isEqualTo("mapping1");
-
-        webClient
-            .get().uri("filter/v1/filters/metadata?ids=" + elementUuid)
-            .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-            .exchange()
-            .expectStatus().isOk()
-            .expectBody()
-            .jsonPath("$[0].id").isEqualTo(elementUuid.toString())
-            .jsonPath("$[0].type").isEqualTo("LINE");
 
         webClient
             .get().uri("explore/v1/explore/elements/metadata?ids=" + elementUuid)
@@ -468,35 +419,35 @@ class TokenValidationTest {
     void testAudienceValidation() {
         initStubForJwk();
 
-        stubFor(get(urlEqualTo("/v1/cases"))
+        stubFor(get(urlEqualTo("/v1/studies"))
                 .willReturn(aResponse()
                         .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                         .withBody("[{\"name\": \"testCase\", \"format\" :\"XIIDM\"}, {\"name\": \"testCase2\", \"format\" :\"CGMES\"}]")));
 
         // Test with token having valid audience
         webClient
-                .get().uri("case/v1/cases")
+                .get().uri("study/v1/studies")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .exchange()
                 .expectStatus().isOk();
 
         // Test with token having invalid audience
         webClient
-                .get().uri("case/v1/cases")
+                .get().uri("study/v1/studies")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenWithNotAllowedAudience)
                 .exchange()
                 .expectStatus().isUnauthorized();
 
         // Test with opaque token having valid audience
         webClient
-                .get().uri("case/v1/cases")
+                .get().uri("study/v1/studies")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + "clientopaquetoken")
                 .exchange()
                 .expectStatus().isOk();
 
         // Test with opaque token having invalid audience
         webClient
-                .get().uri("case/v1/cases")
+                .get().uri("study/v1/studies")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + "invalidAudienceOpaqueToken")
                 .exchange()
                 .expectStatus().isUnauthorized();
@@ -545,7 +496,7 @@ class TokenValidationTest {
     void testClientIdFallback() {
         initStubForJwk();
 
-        stubFor(get(urlEqualTo("/v1/cases"))
+        stubFor(get(urlEqualTo("/v1/studies"))
                 .withHeader("userId", equalTo("chmits"))
                 .willReturn(aResponse()
                         .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
@@ -553,14 +504,14 @@ class TokenValidationTest {
 
         // Test with token having valid client_id but no audience
         webClient
-                .get().uri("case/v1/cases")
+                .get().uri("study/v1/studies")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenWithValidClientId)
                 .exchange()
                 .expectStatus().isUnauthorized();
 
         // Test with token having invalid client_id and no audience
         webClient
-                .get().uri("case/v1/cases")
+                .get().uri("study/v1/studies")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenWithInvalidClientId)
                 .exchange()
                 .expectStatus().isUnauthorized();
@@ -570,7 +521,7 @@ class TokenValidationTest {
     void testJwksUpdate() {
         stubUserRecordConnection();
 
-        stubFor(get(urlEqualTo("/v1/cases"))
+        stubFor(get(urlEqualTo("/v1/studies"))
                 .willReturn(aResponse()
                         .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                         .withBody("[{\"name\": \"testCase\", \"format\" :\"XIIDM\"}, {\"name\": \"testCase2\", \"format\" :\"CGMES\"}]")));
@@ -592,7 +543,7 @@ class TokenValidationTest {
                         .withBody("{\"keys\" : [] }")));
 
         webClient
-                .get().uri("case/v1/cases")
+                .get().uri("study/v1/studies")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .exchange()
                 .expectStatus().isUnauthorized();
@@ -603,13 +554,13 @@ class TokenValidationTest {
                         .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                         .withBody("{\"keys\" : [ " + rsaKey.toJSONString() + " ] }")));
         webClient
-                .get().uri("case/v1/cases")
+                .get().uri("study/v1/studies")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .exchange()
                 .expectStatus().isOk();
 
         webClient
-                .get().uri("case/v1/cases")
+                .get().uri("study/v1/studies")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token2)
                 .exchange()
                 .expectStatus().isUnauthorized();
@@ -621,13 +572,13 @@ class TokenValidationTest {
                         .withBody("{\"keys\" : [ " + rsaKey.toJSONString() + ", " + rsaKey2.toJSONString() + "] }")));
 
         webClient
-                .get().uri("case/v1/cases")
+                .get().uri("study/v1/studies")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token2)
                 .exchange()
                 .expectStatus().isOk();
 
         webClient
-                .get().uri("case/v1/cases")
+                .get().uri("study/v1/studies")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .exchange()
                 .expectStatus().isOk();
@@ -637,7 +588,7 @@ class TokenValidationTest {
     void invalidToken() {
         stubUserRecordConnection();
 
-        stubFor(get(urlEqualTo("/v1/cases"))
+        stubFor(get(urlEqualTo("/v1/studies"))
                 .willReturn(aResponse()
                         .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                         .withBody("[{\"name\": \"testCase\", \"format\" :\"XIIDM\"}, {\"name\": \"testCase2\", \"format\" :\"CGMES\"}]")));
@@ -670,20 +621,20 @@ class TokenValidationTest {
 
         // test with no token
         webClient
-                .get().uri("case/v1/cases")
+                .get().uri("study/v1/studies")
                 .exchange()
                 .expectStatus().isUnauthorized();
 
         //test with an expired token
         webClient
-                .get().uri("case/v1/cases")
+                .get().uri("study/v1/studies")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + expiredToken)
                 .exchange()
                 .expectStatus().isUnauthorized();
 
         //test with with not allowed issuer
         webClient
-                .get().uri("case/v1/cases")
+                .get().uri("study/v1/studies")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenWithNotAllowedIssuer)
                 .exchange()
                 .expectStatus().isUnauthorized();
@@ -693,28 +644,28 @@ class TokenValidationTest {
 
         //test with token with a fake algorithm
         webClient
-                .get().uri("case/v1/cases")
+                .get().uri("study/v1/studies")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenWithFakeAlgorithm)
                 .exchange()
                 .expectStatus().isUnauthorized();
 
         //test with token with fake audience
         webClient
-                .get().uri("case/v1/cases")
+                .get().uri("study/v1/studies")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenWithFakeSub)
                 .exchange()
                 .expectStatus().isUnauthorized();
 
         // test with non JSON token, non valid reference token
         webClient
-                .get().uri("case/v1/cases")
+                .get().uri("study/v1/studies")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + "NonValidToken")
                 .exchange()
                 .expectStatus().isUnauthorized();
 
         //test with a incorrect Authorization value
         webClient
-                .get().uri("case/v1/cases")
+                .get().uri("study/v1/studies")
                 .header(HttpHeaders.AUTHORIZATION, token)
                 .exchange()
                 .expectStatus().isBadRequest();

@@ -12,68 +12,24 @@ gridsuite:
   services:
     study-server:
       base-uri: http://localhost:5001
-    merge-orchestrator-server:
-      base-uri: http://localhost:5020
     study-notification-server:
       base-uri: http://localhost:5009
-    merge-notification-server:
-      base-uri: http://localhost:5002
     directory-notification-server:
       base-uri: http://localhost:5004
-    actions-server:
-      base-uri: http://localhost:5022
     config-server:
       base-uri: http://localhost:5025
     config-notification-server:
       base-uri: http://localhost:5024
-    directory-server:
-      base-uri: http://localhost:5026
-    cgmes-boundary-server:
-      base-uri: http://localhost:5021
     dynamic-mapping-server:
       base-uri: http://localhost:5036
-    filter-server:
-      base-uri: http://localhost:5027
-    report-server:
-      base-uri: http://localhost:5028
     explore-server:
       base-uri: http://localhost:5029
-    network-modification-server:
-      base-uri: http://localhost:5007
-    network-map-server:
-      base-uri: http://localhost:5006
-    odre-server:
-      base-uri: http://localhost:8087
     user-admin-server:
       base-uri: http://localhost:5033
-    cgmes-gl-server:
-      base-uri: http://localhost:8095
-    sensitivity-analysis-server:
-      base-uri: http://localhost:5030
-    loadflow-server:
-      base-uri: http://localhost:5008
-    security-analysis-server:
-      base-uri: http://localhost:5023
-    dynamic-simulation-server:
-      base-uri: http://localhost:5032
-    dynamic-security-analysis-server:
-      base-uri: http://localhost:5040
-    dynamic-margin-calculation-server:
-      base-uri: http://localhost:5041
     case-import-server:
       base-uri: http://localhost:5039
-    voltage-init-server:
-      base-uri: http://localhost:5038
-    shortcircuit-server:
-      base-uri: http://localhost:5031
-    state-estimation-server:
-      base-uri: http://localhost:6040
-    study-config-server:
-      base-uri: http://localhost:5035
     user-identity-server:
       base-uri: http://localhost:5034
-    pcc-min-server:
-      base-uri: http://localhost:6042
     monitor-server:
       base-uri: http://localhost:5043
     monitor-notification-server:
