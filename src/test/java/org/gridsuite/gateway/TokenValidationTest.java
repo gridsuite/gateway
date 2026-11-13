@@ -347,10 +347,19 @@ class TokenValidationTest {
     }
 
     private void testToken(UUID elementUuid, String token) {
-        // test with lowercase bearer scheme
         webClient
                 .get().uri("study/v1/studies/metadata?ids=" + elementUuid)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$[0].id").isEqualTo(elementUuid.toString())
+                .jsonPath("$[0].caseFormat").isEqualTo("IIDM");
+
+        // test with lowercase bearer scheme
+        webClient
+                .get().uri("study/v1/studies/metadata?ids=" + elementUuid)
+                .header(HttpHeaders.AUTHORIZATION, "bearer " + token)
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
