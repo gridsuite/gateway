@@ -41,7 +41,8 @@ public class LoggingFilter extends AbstractGlobalPreFilter {
         "/user-admin/",
         "/monitor/",
         "/monitor-notification/",
-        "/snapshot-refiner/"
+        "/snapshot-refiner/",
+        "/rt-notification/"
     };
 
     protected LoggingFilter(UserAdminService userAdminService) {
