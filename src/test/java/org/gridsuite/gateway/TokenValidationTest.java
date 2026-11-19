@@ -536,6 +536,7 @@ class TokenValidationTest {
 
     @Test
     void testUserIdAndRolesHeadersAreForwarded() {
+        resetAllRequests();
         initStubForJwk();
         stubFor(get(urlEqualTo("/v1/cases")).willReturn(aResponse()));
 
