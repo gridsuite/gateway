@@ -154,8 +154,9 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
             jwtClaimsSet = jwt.getJWTClaimsSet();
 
             LOGGER.debug("checking issuer");
-            if (allowedIssuers.stream().noneMatch(iss -> jwtClaimsSet.getIssuer().startsWith(iss))) {
-                LOGGER.info("{}: 401 Unauthorized, {} Issuer is not in the issuers white list", exchange.getRequest().getPath(), jwtClaimsSet.getIssuer());
+            String issuer = jwtClaimsSet.getIssuer();
+            if (issuer == null || allowedIssuers.stream().noneMatch(issuer::startsWith)) {
+                LOGGER.info("{}: 401 Unauthorized, {} Issuer is not in the issuers white list", exchange.getRequest().getPath(), issuer);
                 return completeWithError(exchange, HttpStatus.UNAUTHORIZED);
             }
 
@@ -163,7 +164,7 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
                 return completeWithError(exchange, HttpStatus.UNAUTHORIZED);
             }
 
-            Issuer iss = new Issuer(jwtClaimsSet.getIssuer());
+            Issuer iss = new Issuer(issuer);
             ClientID clientID;
             List<String> audiences = jwtClaimsSet.getAudience();
             if (audiences != null && !audiences.isEmpty()) {
