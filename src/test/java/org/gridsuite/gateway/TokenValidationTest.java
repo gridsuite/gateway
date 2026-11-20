@@ -16,7 +16,9 @@ import com.nimbusds.jose.JWSSigner;
 import com.nimbusds.jose.crypto.RSASSASigner;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator;
+import com.nimbusds.jwt.JWT;
 import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.JWTParser;
 import com.nimbusds.jwt.SignedJWT;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -784,8 +786,37 @@ class TokenValidationTest {
                 .exchange()
                 .expectStatus().isUnauthorized();
 
-        String tokenWithFakeAlgorithm = token.replaceFirst("U", "Q"); // RS256 -> RC256
-        String tokenWithFakeSub = token.replaceFirst("p", "h"); // chmits -> chmats
+        // simulate a tampered token
+        String tokenWithFakeAlgorithm = token.replaceFirst("U", "Q");
+
+        // ensure tampering setup went as expected
+        String fakedAlg = null;
+        Exception fakedAlgException = null;
+        try {
+            JWT jwtWithFakeAlgorithm = JWTParser.parse(tokenWithFakeAlgorithm);
+            fakedAlg = jwtWithFakeAlgorithm.getHeader().getAlgorithm().getName();
+        } catch (Exception e) {
+            fakedAlgException = e;
+        }
+        if (!"RC256".equals(fakedAlg)) {
+            throw new RuntimeException("Fake token algorithm is not correctly setup for test, expected 'RC256' but was: " + fakedAlg, fakedAlgException);
+        }
+
+        // simulate a tampered token
+        String tokenWithFakeSub = token.replaceFirst("p", "h");
+
+        // ensure tampering setup went as expected
+        String fakedSub = null;
+        Exception fakedSubException = null;
+        try {
+            JWT jwtWithFakeSubject = JWTParser.parse(tokenWithFakeSub);
+            fakedSub = jwtWithFakeSubject.getJWTClaimsSet().getSubject();
+        } catch (Exception e) {
+            fakedSubException = e;
+        }
+        if (!"chmats".equals(fakedSub)) {
+            throw new RuntimeException("Fake token subject is not correctly setup for test, expected 'chmats' but was: " + fakedSub, fakedSubException);
+        }
 
         //test with token with a fake algorithm
         webClient
