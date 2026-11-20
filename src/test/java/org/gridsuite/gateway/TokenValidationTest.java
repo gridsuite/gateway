@@ -16,7 +16,9 @@ import com.nimbusds.jose.JWSSigner;
 import com.nimbusds.jose.crypto.RSASSASigner;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator;
+import com.nimbusds.jwt.JWT;
 import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.JWTParser;
 import com.nimbusds.jwt.SignedJWT;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,6 +45,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.text.ParseException;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.Date;
@@ -52,8 +55,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * @author Chamseddine Benhamed <chamseddine.benhamed at rte-france.com>
@@ -689,7 +691,25 @@ class TokenValidationTest {
                 .expectStatus().isUnauthorized();
 
         String tokenWithFakeAlgorithm = token.replaceFirst("U", "Q"); // RS256 -> RC256
+        try {
+            JWT jwt = JWTParser.parse(tokenWithFakeAlgorithm);
+            assertNotNull(jwt.getHeader());
+            assertNotNull(jwt.getHeader().getAlgorithm());
+            assertEquals("RC256", jwt.getHeader().getAlgorithm().getName());
+        } catch (ParseException e) {
+           throw new RuntimeException("Fake algorithm does not contain fake algorithm value RC256", e);
+        }
+
+        // chmits -> chmats
         String tokenWithFakeSub = token.replaceFirst("p", "h"); // chmits -> chmats
+
+        try {
+            JWT jwt = JWTParser.parse(tokenWithFakeSub);
+            assertNotNull(jwt.getJWTClaimsSet().getSubject());
+            assertEquals("chmats", jwt.getJWTClaimsSet().getSubject());
+        } catch (ParseException e) {
+            throw new RuntimeException("Fake sub does not contain fake algorithm value chmats instead of chmits", e);
+        }
 
         //test with token with a fake algorithm
         webClient
