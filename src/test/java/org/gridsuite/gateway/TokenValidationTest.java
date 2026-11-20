@@ -730,7 +730,7 @@ class TokenValidationTest {
     }
 
     @Test
-    void invalidToken() throws ParseException {
+    void invalidToken() {
         stubUserRecordConnection();
 
         stubFor(get(urlEqualTo("/v1/cases"))
@@ -784,21 +784,33 @@ class TokenValidationTest {
                 .exchange()
                 .expectStatus().isUnauthorized();
 
-        String tokenWithFakeAlgorithm = token.replaceFirst("U", "Q"); // RS256 -> RC256
-        JWT jwtWithFakeAlgorithm = JWTParser.parse(tokenWithFakeAlgorithm);
-        Optional<String> algo = Optional.of(jwtWithFakeAlgorithm).map(JWT::getHeader).map(header -> header.getAlgorithm().getName());
-        if (!"RC256".equals(algo.orElse(null))) {
-            throw new RuntimeException("Fake token algorithm is not correctly setup, expected 'RC256' but was: " + jwtWithFakeAlgorithm.getHeader().getAlgorithm().getName());
+        // RS256 -> RC256
+        String tokenWithFakeAlgorithm = token.replaceFirst("U", "Q");
+
+        String current = null;
+        Exception currentException = null;
+        try {
+            JWT jwtWithFakeAlgorithm = JWTParser.parse(tokenWithFakeAlgorithm);
+            current = jwtWithFakeAlgorithm.getHeader().getAlgorithm().getName();
+        } catch (Exception e) {
+            currentException = e;
+        }
+        if (!"RC256".equals(current)) {
+            throw new RuntimeException("Fake token algorithm is not correctly setup, expected 'RC256' but was: " + current, currentException);
         }
 
         // chmits -> chmats
-        String tokenWithFakeSub = token.replaceFirst("p", "h"); // chmits -> chmats
-
-        JWT jwtWithFakeSubject = JWTParser.parse(tokenWithFakeSub);
-        JWTClaimsSet claimsSet = jwtWithFakeSubject.getJWTClaimsSet();
-        Optional<String> sub = Optional.ofNullable(claimsSet).map(JWTClaimsSet::getSubject);
-        if (!"chmats".equals(sub.orElse(null))) {
-            throw new RuntimeException("Fake token subject is not correctly setup, expected 'chmats' but was: " + jwtWithFakeSubject.getJWTClaimsSet().getSubject());
+        String tokenWithFakeSub = token.replaceFirst("p", "h");
+        current = null;
+        currentException = null;
+        try {
+            JWT jwtWithFakeSubject = JWTParser.parse(tokenWithFakeSub);
+            current = jwtWithFakeSubject.getJWTClaimsSet().getSubject();
+        } catch (Exception e) {
+            currentException = e;
+        }
+        if (!"chmats".equals(current)) {
+            throw new RuntimeException("Fake token subject is not correctly setup, expected 'chmats' but was: " + current, currentException);
         }
 
         //test with token with a fake algorithm
