@@ -793,7 +793,7 @@ class TokenValidationTest {
             assertNotNull(jwt.getHeader().getAlgorithm());
             assertEquals("RC256", jwt.getHeader().getAlgorithm().getName());
         } catch (ParseException e) {
-           throw new RuntimeException("Fake algorithm does not contain fake algorithm value RC256", e);
+            throw new RuntimeException("Fake algorithm does not contain fake algorithm value RC256", e);
         }
 
         // chmits -> chmats
