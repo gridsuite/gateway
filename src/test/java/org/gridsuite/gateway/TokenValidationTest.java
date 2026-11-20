@@ -787,9 +787,7 @@ class TokenValidationTest {
                 .expectStatus().isUnauthorized();
 
         String tokenWithFakeAlgorithm = token.replaceFirst("U", "Q"); // RS256 -> RC256
-        JWT jwtWithFakeAlgorithm = assertDoesNotThrow(() -> JWTParser.parse(tokenWithFakeAlgorithm));
-        assertNotNull(jwtWithFakeAlgorithm.getHeader());
-        assertNotNull(jwtWithFakeAlgorithm.getHeader().getAlgorithm());
+        JWT jwtWithFakeAlgorithm = JWTParser.parse(tokenWithFakeAlgorithm);
         if (!"RC256".equals(jwtWithFakeAlgorithm.getHeader().getAlgorithm().getName())) {
             throw new RuntimeException("Expected algorithm to be 'RC256' but was: " + jwtWithFakeAlgorithm.getHeader().getAlgorithm().getName());
         }
@@ -797,8 +795,7 @@ class TokenValidationTest {
         // chmits -> chmats
         String tokenWithFakeSub = token.replaceFirst("p", "h"); // chmits -> chmats
 
-        JWT jwtWithFakeSubject = assertDoesNotThrow(() -> JWTParser.parse(tokenWithFakeSub));
-        assertNotNull(jwtWithFakeSubject.getJWTClaimsSet().getSubject());
+        JWT jwtWithFakeSubject = JWTParser.parse(tokenWithFakeSub);
         if (!"chmats".equals(jwtWithFakeSubject.getJWTClaimsSet().getSubject())) {
             throw new RuntimeException("Expected subject to be 'chmats' but was: " + jwtWithFakeSubject.getJWTClaimsSet().getSubject());
         }
