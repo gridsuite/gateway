@@ -732,7 +732,7 @@ class TokenValidationTest {
     }
 
     @Test
-    void invalidToken() {
+    void invalidToken() throws ParseException {
         stubUserRecordConnection();
 
         stubFor(get(urlEqualTo("/v1/cases"))
@@ -787,25 +787,17 @@ class TokenValidationTest {
                 .expectStatus().isUnauthorized();
 
         String tokenWithFakeAlgorithm = token.replaceFirst("U", "Q"); // RS256 -> RC256
-        try {
-            JWT jwt = JWTParser.parse(tokenWithFakeAlgorithm);
-            assertNotNull(jwt.getHeader());
-            assertNotNull(jwt.getHeader().getAlgorithm());
-            assertEquals("RC256", jwt.getHeader().getAlgorithm().getName());
-        } catch (ParseException e) {
-            fail("Fake algorithm does not contain fake algorithm value RC256");
-        }
+        JWT jwtWithFakeAlgorithm = assertDoesNotThrow(() -> JWTParser.parse(tokenWithFakeAlgorithm));
+        assertNotNull(jwtWithFakeAlgorithm.getHeader());
+        assertNotNull(jwtWithFakeAlgorithm.getHeader().getAlgorithm());
+        assertEquals("RC256", jwtWithFakeAlgorithm.getHeader().getAlgorithm().getName());
 
         // chmits -> chmats
         String tokenWithFakeSub = token.replaceFirst("p", "h"); // chmits -> chmats
 
-        try {
-            JWT jwt = JWTParser.parse(tokenWithFakeSub);
-            assertNotNull(jwt.getJWTClaimsSet().getSubject());
-            assertEquals("chmats", jwt.getJWTClaimsSet().getSubject());
-        } catch (ParseException e) {
-            fail("Fake sub does not contain fake algorithm value chmats instead of chmits");
-        }
+        JWT jwtWithFakeSubject = assertDoesNotThrow(() -> JWTParser.parse(tokenWithFakeSub));
+        assertNotNull(jwtWithFakeSubject.getJWTClaimsSet().getSubject());
+        assertEquals("chmats", jwtWithFakeSubject.getJWTClaimsSet().getSubject());
 
         //test with token with a fake algorithm
         webClient
