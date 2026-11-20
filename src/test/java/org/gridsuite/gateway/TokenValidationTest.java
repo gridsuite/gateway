@@ -786,8 +786,10 @@ class TokenValidationTest {
                 .exchange()
                 .expectStatus().isUnauthorized();
 
+        // simulate a tampered token
         String tokenWithFakeAlgorithm = token.replaceFirst("U", "Q");
 
+        // ensure tampering setup went as expected
         String fakedAlg = null;
         Exception fakedAlgException = null;
         try {
@@ -800,7 +802,10 @@ class TokenValidationTest {
             throw new RuntimeException("Fake token algorithm is not correctly setup for test, expected 'RC256' but was: " + fakedAlg, fakedAlgException);
         }
 
+        // simulate a tampered token
         String tokenWithFakeSub = token.replaceFirst("p", "h");
+
+        // ensure tampering setup went as expected
         String fakedSub = null;
         Exception fakedSubException = null;
         try {
