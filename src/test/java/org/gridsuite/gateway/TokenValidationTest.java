@@ -789,7 +789,7 @@ class TokenValidationTest {
         String tokenWithFakeAlgorithm = token.replaceFirst("U", "Q"); // RS256 -> RC256
         JWT jwtWithFakeAlgorithm = JWTParser.parse(tokenWithFakeAlgorithm);
         if (!"RC256".equals(jwtWithFakeAlgorithm.getHeader().getAlgorithm().getName())) {
-            throw new RuntimeException("Expected algorithm to be 'RC256' but was: " + jwtWithFakeAlgorithm.getHeader().getAlgorithm().getName());
+            throw new RuntimeException("Fake algorithm setup is not enabled, fake algorithm supposed to be 'RC256' but was: " + jwtWithFakeAlgorithm.getHeader().getAlgorithm().getName());
         }
 
         // chmits -> chmats
@@ -797,7 +797,7 @@ class TokenValidationTest {
 
         JWT jwtWithFakeSubject = JWTParser.parse(tokenWithFakeSub);
         if (!"chmats".equals(jwtWithFakeSubject.getJWTClaimsSet().getSubject())) {
-            throw new RuntimeException("Expected subject to be 'chmats' but was: " + jwtWithFakeSubject.getJWTClaimsSet().getSubject());
+            throw new RuntimeException("Fake subject setup is not enabled, fake subject supposed to be 'chmats' but was: " + jwtWithFakeSubject.getJWTClaimsSet().getSubject());
         }
 
         //test with token with a fake algorithm
