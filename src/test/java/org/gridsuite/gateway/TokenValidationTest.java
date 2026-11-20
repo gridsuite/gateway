@@ -802,7 +802,6 @@ class TokenValidationTest {
         // chmits -> chmats
         String tokenWithFakeSub = token.replaceFirst("p", "h");
         current = null;
-        currentException = null;
         try {
             JWT jwtWithFakeSubject = JWTParser.parse(tokenWithFakeSub);
             current = jwtWithFakeSubject.getJWTClaimsSet().getSubject();
