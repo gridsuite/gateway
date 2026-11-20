@@ -158,7 +158,7 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
 
             LOGGER.debug("checking issuer");
             String issuer = jwtClaimsSet.getIssuer();
-            if (issuer == null || allowedIssuers.stream().noneMatch(issuer::startsWith)) {
+            if (allowedIssuers.stream().noneMatch(issuer::startsWith)) {
                 LOGGER.info("{}: 401 Unauthorized, {} Issuer is not in the issuers white list", exchange.getRequest().getPath(), issuer);
                 return completeWithError(exchange, HttpStatus.UNAUTHORIZED);
             }
