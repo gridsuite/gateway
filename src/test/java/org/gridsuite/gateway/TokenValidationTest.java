@@ -45,9 +45,11 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.text.ParseException;
 import java.time.Duration;
-import java.util.*;
+import java.util.Base64;
+import java.util.Date;
+import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -784,32 +786,31 @@ class TokenValidationTest {
                 .exchange()
                 .expectStatus().isUnauthorized();
 
-        // RS256 -> RC256
         String tokenWithFakeAlgorithm = token.replaceFirst("U", "Q");
 
-        String current = null;
-        Exception currentException = null;
+        String fakedAlg = null;
+        Exception fakedAlgException = null;
         try {
             JWT jwtWithFakeAlgorithm = JWTParser.parse(tokenWithFakeAlgorithm);
-            current = jwtWithFakeAlgorithm.getHeader().getAlgorithm().getName();
+            fakedAlg = jwtWithFakeAlgorithm.getHeader().getAlgorithm().getName();
         } catch (Exception e) {
-            currentException = e;
+            fakedAlgException = e;
         }
-        if (!"RC256".equals(current)) {
-            throw new RuntimeException("Fake token algorithm is not correctly setup, expected 'RC256' but was: " + current, currentException);
+        if (!"RC256".equals(fakedAlg)) {
+            throw new RuntimeException("Fake token algorithm is not correctly setup for test, expected 'RC256' but was: " + fakedAlg, fakedAlgException);
         }
 
-        // chmits -> chmats
         String tokenWithFakeSub = token.replaceFirst("p", "h");
-        current = null;
+        String fakedSub = null;
+        Exception fakedSubException = null;
         try {
             JWT jwtWithFakeSubject = JWTParser.parse(tokenWithFakeSub);
-            current = jwtWithFakeSubject.getJWTClaimsSet().getSubject();
+            fakedSub = jwtWithFakeSubject.getJWTClaimsSet().getSubject();
         } catch (Exception e) {
-            currentException = e;
+            fakedSubException = e;
         }
-        if (!"chmats".equals(current)) {
-            throw new RuntimeException("Fake token subject is not correctly setup, expected 'chmats' but was: " + current, currentException);
+        if (!"chmats".equals(fakedSub)) {
+            throw new RuntimeException("Fake token subject is not correctly setup for test, expected 'chmats' but was: " + fakedSub, fakedSubException);
         }
 
         //test with token with a fake algorithm
