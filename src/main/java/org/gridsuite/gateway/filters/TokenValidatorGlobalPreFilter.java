@@ -189,13 +189,13 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
         }
     }
 
-    static boolean isTrustedIssuer(String value, String ref) {
-        if (value.regionMatches(0, ref, 0, ref.length())) {
-            boolean exactMatch = value.length() == ref.length();
+    static boolean isTrustedIssuer(String inputIssuer, String allowedIssuer) {
+        if (inputIssuer.startsWith(allowedIssuer)) {
+            boolean exactMatch = inputIssuer.length() == allowedIssuer.length();
             if (exactMatch) {
                 return true;
             }
-            boolean pathSuffix = ref.charAt(ref.length() - 1) == '/' || value.charAt(ref.length()) == '/';
+            boolean pathSuffix = allowedIssuer.charAt(allowedIssuer.length() - 1) == '/' || inputIssuer.charAt(allowedIssuer.length()) == '/';
             if (pathSuffix) {
                 return true;
             }
