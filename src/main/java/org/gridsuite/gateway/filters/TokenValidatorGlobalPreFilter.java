@@ -157,8 +157,8 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
             jwtClaimsSet = jwt.getJWTClaimsSet();
 
             LOGGER.debug("checking issuer");
-            if (allowedIssuers.stream().noneMatch(iss -> jwtClaimsSet.getIssuer().startsWith(iss))) {
-                LOGGER.info("{}: 401 Unauthorized, {} Issuer is not in the issuers white list", exchange.getRequest().getPath(), jwtClaimsSet.getIssuer());
+            if (allowedIssuers.stream().noneMatch(iss -> isTrustedIssuer(jwtClaimsSet.getIssuer(), iss))) {
+                LOGGER.info("{}: 401 Unauthorized, {} Issuer is not trusted by the issuers white list", exchange.getRequest().getPath(), jwtClaimsSet.getIssuer());
                 return completeWithError(exchange, HttpStatus.UNAUTHORIZED);
             }
 
@@ -187,6 +187,20 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
             // TODO try more than just the first issuer here ? get the issuer from the client ?
             return validateOpaqueReferenceToken(allowedIssuers.get(0), token, exchange, chain);
         }
+    }
+
+    static boolean isTrustedIssuer(String inputIssuer, String allowedIssuer) {
+        if (inputIssuer.startsWith(allowedIssuer)) {
+            boolean exactMatch = inputIssuer.length() == allowedIssuer.length();
+            if (exactMatch) {
+                return true;
+            }
+            boolean pathSuffix = allowedIssuer.charAt(allowedIssuer.length() - 1) == '/' || inputIssuer.charAt(allowedIssuer.length()) == '/';
+            if (pathSuffix) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
