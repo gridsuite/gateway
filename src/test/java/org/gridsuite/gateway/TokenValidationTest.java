@@ -803,7 +803,7 @@ class TokenValidationTest {
         }
 
         // simulate a tampered token
-        String tokenWithFakeSub = token.replaceFirst("p", "h");
+        String tokenWithFakeSub = token.replaceFirst("taXRz", "tYXRz");
 
         // ensure tampering setup went as expected
         String fakedSub = null;
