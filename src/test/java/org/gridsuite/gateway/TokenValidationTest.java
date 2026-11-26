@@ -17,7 +17,9 @@ import com.nimbusds.jose.JWSSigner;
 import com.nimbusds.jose.crypto.RSASSASigner;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator;
+import com.nimbusds.jwt.JWT;
 import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.JWTParser;
 import com.nimbusds.jwt.SignedJWT;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -128,6 +130,7 @@ class TokenValidationTest {
         // Prepare JWT with claims set
         JWTClaimsSet claimsSet = new JWTClaimsSet.Builder()
                 .subject("chmits")
+                .claim("profile", "myRole")
                 .audience("test.app")
                 .issuer("http://localhost:" + port)
                 .issueTime(new Date())
@@ -206,12 +209,20 @@ class TokenValidationTest {
     }
 
     private void testWebsocket(String name, boolean useSubProtocolToken) throws Exception {
+        testWebsocket(name, useSubProtocolToken, false);
+    }
+
+    private void testWebsocket(String name, boolean useSubProtocolToken, boolean useAuthorizationHeader) throws Exception {
         resetAllRequests();
         WebSocketClient client = new StandardWebSocketClient();
         AtomicReference<String> negotiatedSubProtocol = new AtomicReference<>();
-        String query = useSubProtocolToken ? "" : "?access_token=" + token;
+        String query = useSubProtocolToken || useAuthorizationHeader ? "" : "?access_token=" + token;
+        HttpHeaders headers = new HttpHeaders();
+        if (useAuthorizationHeader) {
+            headers.setBearerAuth(token);
+        }
         Mono<Void> wsconnection = client.execute(
-            URI.create("ws://localhost:" + this.localServerPort + "/" + name + "/notify" + query), new HttpHeaders(),
+            URI.create("ws://localhost:" + this.localServerPort + "/" + name + "/notify" + query), headers,
             new WebSocketHandler() {
                 @Override
                 public List<String> getSubProtocols() {
@@ -337,7 +348,30 @@ class TokenValidationTest {
         testToken(elementUuid, "clientopaquetoken");
     }
 
+    @Test
+    void testSupervisionEndpointsAccess() {
+        initStubForJwk();
+
+        // Access to supervision endpoints is blocked.
+        webClient.get().uri("study/v1/supervision/studies")
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+            .exchange()
+            .expectStatus().isForbidden();
+
+        // A non-supervision endpoint whose name contains "supervision" is allowed.
+        stubFor(get(urlEqualTo("/v1/studies/supervision-report"))
+            .withHeader("userId", equalTo("chmits"))
+            .willReturn(aResponse()));
+
+        webClient.get().uri("study/v1/studies/supervision-report")
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+            .exchange()
+            .expectStatus().isOk();
+    }
+
     private void testToken(UUID elementUuid, String token) {
+        resetAllRequests();
+
         webClient
                 .get().uri("case/v1/cases")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
@@ -443,6 +477,91 @@ class TokenValidationTest {
         testWebsocket("study-notification", true);
         testWebsocket("config-notification", true);
         testWebsocket("directory-notification", true);
+    }
+
+    @Test
+    void testAccessTokenQueryParameterIsRemovedFromForwardedRequest() throws Exception {
+        initStubForJwk();
+        stubFor(get(urlPathEqualTo("/v1/cases"))
+                .willReturn(aResponse()));
+        stubFor(get(urlPathEqualTo("/notify"))
+                .willReturn(aResponse()
+                        .withHeader("Sec-WebSocket-Accept", "{{{sec-websocket-accept request.headers.Sec-WebSocket-Key}}}")
+                        .withHeader(HttpHeaders.UPGRADE, "websocket")
+                        .withHeader(HttpHeaders.CONNECTION, HttpHeaders.UPGRADE)
+                        .withStatus(101)
+                        .withStatusMessage("Switching Protocols")));
+
+        webClient.get().uri("case/v1/cases?access_token=" + token + "&keep=value")
+                .exchange()
+                .expectStatus().isOk();
+        verify(1, getRequestedFor(urlPathEqualTo("/v1/cases"))
+                .withQueryParam("access_token", absent())
+                .withQueryParam("keep", equalTo("value"))
+                .withoutHeader(HttpHeaders.AUTHORIZATION));
+
+        resetAllRequests();
+        webClient.get().uri("case/v1/cases?access_token=clientopaquetoken")
+                .exchange()
+                .expectStatus().isOk();
+        verify(1, getRequestedFor(urlPathEqualTo("/v1/cases"))
+                .withQueryParam("access_token", absent())
+                .withoutHeader(HttpHeaders.AUTHORIZATION));
+
+        resetAllRequests();
+        webClient.get().uri("case/v1/cases?access_token=" + token + "&keep=value")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .exchange()
+                .expectStatus().isOk();
+        verify(1, getRequestedFor(urlPathEqualTo("/v1/cases"))
+                .withQueryParam("access_token", absent())
+                .withQueryParam("keep", equalTo("value"))
+                .withoutHeader(HttpHeaders.AUTHORIZATION));
+
+        testWebsocket("study-notification", false);
+        verify(1, getRequestedFor(urlPathEqualTo("/notify"))
+                .withQueryParam("access_token", absent())
+                .withoutHeader(HttpHeaders.AUTHORIZATION)
+                .withoutHeader("Sec-WebSocket-Protocol"));
+
+        testWebsocket("study-notification", true);
+        verify(1, getRequestedFor(urlPathEqualTo("/notify"))
+                .withQueryParam("access_token", absent())
+                .withoutHeader(HttpHeaders.AUTHORIZATION)
+                .withoutHeader("Sec-WebSocket-Protocol"));
+
+        testWebsocket("study-notification", false, true);
+        verify(1, getRequestedFor(urlPathEqualTo("/notify"))
+                .withQueryParam("access_token", absent())
+                .withoutHeader(HttpHeaders.AUTHORIZATION)
+                .withoutHeader("Sec-WebSocket-Protocol"));
+
+    }
+
+    @Test
+    void testUserIdAndRolesHeadersAreForwarded() {
+        resetAllRequests();
+        initStubForJwk();
+        stubFor(get(urlEqualTo("/v1/cases")).willReturn(aResponse()));
+
+        webClient.get().uri("case/v1/cases")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .exchange()
+                .expectStatus().isOk();
+
+        verify(1, getRequestedFor(urlEqualTo("/v1/cases"))
+                .withHeader("userId", equalTo("chmits"))
+                .withHeader("roles", equalTo("myRole")));
+
+        resetAllRequests();
+        webClient.get().uri("case/v1/cases")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer clientopaquetoken")
+                .exchange()
+                .expectStatus().isOk();
+
+        verify(1, getRequestedFor(urlEqualTo("/v1/cases"))
+                .withHeader("userId", equalTo("chmits"))
+                .withoutHeader("roles"));
     }
 
     @Test
@@ -669,8 +788,37 @@ class TokenValidationTest {
                 .exchange()
                 .expectStatus().isUnauthorized();
 
-        String tokenWithFakeAlgorithm = token.replaceFirst("U", "Q"); // RS256 -> RC256
-        String tokenWithFakeSub = token.replaceFirst("p", "h"); // chmits -> chmats
+        // simulate a tampered token
+        String tokenWithFakeAlgorithm = token.replaceFirst("U", "Q");
+
+        // ensure tampering setup went as expected
+        String fakedAlg = null;
+        Exception fakedAlgException = null;
+        try {
+            JWT jwtWithFakeAlgorithm = JWTParser.parse(tokenWithFakeAlgorithm);
+            fakedAlg = jwtWithFakeAlgorithm.getHeader().getAlgorithm().getName();
+        } catch (Exception e) {
+            fakedAlgException = e;
+        }
+        if (!"RC256".equals(fakedAlg)) {
+            throw new RuntimeException("Fake token algorithm is not correctly setup for test, expected 'RC256' but was: " + fakedAlg, fakedAlgException);
+        }
+
+        // simulate a tampered token
+        String tokenWithFakeSub = token.replaceFirst("taXRz", "tYXRz");
+
+        // ensure tampering setup went as expected
+        String fakedSub = null;
+        Exception fakedSubException = null;
+        try {
+            JWT jwtWithFakeSubject = JWTParser.parse(tokenWithFakeSub);
+            fakedSub = jwtWithFakeSubject.getJWTClaimsSet().getSubject();
+        } catch (Exception e) {
+            fakedSubException = e;
+        }
+        if (!"chmats".equals(fakedSub)) {
+            throw new RuntimeException("Fake token subject is not correctly setup for test, expected 'chmats' but was: " + fakedSub, fakedSubException);
+        }
 
         //test with token with a fake algorithm
         webClient

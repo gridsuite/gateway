@@ -131,4 +131,7 @@ public class ServiceURIsConfig {
 
     @Value("${gridsuite.services.snapshot-refiner-server.base-uri:http://snapshot-refiner-server/}")
     String snapshotRefinerServerBaseUri;
+
+    @Value("${gridsuite.services.rt-notification-server.base-uri:http://rt-notification-server/}")
+    String rtNotificationServerBaseUri;
 }
