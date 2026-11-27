@@ -18,7 +18,7 @@ It provides the following capabilities:
 - **Issuer / audience / client allow-listing**: only tokens issued by a configured allow-list of issuers are accepted; audience and/or client ID can optionally be restricted to a configured allow-list.
 - **User header propagation**: once a token is validated, the gateway injects the `userId` header (from the JWT `sub` claim, or from the introspected client ID for opaque tokens) and an optional `roles` header (from the JWT `profile` claim) into the request forwarded to downstream services. Downstream services never see or validate the original token — they trust the gateway.
 - **Connection tracking**: records accepted and refused connection attempts through `user-admin-server`, based on the presence/validity of the user ID.
-- **Supervision endpoint protection**: blocks direct external access to any `/v{n}/supervision/**` path across all proxied services (403 Forbidden), since these expose sensitive operational internals meant only for internal/admin use.
+- **Supervision endpoint protection**: blocks direct external access to any `supervision/**` path (with or without a leading `/v{n}` version segment) across all proxied services (403 Forbidden), since these expose sensitive operational internals meant only for internal/admin use. Matrix parameters (e.g. `;x`) on a path segment can't be used to bypass the check, and the already-parsed request path is used so percent-escapes aren't decoded twice. This protection assumes every service's `base-uri` is path-less (see `ServiceURIsConfig`); a `base-uri` with a path component would push `supervision` to a deeper segment and bypass it.
 - **Restricted-service access logging**: temporarily logs (without blocking) requests that reach the gateway for services no longer meant to be exposed directly, in order to safely track down remaining callers before removing routes.
 - **Observability**: Micrometer / Prometheus metrics (including Netty connection pool metrics) and Spring Boot Actuator endpoints.
 
@@ -59,7 +59,7 @@ Requests go through the following filters, executed in this order:
 |---|---|---|
 | 1 | `TokenValidatorGlobalPreFilter` | Extracts and validates the bearer token (signed JWT or opaque), enforces issuer/audience/client allow-lists, injects `userId`/`roles` headers. Rejects with `400`/`401` on missing/invalid/untrusted tokens. |
 | 2 | `UserAdminControlGlobalPreFilter` | Requires the `userId` header to be present (set by the previous filter); records a successful connection attempt via `user-admin-server`. Rejects with `401` if the header is missing. |
-| 3 | `SupervisionAccessControlFilter` | Blocks (`403`) any `/v{n}/supervision/**` path, regardless of which downstream service it targets. |
+| 3 | `SupervisionAccessControlFilter` | Blocks (`403`) any `supervision/**` path (with or without a leading `/v{n}` version segment), regardless of which downstream service it targets. |
 | 4 | `LoggingFilter` | Temporary diagnostic filter: logs an error (without blocking) when a request's *original* URL does not match one of a hard-coded set of still-allowed service prefixes, to help identify remaining direct callers of deprecated/restricted routes before they are removed. |
 
 All filters extend `AbstractGlobalPreFilter`, which centralizes error completion (`completeWithError`) and failed-connection recording through `UserAdminService`, and special-cases WebSocket handshakes by forcing the connection to close on error (to avoid connection reuse issues behind Apache httpd).

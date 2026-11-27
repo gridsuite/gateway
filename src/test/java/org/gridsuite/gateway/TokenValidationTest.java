@@ -365,6 +365,20 @@ class TokenValidationTest {
             .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
             .exchange()
             .expectStatus().isOk();
+
+        // A matrix parameter right after "supervision" must not be a way to bypass the filter,
+        // even though the downstream Spring MVC service would ignore it and still route to the
+        // protected controller.
+        webClient.get().uri("study/v1/supervision;x/studies")
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+            .exchange()
+            .expectStatus().isForbidden();
+
+        // Supervision endpoints with no version segment (e.g. dynamic-mapping-server) are blocked too.
+        webClient.get().uri("dynamic-mapping/supervision/filters")
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+            .exchange()
+            .expectStatus().isForbidden();
     }
 
     private void testToken(UUID elementUuid, String token) {
