@@ -13,8 +13,17 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * @author Chamseddine Benhamed <chamseddine.benhamed at rte-france.com>
- * @author Slimane Amar <slimane.amar at rte-france.com>
+ * Base URIs of the proxied microservices.
+ *
+ * <p>Every {@code base-uri} here must be path-less (only {@code scheme://host[:port]}, no
+ * trailing path segment such as {@code /some-prefix}). {@code EndPointServer.getRoute()}
+ * re-prepends this path, if any, to the forwarded request before
+ * {@link org.gridsuite.gateway.filters.SupervisionAccessControlFilter} runs; that filter
+ * assumes {@code supervision} is at a fixed segment position (first, or second after a
+ * version segment) to block access to supervision endpoints. A {@code base-uri} with a path
+ * component would push {@code supervision} to a deeper segment and silently bypass that
+ * protection. See {@link org.gridsuite.gateway.filters.SupervisionAccessControlFilter} for
+ * details.
  */
 @Configuration
 @Getter
