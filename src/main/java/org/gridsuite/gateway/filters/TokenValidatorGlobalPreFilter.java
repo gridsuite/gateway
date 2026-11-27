@@ -319,7 +319,13 @@ public class TokenValidatorGlobalPreFilter extends AbstractGlobalPreFilter {
         URI sanitizedRequestUri = removeAccessTokenQueryParameter(request.getURI());
         ServerHttpRequest sanitizedRequest = request.mutate()
                 .uri(sanitizedRequestUri)
-                .headers(headers -> headers.remove(HttpHeaders.AUTHORIZATION))
+                .headers(headers -> {
+                    headers.remove(HttpHeaders.AUTHORIZATION);
+                    // Always strip any client-supplied identity headers: these must only ever be
+                    // set by the gateway itself from a validated token, never forwarded from the caller.
+                    headers.remove(HEADER_USER_ID);
+                    headers.remove(HEADER_ROLES);
+                })
                 .build();
         URI gatewayRequestUrl = exchange.getAttribute(ServerWebExchangeUtils.GATEWAY_REQUEST_URL_ATTR);
         if (gatewayRequestUrl != null) {

@@ -100,6 +100,7 @@ class TokenValidationTest {
     private String tokenWithNotAllowedAudience;
     private String tokenWithValidClientId;
     private String tokenWithInvalidClientId;
+    private String tokenWithoutProfileClaim;
     private RSAKey rsaKey;
     private RSAKey rsaKey2;
 
@@ -180,6 +181,16 @@ class TokenValidationTest {
                 .expirationTime(new Date(new Date().getTime() + 60 * 1000))
                 .build();
 
+        // Prepare JWT with claims set, valid audience, but no "profile" claim (e.g. an access token
+        // or an ID token from an IdP that doesn't map a "profile" claim)
+        JWTClaimsSet claimsSetWithoutProfileClaim = new JWTClaimsSet.Builder()
+                .subject("chmits")
+                .audience("test.app")
+                .issuer("http://localhost:" + port)
+                .issueTime(new Date())
+                .expirationTime(new Date(new Date().getTime() + 60 * 1000))
+                .build();
+
         SignedJWT signedJWT = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(rsaJWK.getKeyID()).build(), claimsSet);
         SignedJWT signedJWT2 = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(rsaJWK2.getKeyID()).build(), claimsSet);
         SignedJWT signedJWTExpired = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(rsaJWK.getKeyID()).build(), claimsSetForExpiredToken);
@@ -187,6 +198,7 @@ class TokenValidationTest {
         SignedJWT signedJWTWithInvalidAudience = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(rsaJWK.getKeyID()).build(), claimsSetForInvalidAudience);
         SignedJWT signedJWTValidClientId = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(rsaJWK.getKeyID()).build(), claimsSetValidClientId);
         SignedJWT signedJWTInvalidClientId = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(rsaJWK.getKeyID()).build(), claimsSetInvalidClientId);
+        SignedJWT signedJWTWithoutProfileClaim = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(rsaJWK.getKeyID()).build(), claimsSetWithoutProfileClaim);
 
         // Compute the RSA signature
         signedJWT.sign(signer);
@@ -196,6 +208,7 @@ class TokenValidationTest {
         signedJWTWithInvalidAudience.sign(signer);
         signedJWTValidClientId.sign(signer);
         signedJWTInvalidClientId.sign(signer);
+        signedJWTWithoutProfileClaim.sign(signer);
 
         token = signedJWT.serialize();
         token2 = signedJWT2.serialize();
@@ -204,6 +217,7 @@ class TokenValidationTest {
         tokenWithNotAllowedAudience = signedJWTWithInvalidAudience.serialize();
         tokenWithValidClientId = signedJWTValidClientId.serialize();
         tokenWithInvalidClientId = signedJWTInvalidClientId.serialize();
+        tokenWithoutProfileClaim = signedJWTWithoutProfileClaim.serialize();
     }
 
     private void testWebsocket(String name, boolean useSubProtocolToken) throws Exception {
@@ -554,6 +568,56 @@ class TokenValidationTest {
         resetAllRequests();
         webClient.get().uri("case/v1/cases")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer clientopaquetoken")
+                .exchange()
+                .expectStatus().isOk();
+
+        verify(1, getRequestedFor(urlEqualTo("/v1/cases"))
+                .withHeader("userId", equalTo("chmits"))
+                .withoutHeader("roles"));
+    }
+
+    @Test
+    void testClientSuppliedIdentityHeadersAreNeverForwarded() {
+        // Regression test for a security issue where a client-forged "roles" (and "userId") header
+        // was forwarded unchanged to backend services whenever the incoming token had no "profile"
+        // claim (always the case for opaque tokens, and possibly for some JWTs depending on the IdP).
+        resetAllRequests();
+        initStubForJwk();
+        stubFor(get(urlEqualTo("/v1/cases")).willReturn(aResponse()));
+
+        // JWT without a "profile" claim: must not let a forged "roles" header through
+        webClient.get().uri("case/v1/cases")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenWithoutProfileClaim)
+                .header("roles", "ADMIN")
+                .header("userId", "attacker")
+                .exchange()
+                .expectStatus().isOk();
+
+        verify(1, getRequestedFor(urlEqualTo("/v1/cases"))
+                .withHeader("userId", equalTo("chmits"))
+                .withoutHeader("roles"));
+
+        resetAllRequests();
+
+        // JWT with a "profile" claim: the forged header must be overwritten, not merged/kept
+        webClient.get().uri("case/v1/cases")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .header("roles", "ADMIN")
+                .header("userId", "attacker")
+                .exchange()
+                .expectStatus().isOk();
+
+        verify(1, getRequestedFor(urlEqualTo("/v1/cases"))
+                .withHeader("userId", equalTo("chmits"))
+                .withHeader("roles", equalTo("myRole")));
+
+        resetAllRequests();
+
+        // Opaque token path: must not let a forged "roles" header through either
+        webClient.get().uri("case/v1/cases")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer clientopaquetoken")
+                .header("roles", "ADMIN")
+                .header("userId", "attacker")
                 .exchange()
                 .expectStatus().isOk();
 
